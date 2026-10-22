@@ -1,6 +1,10 @@
 package delta
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
+)
 
 // compareOnlyWhenConfigured are root items midPoint fills in when the
 // configuration leaves them out. They are configuration (Canonical keeps
@@ -138,7 +142,16 @@ func dropUnconfigured(desired, a map[string]any, path []string) {
 
 // alignValue returns a copy of a, the actual value of item name, aligned to
 // d, the desired value at the same position.
+//
+// midPoint returns a single value of a multi-valued item as that value, not
+// as a one-element list. Canonical wraps the names in normalize.MultiValued;
+// for any other item (an extension item, say) a one-element list of a scalar
+// and that same scalar are the same item value, so the actual one takes the
+// desired shape.
 func alignValue(name string, d, a any) any {
+	if v, ok := alignSingleValue(name, d, a); ok {
+		return v
+	}
 	switch at := a.(type) {
 	case map[string]any:
 		dm, ok := d.(map[string]any)
@@ -158,6 +171,32 @@ func alignValue(name string, d, a any) any {
 	default:
 		return deepCopy(a)
 	}
+}
+
+// alignSingleValue returns a in the shape of d when one of them is a
+// one-element list holding a scalar and the other is that scalar, and name
+// is not a normalize.MultiValued item (Canonical already makes those lists
+// on both sides).
+func alignSingleValue(name string, d, a any) (any, bool) {
+	if normalize.MultiValued[name] {
+		return nil, false
+	}
+	if dl, ok := d.([]any); ok && len(dl) == 1 && isScalar(dl[0]) && isScalar(a) && normalize.Equal(dl[0], a) {
+		return []any{a}, true
+	}
+	if al, ok := a.([]any); ok && len(al) == 1 && isScalar(al[0]) && isScalar(d) && normalize.Equal(al[0], d) {
+		return al[0], true
+	}
+	return nil, false
+}
+
+// isScalar reports whether v is a present value other than a map or a list.
+func isScalar(v any) bool {
+	switch v.(type) {
+	case nil, map[string]any, []any:
+		return false
+	}
+	return true
 }
 
 func alignMap(d, a map[string]any) map[string]any {

@@ -556,3 +556,49 @@ resource "midpoint_role" "r" {
 		CheckDestroy: checkGone(s, "roles", &oid),
 	})
 }
+
+// TestRole_singleValueExtensionListConverges configures an extension item
+// that is not a known multi-valued item as a one-element list. midPoint
+// returns a single value as that value, not a list; the plan stays clean
+// and nothing is sent.
+func TestRole_singleValueExtensionListConverges(t *testing.T) {
+	s := newTestStub(t)
+	const addr = "midpoint_role.r"
+	const cfg = `
+resource "midpoint_role" "r" {
+  name      = "extended"
+  extension = { costCenter = ["CC-1"] }
+}
+`
+	var oid string
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					captureOID(addr, &oid),
+					// What midPoint returns for a single value.
+					checkStub(func() error {
+						body := s.Get("roles", oid)
+						body["extension"] = map[string]any{"costCenter": "CC-1"}
+						s.Put("roles", body)
+						return nil
+					}),
+				),
+			},
+			refreshIsClean(),
+			{Config: cfg, PlanOnly: true},
+			{
+				Config: cfg,
+				Check: checkStub(func() error {
+					if patches := requests(s, "PATCH"); len(patches) != 0 {
+						return fmt.Errorf("a single value must not PATCH, got %+v", patches)
+					}
+					return nil
+				}),
+			},
+		},
+		CheckDestroy: checkGone(s, "roles", &oid),
+	})
+}

@@ -27,6 +27,7 @@ var requiredComputeCases = []string{
 	"nested_objecttype_attribute_add",
 	"reference_filter_only_needs_reevaluation",
 	"extension_scalar_replace",
+	"extension_single_value_list_no_change",
 }
 
 // needsReevaluation lists the cases whose deltas carry a filter-only

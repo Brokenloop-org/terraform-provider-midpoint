@@ -130,6 +130,26 @@ func TestAlign(t *testing.T) {
 			wantActual: `{"activity":{"work":{},"binding":"x"}}`,
 		},
 		{
+			// midPoint returns a single value of an extension item as that
+			// value; the configured one-element list is the same value.
+			name:       "single_value_list_matches_scalar",
+			desired:    `{"extension":{"costCenter":["a"],"level":[3]}}`,
+			actual:     `{"extension":{"costCenter":"a","level":3.0}}`,
+			wantActual: `{"extension":{"costCenter":["a"],"level":[3.0]}}`,
+		},
+		{
+			name:       "scalar_matches_single_value_list",
+			desired:    `{"extension":{"costCenter":"a"}}`,
+			actual:     `{"extension":{"costCenter":["a"]}}`,
+			wantActual: `{"extension":{"costCenter":"a"}}`,
+		},
+		{
+			name:       "single_value_list_other_value_untouched",
+			desired:    `{"extension":{"costCenter":["a"],"tags":["x","y"],"obj":[{"k":"a"}]}}`,
+			actual:     `{"extension":{"costCenter":"b","tags":"x","obj":{"k":"a"}}}`,
+			wantActual: `{"extension":{"costCenter":"b","tags":"x","obj":{"k":"a"}}}`,
+		},
+		{
 			name:       "unmatched_reference_untouched",
 			desired:    `{"assignment":[{"targetRef":{"oid":"r1"}}]}`,
 			actual:     `{"assignment":[{"@id":1,"targetRef":{"oid":"r2","type":"RoleType","relation":"org:default"}}]}`,
