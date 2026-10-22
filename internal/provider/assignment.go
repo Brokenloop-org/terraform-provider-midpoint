@@ -151,6 +151,7 @@ func assignmentFromJSON(restType, item string, v map[string]any, prior map[strin
 	for k, e := range v {
 		rest[k] = e
 	}
+	p, hasPrior := prior[delta.Key(item, v)]
 	if tr, present := rest["targetRef"]; present {
 		m, isMap := tr.(map[string]any)
 		if !isMap {
@@ -159,6 +160,13 @@ func assignmentFromJSON(restType, item string, v map[string]any, prior map[strin
 		t, refOK := refFromJSON(m)
 		if !refOK {
 			return a, false
+		}
+		// The prior spelling of the relation ("manager", "default") is
+		// kept when midPoint stores it qualified.
+		if hasPrior && p.Target != nil {
+			if pr, known := knownValue(p.Target.Relation); known && qualifiedRelation(pr) == t.Relation.ValueString() {
+				t.Relation = p.Target.Relation
+			}
 		}
 		a.Target = &t
 		delete(rest, "targetRef")
@@ -175,7 +183,6 @@ func assignmentFromJSON(restType, item string, v map[string]any, prior map[strin
 		a.Order = types.Int64Value(i)
 		delete(rest, "order")
 	}
-	p, hasPrior := prior[delta.Key(item, v)]
 	same := func(field string, priorText jsontypes.Normalized, actual any) bool {
 		if !hasPrior {
 			return false

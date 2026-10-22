@@ -195,6 +195,27 @@ func focusCases() []focusCase {
 			},
 		},
 		{
+			// An unqualified relation is in the org: namespace: written
+			// qualified, as midPoint returns it, and read back with the
+			// configured spelling; "default" is the default relation.
+			name: "unqualified_relations", kind: roleKind,
+			m: func(t *testing.T) focusModel {
+				m := baseModel()
+				m.Name = str("unqualified")
+				m.Assignments = []assignmentModel{block(target(fRoleOID, "OrgType")), block(target(fServiceOID, "OrgType"))}
+				m.Assignments[0].Target.Relation = str("manager")
+				m.Assignments[1].Target.Relation = str("default")
+				return m
+			},
+			want: map[string]any{
+				"name": "unqualified",
+				"assignment": []any{
+					map[string]any{"targetRef": map[string]any{"oid": fRoleOID, "type": "OrgType", "relation": "org:manager"}},
+					map[string]any{"targetRef": map[string]any{"oid": fServiceOID, "type": "OrgType"}},
+				},
+			},
+		},
+		{
 			name: "archetype_holder_type", kind: archetypeKind,
 			m: func(t *testing.T) focusModel {
 				m := baseModel()

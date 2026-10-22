@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -43,17 +44,29 @@ func targetBlock() schema.SingleNestedBlock {
 				Optional:    true,
 			},
 			"relation": schema.StringAttribute{
-				Description: "Relation of the reference. Defaults to org:default.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString(defaultRelation),
+				Description: "Relation of the reference, e.g. org:manager. Defaults to org:default. A name without a " +
+					"prefix is in the org: namespace, as midPoint stores it: manager is written org:manager.",
+				Optional:   true,
+				Computed:   true,
+				Default:    stringdefault.StaticString(defaultRelation),
+				Validators: []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 		},
 	}
 }
 
-// refToJSON is the midPoint reference for t; the default relation is left
-// out, so a configured and a server reference compare alike.
+// qualifiedRelation is the relation midPoint stores for s: a name without a
+// namespace prefix is in the org: namespace ("manager" is "org:manager").
+func qualifiedRelation(s string) string {
+	if strings.Contains(s, ":") {
+		return s
+	}
+	return "org:" + s
+}
+
+// refToJSON is the midPoint reference for t; the relation is qualified
+// (qualifiedRelation) and the default relation is left out, so a
+// configured and a server reference compare alike.
 func refToJSON(t targetRef) map[string]any {
 	out := map[string]any{}
 	if s, ok := knownValue(t.OID); ok {
@@ -62,8 +75,8 @@ func refToJSON(t targetRef) map[string]any {
 	if s, ok := knownValue(t.Type); ok {
 		out["type"] = s
 	}
-	if s, ok := knownValue(t.Relation); ok && s != defaultRelation {
-		out["relation"] = s
+	if s, ok := knownValue(t.Relation); ok && qualifiedRelation(s) != defaultRelation {
+		out["relation"] = qualifiedRelation(s)
 	}
 	if s, ok := knownValue(t.Filter); ok {
 		out["filter"] = map[string]any{"text": s}

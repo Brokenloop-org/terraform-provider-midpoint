@@ -43,7 +43,7 @@ const defaultRelation = "org:default"
 // to their orig string, wraps single values of MultiValued items into
 // one-element lists, drops the "#" or "c:" prefix of type QName string
 // values ("#UserType" is "UserType"), gives references without a relation
-// "org:default",
+// "org:default" and an unqualified relation the org: prefix,
 // prunes maps and lists that only became empty through stripping, and keeps
 // container "@id"s.
 func Canonical(restType string, body map[string]any) map[string]any {
@@ -189,7 +189,8 @@ func isReference(name string) bool {
 }
 
 // canonicalReference strips the c: prefix from the type of each reference
-// value in v and fills in the default relation. v is already a canonical
+// value in v, fills in the default relation and qualifies an unqualified
+// relation with org:. v is already a canonical
 // copy, so it is modified in place.
 func canonicalReference(v any) any {
 	switch t := v.(type) {
@@ -197,8 +198,15 @@ func canonicalReference(v any) any {
 		if s, ok := t["type"].(string); ok {
 			t["type"] = strings.TrimPrefix(s, "c:")
 		}
-		if t["relation"] == nil {
+		switch r := t["relation"].(type) {
+		case nil:
 			t["relation"] = defaultRelation
+		case string:
+			// midPoint stores an unqualified relation in the org:
+			// namespace: "manager" is returned as "org:manager".
+			if !strings.Contains(r, ":") {
+				t["relation"] = "org:" + r
+			}
 		}
 	case []any:
 		for _, e := range t {

@@ -37,6 +37,7 @@ var requiredCases = []string{
 	"strips_key_prefixes",
 	"reference_type_prefix",
 	"reference_default_relation",
+	"reference_unqualified_relation",
 	"drops_targetName",
 	"folds_polystring_name",
 	"task_strips_execution_state",

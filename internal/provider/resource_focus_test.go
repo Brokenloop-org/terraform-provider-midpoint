@@ -491,3 +491,68 @@ resource "midpoint_role" "r" {
 		CheckDestroy: checkGone(s, "roles", &oid),
 	})
 }
+
+// TestRole_unqualifiedRelationConverges writes relation = "manager": it is
+// sent as org:manager, the name midPoint stores, so the plan is clean after
+// the apply and the refresh, and the state keeps the configured spelling.
+// An empty relation is invalid.
+func TestRole_unqualifiedRelationConverges(t *testing.T) {
+	s := newTestStub(t)
+	const addr = "midpoint_role.r"
+	cfg := func(relation string) string {
+		return fmt.Sprintf(`
+resource "midpoint_role" "r" {
+  name = "managers"
+
+  assignment {
+    target {
+      oid      = %q
+      type     = "OrgType"
+      relation = %q
+    }
+  }
+}
+`, stubOtherOID, relation)
+	}
+	var oid string
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{Config: cfg(""), ExpectError: regexp.MustCompile(`(?s)relation.*at least 1`)},
+			{
+				Config: cfg("manager"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					captureOID(addr, &oid),
+					resource.TestCheckResourceAttr(addr, "assignment.0.target.relation", "manager"),
+					checkStub(func() error {
+						body, err := onePost(t, s, "/roles", []string{"isImport", "raw"})
+						if err != nil {
+							return err
+						}
+						want := asJSON(t, []any{map[string]any{"targetRef": map[string]any{
+							"oid": stubOtherOID, "type": "OrgType", "relation": "org:manager",
+						}}})
+						if got := body["assignment"]; !reflect.DeepEqual(got, want) {
+							return fmt.Errorf("assignment = %v, want %v", got, want)
+						}
+						return nil
+					}),
+				),
+			},
+			refreshIsClean(),
+			{Config: cfg("manager"), PlanOnly: true},
+			{
+				// The qualified spelling is the same relation: no change.
+				Config: cfg("org:manager"),
+				Check: checkStub(func() error {
+					if patches := requests(s, "PATCH"); len(patches) != 0 {
+						return fmt.Errorf("the same relation must not PATCH, got %+v", patches)
+					}
+					return nil
+				}),
+			},
+			{Config: cfg("org:manager"), PlanOnly: true},
+		},
+		CheckDestroy: checkGone(s, "roles", &oid),
+	})
+}
