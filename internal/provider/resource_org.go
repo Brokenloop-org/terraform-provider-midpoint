@@ -37,11 +37,8 @@ func (s *orgState) setModel(m focusModel) {
 
 // NewOrgResource returns the midpoint_org resource.
 func NewOrgResource() resource.Resource {
-	return &focusResource[orgState, *orgState]{
-		kind: orgKind,
-		attributes: map[string]schema.Attribute{
-			"authorization": authorizationAttribute(),
-			"tenant":        schema.BoolAttribute{Description: "Whether the org is a tenant.", Optional: true},
-		},
-	}
+	return newFocusResource[orgState](orgKind, map[string]schema.Attribute{
+		"authorization": authorizationAttribute(),
+		"tenant":        schema.BoolAttribute{Description: "Whether the org is a tenant.", Optional: true},
+	})
 }

@@ -47,8 +47,8 @@ func authorizationAttribute() schema.Attribute {
 
 // NewRoleResource returns the midpoint_role resource.
 func NewRoleResource() resource.Resource {
-	return &focusResource[roleLikeState, *roleLikeState]{
-		kind:       roleKind,
-		attributes: map[string]schema.Attribute{"authorization": authorizationAttribute()},
-	}
+	return newFocusResource[roleLikeState](
+		roleKind,
+		map[string]schema.Attribute{"authorization": authorizationAttribute()},
+	)
 }

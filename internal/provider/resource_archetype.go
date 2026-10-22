@@ -38,20 +38,17 @@ func (s *archetypeState) setModel(m focusModel) {
 
 // NewArchetypeResource returns the midpoint_archetype resource.
 func NewArchetypeResource() resource.Resource {
-	return &focusResource[archetypeState, *archetypeState]{
-		kind: archetypeKind,
-		attributes: map[string]schema.Attribute{
-			"authorization": authorizationAttribute(),
-			"holder_type": schema.ListAttribute{
-				Description: "Object types that may hold the archetype, e.g. [\"RoleType\"]; written as the " +
-					"assignmentRelation assignment (holderType #RoleType).",
-				Optional:    true,
-				ElementType: types.StringType,
-			},
-			"archetype_policy": schema.DynamicAttribute{
-				Description: "Archetype policy (archetypePolicy) in midPoint naming, e.g. { display = { label = \"Cluster\" } }.",
-				Optional:    true,
-			},
+	return newFocusResource[archetypeState](archetypeKind, map[string]schema.Attribute{
+		"authorization": authorizationAttribute(),
+		"holder_type": schema.ListAttribute{
+			Description: "Object types that may hold the archetype, e.g. [\"RoleType\"]; written as the " +
+				"assignmentRelation assignment (holderType #RoleType).",
+			Optional:    true,
+			ElementType: types.StringType,
 		},
-	}
+		"archetype_policy": schema.DynamicAttribute{
+			Description: "Archetype policy (archetypePolicy) in midPoint naming, e.g. { display = { label = \"Cluster\" } }.",
+			Optional:    true,
+		},
+	})
 }

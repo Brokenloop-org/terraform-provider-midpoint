@@ -18,8 +18,8 @@ var serviceKind = focusKind{
 
 // NewServiceResource returns the midpoint_service resource.
 func NewServiceResource() resource.Resource {
-	return &focusResource[roleLikeState, *roleLikeState]{
-		kind:       serviceKind,
-		attributes: map[string]schema.Attribute{"authorization": authorizationAttribute()},
-	}
+	return newFocusResource[roleLikeState](
+		serviceKind,
+		map[string]schema.Attribute{"authorization": authorizationAttribute()},
+	)
 }
