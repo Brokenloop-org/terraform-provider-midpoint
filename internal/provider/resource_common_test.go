@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
@@ -29,4 +31,29 @@ func newTestStub(t *testing.T) *mpstub.Server {
 	s := mpstub.New()
 	t.Cleanup(s.Close)
 	return s
+}
+
+func TestStateBody_dropsOIDAndContainerIDs(t *testing.T) {
+	in := map[string]any{
+		"oid":  "o",
+		"name": "n",
+		"inducement": []any{map[string]any{
+			"@id":       json.Number("3"),
+			"targetRef": map[string]any{"oid": "t", "relation": "org:default"},
+			"condition": map[string]any{"@id": json.Number("4"), "source": []any{map[string]any{"path": "x"}}},
+		}},
+	}
+	want := map[string]any{
+		"name": "n",
+		"inducement": []any{map[string]any{
+			"targetRef": map[string]any{"oid": "t", "relation": "org:default"},
+			"condition": map[string]any{"source": []any{map[string]any{"path": "x"}}},
+		}},
+	}
+	if got := stateBody(in); !reflect.DeepEqual(got, want) {
+		t.Errorf("stateBody = %v, want %v", got, want)
+	}
+	if in["oid"] != "o" || in["inducement"].([]any)[0].(map[string]any)["@id"] == nil {
+		t.Error("stateBody modified its input")
+	}
 }

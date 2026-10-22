@@ -9,6 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
 )
 
 // commonAttributes are the attributes every midPoint resource has:
@@ -62,4 +64,42 @@ func configuredData(req resource.ConfigureRequest, resp *resource.ConfigureRespo
 		return nil
 	}
 	return data
+}
+
+// canonicalName is the canonical name of body, null when it has none.
+func canonicalName(restType string, body map[string]any) types.String {
+	if s, ok := normalize.Canonical(restType, body)["name"].(string); ok {
+		return types.StringValue(s)
+	}
+	return types.StringNull()
+}
+
+// stateBody is a canonical server body as stored in state: without the root
+// oid (it is the oid attribute) and without container "@id"s (server
+// identifiers, never configuration). It never mutates body.
+func stateBody(body map[string]any) map[string]any {
+	out := stripIDs(body).(map[string]any)
+	delete(out, "oid")
+	return out
+}
+
+func stripIDs(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(t))
+		for k, e := range t {
+			if k != "@id" {
+				out[k] = stripIDs(e)
+			}
+		}
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, e := range t {
+			out[i] = stripIDs(e)
+		}
+		return out
+	default:
+		return v
+	}
 }

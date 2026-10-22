@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"sync/atomic"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -272,6 +273,22 @@ func TestObject_adoptExisting(t *testing.T) {
 					if posts := requests(s, "POST"); len(posts) != 0 {
 						return fmt.Errorf("adoption must not POST, got %+v", posts)
 					}
+					if puts := requests(s, "PUT"); len(puts) != 0 {
+						return fmt.Errorf("adoption must not PUT, got %+v", puts)
+					}
+					// Adoption sends exactly the configured diff: the changed
+					// description and the removal of the unconfigured riskLevel.
+					patches := requests(s, "PATCH")
+					if len(patches) != 1 || patches[0].Path != "/roles/"+objRoleOID {
+						return fmt.Errorf("want exactly one PATCH /roles/%s, got %+v", objRoleOID, patches)
+					}
+					wantPatch := map[string]any{"objectModification": map[string]any{"itemDelta": []any{
+						map[string]any{"modificationType": "replace", "path": "description", "value": "customized"},
+						map[string]any{"modificationType": "replace", "path": "riskLevel"},
+					}}}
+					if got := asJSON(t, patches[0].Body); !reflect.DeepEqual(got, asJSON(t, wantPatch)) {
+						return fmt.Errorf("PATCH body = %v, want %v", got, wantPatch)
+					}
 					got := stubBody(s, "roles", objRoleOID)
 					want := map[string]any{"oid": objRoleOID, "name": "Built-in", "description": "customized"}
 					if !reflect.DeepEqual(got, want) {
@@ -409,31 +426,6 @@ func TestObjectSpec(t *testing.T) {
 	}
 }
 
-func TestStateBody_dropsOIDAndContainerIDs(t *testing.T) {
-	in := map[string]any{
-		"oid":  "o",
-		"name": "n",
-		"inducement": []any{map[string]any{
-			"@id":       json.Number("3"),
-			"targetRef": map[string]any{"oid": "t", "relation": "org:default"},
-			"condition": map[string]any{"@id": json.Number("4"), "source": []any{map[string]any{"path": "x"}}},
-		}},
-	}
-	want := map[string]any{
-		"name": "n",
-		"inducement": []any{map[string]any{
-			"targetRef": map[string]any{"oid": "t", "relation": "org:default"},
-			"condition": map[string]any{"source": []any{map[string]any{"path": "x"}}},
-		}},
-	}
-	if got := stateBody(in); !reflect.DeepEqual(got, want) {
-		t.Errorf("stateBody = %v, want %v", got, want)
-	}
-	if in["oid"] != "o" || in["inducement"].([]any)[0].(map[string]any)["@id"] == nil {
-		t.Error("stateBody modified its input")
-	}
-}
-
 func TestObject_bodyOIDChangeReplaces(t *testing.T) {
 	s := newTestStub(t)
 	cfg := func(oid string) string {
@@ -469,6 +461,114 @@ func TestObject_bodyOIDChangeReplaces(t *testing.T) {
 				}
 			}
 			return nil
+		},
+	})
+}
+
+// failReadBack makes the first GET of restType/oid after a request with
+// method after fail with status, once. fired reports whether it did.
+func failReadBack(s *mpstub.Server, after, restType, oid string, status int) (fired func() bool) {
+	var written, done atomic.Bool
+	s.SetFault(func(r mpstub.Recorded) int {
+		switch {
+		case r.Method == after:
+			written.Store(true)
+		case written.Load() && !done.Load() && r.Method == "GET" && r.Path == "/"+restType+"/"+oid:
+			done.Store(true)
+			return status
+		}
+		return 0
+	})
+	return done.Load
+}
+
+// TestObject_readBackFailureDoesNotTaint: when the write succeeds but the
+// read-back fails, the object stays in state untainted (a warning, not an
+// error), so the next plan never replaces (deletes) it.
+func TestObject_readBackFailureDoesNotTaint(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		adopt  bool
+		after  string
+		status int
+	}{
+		{"create, server error", false, "POST", 500},
+		{"create, not found", false, "POST", 404},
+		{"adopt, server error", true, "PATCH", 500},
+		{"adopt, not found", true, "PATCH", 404},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newTestStub(t)
+			if tc.adopt {
+				s.Put("roles", map[string]any{"oid": objRoleOID, "name": "Read-back role", "description": "original"})
+			}
+			fired := failReadBack(s, tc.after, "roles", objRoleOID, tc.status)
+			cfg := objectConfig(fmt.Sprintf(`
+  type           = "roles"
+  oid            = %q
+  adopt_existing = %t
+  body = {
+    name        = "Read-back role"
+    description = "configured"
+  }
+`, objRoleOID, tc.adopt))
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: stubProviderFactories(t, s),
+				Steps: []resource.TestStep{
+					{
+						Config: cfg,
+						Check: resource.ComposeAggregateTestCheckFunc(
+							resource.TestCheckResourceAttr(objAddr, "oid", objRoleOID),
+							checkStub(func() error {
+								if !fired() {
+									return fmt.Errorf("the read-back fault did not fire")
+								}
+								if got := stubBody(s, "roles", objRoleOID)["description"]; got != "configured" {
+									return fmt.Errorf("stored description = %v", got)
+								}
+								return nil
+							}),
+						),
+					},
+					{
+						Config: cfg,
+						ConfigPlanChecks: resource.ConfigPlanChecks{
+							PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(objAddr, plancheck.ResourceActionNoop)},
+						},
+					},
+				},
+			})
+		})
+	}
+}
+
+// TestObject_updateReadBackFailureIsError: a failed read-back after an
+// update stays an error (an update failure does not taint).
+func TestObject_updateReadBackFailureIsError(t *testing.T) {
+	s := newTestStub(t)
+	cfg := func(desc string) string {
+		return objectConfig(fmt.Sprintf(`
+  type = "roles"
+  oid  = %q
+  body = { name = "Update role", description = %q }
+`, objRoleOID, desc))
+	}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{Config: cfg("before")},
+			{
+				PreConfig:   func() { failReadBack(s, "PATCH", "roles", objRoleOID, 500) },
+				Config:      cfg("after"),
+				ExpectError: regexp.MustCompile(`Cannot read object`),
+			},
+			{
+				PreConfig: func() { s.SetFault(nil) },
+				Config:    cfg("after"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(objAddr, plancheck.ResourceActionNoop)},
+				},
+			},
 		},
 	})
 }

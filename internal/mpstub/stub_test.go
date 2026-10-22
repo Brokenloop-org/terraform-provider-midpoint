@@ -501,3 +501,32 @@ func TestStubRequests_recordsMethodPathQueryBody(t *testing.T) {
 		map[string]any{"modificationType": "replace", "path": "description", "value": "x"},
 	}}})
 }
+
+func TestStubSetFault(t *testing.T) {
+	s, c := newStub(t)
+	s.Put("roles", map[string]any{"oid": roleOID, "name": "r1"})
+	ctx := context.Background()
+	failed := 0
+	s.SetFault(func(r Recorded) int {
+		if r.Method == http.MethodGet && failed == 0 {
+			failed++
+			return http.StatusInternalServerError
+		}
+		return 0
+	})
+	_, err := c.Get(ctx, "roles", roleOID, client.GetOptions{})
+	var apiErr *client.APIError
+	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusInternalServerError {
+		t.Fatalf("faulted GET: err = %v, want an HTTP 500 APIError", err)
+	}
+	if _, err := c.Get(ctx, "roles", roleOID, client.GetOptions{}); err != nil {
+		t.Fatalf("GET after the fault: %v", err)
+	}
+	if n := len(s.Requests()); n != 2 {
+		t.Errorf("faulted requests are recorded too: got %d records, want 2", n)
+	}
+	s.SetFault(nil)
+	if _, err := c.Get(ctx, "roles", roleOID, client.GetOptions{}); err != nil {
+		t.Fatalf("GET after clearing the fault: %v", err)
+	}
+}

@@ -306,6 +306,38 @@ func (e *engine) readInto(ctx context.Context, oid string, desired map[string]an
 	return true, diags
 }
 
+// readAfterWrite reads the object oid back right after a write and compares
+// it with desired, keeping the configured state (readInto with afterWrite;
+// a difference is the readInto warning).
+//
+// created says the write was a create or an adoption and the resource has
+// already recorded the object in state. A read-back failure (transport or
+// API error, or the object not found) is then a warning: an error would
+// taint the object, and the next apply would replace it, deleting an object
+// that was written successfully (or a built-in that was adopted). The next
+// refresh reconciles the state. After an update (created false) the
+// failures stay errors; a failed update does not taint.
+func (e *engine) readAfterWrite(ctx context.Context, oid string, desired map[string]any, created bool) diag.Diagnostics {
+	found, diags := e.readInto(ctx, oid, desired, true, func(map[string]any) {})
+	if !found && !diags.HasError() {
+		diags.AddError("Object not found after write",
+			fmt.Sprintf("%s was written but cannot be read back", e.ref(oid)))
+	}
+	if !created || !diags.HasError() {
+		return diags
+	}
+	var out diag.Diagnostics
+	for _, d := range diags {
+		if d.Severity() != diag.SeverityError {
+			out.Append(d)
+			continue
+		}
+		out.AddWarning(d.Summary(), fmt.Sprintf("%s. %s was written and is kept in state with the configured values; the next refresh reconciles it with midPoint.",
+			strings.TrimSuffix(d.Detail(), "."), e.ref(oid)))
+	}
+	return out
+}
+
 // differingItems lists, sorted, the top-level items (not "@" annotations)
 // whose values differ between two aligned canonical bodies.
 func differingItems(d, a map[string]any) []string {

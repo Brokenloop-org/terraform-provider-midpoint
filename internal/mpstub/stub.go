@@ -72,6 +72,7 @@ type Server struct {
 	requests     []Recorded
 	reportTotals bool
 	seq          int
+	fault        func(Recorded) int
 }
 
 // New starts a stub. Point a client.Config.URL at URL() and Close it when
@@ -125,6 +126,16 @@ func (s *Server) ReportTotals(on bool) {
 	s.reportTotals = on
 }
 
+// SetFault installs fn, which sees every request after it is recorded and
+// returns an HTTP status to fail it with (the request is then not
+// processed), or 0 to let it through. fn runs with the stub locked, so it
+// must not call the stub. nil removes the fault.
+func (s *Server) SetFault(fn func(Recorded) int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.fault = fn
+}
+
 func (s *Server) store(typ string, body map[string]any) string {
 	oid, _ := body["oid"].(string)
 	if oid == "" {
@@ -171,6 +182,12 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		rec.Body = clone(body).(map[string]any)
 	}
 	s.requests = append(s.requests, rec)
+	if s.fault != nil {
+		if status := s.fault(rec); status != 0 {
+			writeError(w, status, fmt.Sprintf("injected fault: %s %s", r.Method, rel))
+			return
+		}
+	}
 
 	seg := strings.Split(strings.Trim(rel, "/"), "/")
 	switch {

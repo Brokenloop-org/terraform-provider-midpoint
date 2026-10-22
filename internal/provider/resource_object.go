@@ -21,7 +21,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/jplana/terraform-provider-midpoint/internal/client"
-	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
 )
 
 var (
@@ -197,44 +196,6 @@ func desiredBody(ctx context.Context, m objectModel) (map[string]any, diag.Diagn
 	return body, diags
 }
 
-// canonicalName is the canonical name of body, null when it has none.
-func canonicalName(restType string, body map[string]any) types.String {
-	if s, ok := normalize.Canonical(restType, body)["name"].(string); ok {
-		return types.StringValue(s)
-	}
-	return types.StringNull()
-}
-
-// stateBody is a canonical server body as stored in state: without the root
-// oid (it is the oid attribute) and without container "@id"s (server
-// identifiers, never configuration). It never mutates body.
-func stateBody(body map[string]any) map[string]any {
-	out := stripIDs(body).(map[string]any)
-	delete(out, "oid")
-	return out
-}
-
-func stripIDs(v any) any {
-	switch t := v.(type) {
-	case map[string]any:
-		out := make(map[string]any, len(t))
-		for k, e := range t {
-			if k != "@id" {
-				out[k] = stripIDs(e)
-			}
-		}
-		return out
-	case []any:
-		out := make([]any, len(t))
-		for i, e := range t {
-			out[i] = stripIDs(e)
-		}
-		return out
-	default:
-		return v
-	}
-}
-
 func (r *objectResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
 		return // destroy
@@ -323,9 +284,11 @@ func (r *objectResource) Create(ctx context.Context, req resource.CreateRequest,
 	plan.ID = types.StringValue(oid)
 	plan.Name = canonicalName(plan.Type.ValueString(), desired)
 	// Record the object before reading it back, so that it is never
-	// orphaned.
+	// orphaned; readAfterWrite then reports read-back failures as warnings,
+	// because an error now would taint the object and the next apply would
+	// replace (delete) it.
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-	r.readAfterWrite(ctx, eng, oid, desired, &resp.Diagnostics)
+	resp.Diagnostics.Append(eng.readAfterWrite(ctx, oid, desired, true)...)
 }
 
 func (r *objectResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -352,18 +315,7 @@ func (r *objectResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	plan.Name = canonicalName(plan.Type.ValueString(), desired)
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-	r.readAfterWrite(ctx, eng, state.OID.ValueString(), desired, &resp.Diagnostics)
-}
-
-// readAfterWrite reads the object back after a write. The state keeps the
-// configured values; a difference only produces the engine's warning.
-func (r *objectResource) readAfterWrite(ctx context.Context, eng *engine, oid string, desired map[string]any, diags *diag.Diagnostics) {
-	found, d := eng.readInto(ctx, oid, desired, true, func(map[string]any) {})
-	diags.Append(d...)
-	if !found && !d.HasError() {
-		diags.AddError("Object not found after write",
-			fmt.Sprintf("%s/%s was written but cannot be read back", eng.spec.RestType, oid))
-	}
+	resp.Diagnostics.Append(eng.readAfterWrite(ctx, state.OID.ValueString(), desired, false)...)
 }
 
 func (r *objectResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
