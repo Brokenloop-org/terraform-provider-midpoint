@@ -49,11 +49,24 @@ type typedResource[S any] struct {
 	fromBody func(ctx context.Context, s *S, actual map[string]any) diag.Diagnostics
 	// validate checks the configuration; nil for none.
 	validate func(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse)
-	// onImport sets kind-specific attributes or private state after an
-	// import by OID; nil for none.
+	// onImport sets kind-specific attributes after an import by OID (which
+	// also marks the object preexisting); nil for none.
 	onImport func(ctx context.Context, resp *resource.ImportStateResponse)
 
 	data *providerData
+}
+
+// preexistingKey is the private state key that marks an object the
+// provider did not create: it was imported or adopted. Create-only
+// attributes (a task's initial_execution_state) are then not known, and a
+// change to them never re-creates the object.
+const preexistingKey = "preexisting"
+
+// markPreexisting sets preexistingKey in private.
+func markPreexisting(ctx context.Context, private interface {
+	SetKey(context.Context, string, []byte) diag.Diagnostics
+}) diag.Diagnostics {
+	return private.SetKey(ctx, preexistingKey, []byte("true"))
 }
 
 // commonModel maps identityAttributes and commonAttributes; the state
@@ -208,6 +221,7 @@ func (r *typedResource[S]) Create(ctx context.Context, req resource.CreateReques
 		if resp.Diagnostics.HasError() {
 			return
 		}
+		resp.Diagnostics.Append(markPreexisting(ctx, resp.Private)...)
 	}
 	// Recorded before the read-back, so the object is never orphaned.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &s)...)
@@ -298,6 +312,7 @@ func (r *typedResource[S]) ImportState(ctx context.Context, req resource.ImportS
 	} {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(name), v)...)
 	}
+	resp.Diagnostics.Append(markPreexisting(ctx, resp.Private)...)
 	if r.onImport != nil {
 		r.onImport(ctx, resp)
 	}

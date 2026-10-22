@@ -172,11 +172,13 @@ func (e *engine) canonicalPair(desired, actual map[string]any) (d, a map[string]
 // cannot be expressed as item deltas. ctx is reserved for logging.
 func (e *engine) reconcile(_ context.Context, desired, actual map[string]any) (equal bool, deltas []client.ItemDelta, err error) {
 	cd, ca := e.canonicalPair(desired, actual)
-	d, a := delta.Align(cd, ca)
+	d, a := delta.AlignForType(e.spec.RestType, cd, ca)
 	if normalize.Equal(d, a) {
 		return true, nil, nil
 	}
-	deltas, err = delta.Compute(cd, ca)
+	// Compute aligns again without the type; the type-aligned pair keeps
+	// it from deleting items compared only when configured for the type.
+	deltas, err = delta.Compute(d, a)
 	return false, deltas, err
 }
 
@@ -289,7 +291,8 @@ func (e *engine) readInto(ctx context.Context, oid string, desired map[string]an
 	if diags.HasError() || !found {
 		return found, diags
 	}
-	d, a := delta.Align(e.canonicalPair(desired, actual))
+	cd, ca := e.canonicalPair(desired, actual)
+	d, a := delta.AlignForType(e.spec.RestType, cd, ca)
 	if normalize.Equal(d, a) {
 		return true, diags
 	}

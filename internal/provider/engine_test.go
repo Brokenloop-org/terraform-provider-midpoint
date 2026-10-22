@@ -644,3 +644,40 @@ func TestPruneEmpty(t *testing.T) {
 		})
 	}
 }
+
+// midPoint assigns a task the archetype of its activity when it runs: with
+// no assignment configured, that is neither a difference nor a delta.
+func TestEngine_taskArchetypeAssignmentIsNotADifference(t *testing.T) {
+	eng, s := testEngine(t, engineSpec{RestType: "tasks", ShortName: "task", CreateOptions: []string{"isImport"}}, nil)
+	const oid = "07000000-0000-4000-8000-0000000000aa"
+	s.Put("tasks", map[string]any{
+		"oid": oid, "name": "t", "executionState": "suspended",
+		"assignment": []any{archetypeAssignment("00000000-0000-0000-0000-000000000502")},
+	})
+	desired := map[string]any{"name": "t"}
+	found, diags := eng.readInto(context.Background(), oid, desired, false, func(map[string]any) {
+		t.Error("readInto reported a difference")
+	})
+	noErrors(t, diags)
+	if !found {
+		t.Fatal("task not found")
+	}
+	noErrors(t, eng.update(context.Background(), oid, desired, nil))
+	if p := requests(s, "PATCH"); len(p) != 0 {
+		t.Fatalf("update sent %d PATCH requests, want none", len(p))
+	}
+
+	// A real change sends only that change, never a delete of the
+	// assignment.
+	noErrors(t, eng.update(context.Background(), oid, map[string]any{"name": "t", "description": "d"}, nil))
+	p := requests(s, "PATCH")
+	if len(p) != 1 {
+		t.Fatalf("want one PATCH, got %d", len(p))
+	}
+	want := asJSON(t, map[string]any{"objectModification": map[string]any{"itemDelta": []any{
+		map[string]any{"modificationType": "add", "path": "description", "value": "d"},
+	}}})
+	if got := asJSON(t, p[0].Body); !reflect.DeepEqual(got, want) {
+		t.Errorf("PATCH body = %v, want %v", got, want)
+	}
+}

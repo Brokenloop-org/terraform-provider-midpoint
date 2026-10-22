@@ -102,7 +102,7 @@ func simpleToBody(ctx context.Context, f simpleFields) (map[string]any, diag.Dia
 func simpleFromBody(ctx context.Context, restType string, desired, actual map[string]any, prior, out simpleFields,
 	take func(rest map[string]any)) diag.Diagnostics {
 	var diags diag.Diagnostics
-	_, aligned := delta.Align(normalize.Canonical(restType, pruneEmpty(desired)), actual)
+	_, aligned := delta.AlignForType(restType, normalize.Canonical(restType, pruneEmpty(desired)), actual)
 	rest := stateBody(aligned)
 	if take != nil {
 		take(rest)

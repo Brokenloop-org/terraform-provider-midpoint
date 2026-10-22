@@ -10,6 +10,20 @@ var compareOnlyWhenConfigured = []string{
 	"binding",  // TaskType.binding: midPoint defaults it to "loose"
 }
 
+// compareOnlyWhenConfiguredByType are root items, per REST type, that
+// midPoint fills in on objects of that type: compared only when the desired
+// body sets them, like compareOnlyWhenConfigured. The whole item is
+// compared as soon as the desired body has any value of it.
+//
+// Documented limitation: an assignment added to a task by hand is not
+// drift unless the task configures assignments (a block or
+// extra.assignment).
+var compareOnlyWhenConfiguredByType = map[string][]string{
+	// TaskType.assignment: when a task runs, midPoint assigns it the
+	// archetype of its activity (e.g. Recomputation task, ...0502).
+	"tasks": {"assignment"},
+}
+
 // Align returns copies of desired and actual in which the actual body is
 // normalized against the desired one, pairwise, so that normalize.Equal and
 // Compute see only real differences:
@@ -33,6 +47,23 @@ func Align(desired, actual map[string]any) (d, a map[string]any) {
 	}
 	a = alignMap(desired, actual)
 	for _, name := range compareOnlyWhenConfigured {
+		if desired[name] == nil {
+			delete(a, name)
+		}
+	}
+	return d, a
+}
+
+// AlignForType is Align for an object of REST type restType: it also drops
+// the root items of compareOnlyWhenConfiguredByType[restType] from the
+// actual body when the desired body does not set them. Like Align it is
+// idempotent and modifies neither input.
+func AlignForType(restType string, desired, actual map[string]any) (d, a map[string]any) {
+	d, a = Align(desired, actual)
+	if a == nil {
+		return d, a
+	}
+	for _, name := range compareOnlyWhenConfiguredByType[restType] {
 		if desired[name] == nil {
 			delete(a, name)
 		}

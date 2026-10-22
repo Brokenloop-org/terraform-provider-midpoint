@@ -237,7 +237,7 @@ func focusFromBody(ctx context.Context, actual map[string]any, prior focusModel,
 	var diags diag.Diagnostics
 	restType := kind.Spec.RestType
 	desired, _ := focusToBody(ctx, prior, kind, false)
-	_, aligned := delta.Align(normalize.Canonical(restType, pruneEmpty(desired)), actual)
+	_, aligned := delta.AlignForType(restType, normalize.Canonical(restType, pruneEmpty(desired)), actual)
 	rest := stateBody(aligned)
 	importing := prior.Name.IsNull()
 
@@ -374,7 +374,7 @@ func keepOrConvert(ctx context.Context, restType, item string, prior types.Dynam
 			}
 			pd := normalize.Canonical(restType, pruneEmpty(wrap(pv)))
 			pa := normalize.Canonical(restType, wrap(actual))
-			if a, b := delta.Align(pd, pa); normalize.Equal(a, b) {
+			if a, b := delta.AlignForType(restType, pd, pa); normalize.Equal(a, b) {
 				return prior, nil
 			}
 		}

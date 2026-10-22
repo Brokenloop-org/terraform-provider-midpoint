@@ -20,9 +20,6 @@ var taskSpec = engineSpec{RestType: "tasks", ShortName: "task", CreateOptions: [
 const (
 	executionRunnable  = "runnable"
 	executionSuspended = "suspended"
-	// importedKey is the private state key that marks a task imported
-	// rather than created: its initial_execution_state is not known.
-	importedKey = "imported"
 )
 
 // initialStates maps initial_execution_state to the executionState and
@@ -114,17 +111,18 @@ func taskFromBody(ctx context.Context, s *taskState, actual map[string]any) diag
 	})
 }
 
-// replaceUnlessImported requires replacement when initial_execution_state
-// changes on a task this provider created. On an imported task the value
-// is not known (the task was created elsewhere), so a change is a no-op
-// update rather than deleting and re-creating the task.
-func replaceUnlessImported(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+// replaceUnlessPreexisting requires replacement when
+// initial_execution_state changes on a task this provider created. On an
+// imported or adopted task (preexistingKey) the value was never applied,
+// so a change is a no-op update rather than deleting and re-creating a
+// task the provider did not create.
+func replaceUnlessPreexisting(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
 	if req.StateValue.IsNull() {
 		return
 	}
-	imported, diags := req.Private.GetKey(ctx, importedKey)
+	preexisting, diags := req.Private.GetKey(ctx, preexistingKey)
 	resp.Diagnostics.Append(diags...)
-	resp.RequiresReplace = len(imported) == 0
+	resp.RequiresReplace = len(preexisting) == 0
 }
 
 // NewTaskResource returns the midpoint_task resource.
@@ -134,16 +132,22 @@ func NewTaskResource() resource.Resource {
 		spec: taskSpec,
 		schema: typedSchema(
 			"A midPoint task (TaskType). The provider sets the execution state only when it creates the task; "+
-				"suspending or resuming it in midPoint is an operation, not a change of configuration, and is never drift.",
+				"suspending or resuming it in midPoint is an operation, not a change of configuration, and is never drift. "+
+				"Assignments (in extra) are compared only when the task configures some: midPoint assigns a task the "+
+				"archetype of its activity when it runs, so an assignment added in midPoint to a task that configures "+
+				"none is not drift.",
 			map[string]schema.Attribute{
 				"name":        nameAttribute(),
 				"description": optionalString("Description."),
 				"owner": optionalString("OID of the owning user (ownerRef). When unset midPoint makes the calling " +
-					"user the owner, and the owner is not compared."),
+					"user the owner, and the owner is not compared. An imported task reads it back as null until it " +
+					"is configured, so a config that sets it plans one no-op update after the import."),
 				"initial_execution_state": schema.StringAttribute{
 					Description: "Execution state the task is created in: suspended (the default) or runnable. It is " +
-						"written only on create; changing it re-creates the task. On an imported task it is recorded as " +
-						"suspended and a change has no effect.",
+						"written only on create; later suspending or resuming the task in midPoint is not drift. Changing " +
+						"it re-creates a task the provider created, and removing the line counts as a change (back to " +
+						"suspended). An imported or adopted task is never replaced for it: an import records suspended, " +
+						"an adoption the configured value, and a change only updates the state.",
 					Optional: true,
 					Computed: true,
 					Default:  stringdefault.StaticString(executionSuspended),
@@ -151,13 +155,14 @@ func NewTaskResource() resource.Resource {
 						stringvalidator.OneOf(executionRunnable, executionSuspended),
 					},
 					PlanModifiers: []planmodifier.String{
-						stringplanmodifier.RequiresReplaceIf(replaceUnlessImported,
-							"Changing it re-creates a task the provider created.",
-							"Changing it re-creates a task the provider created."),
+						stringplanmodifier.RequiresReplaceIf(replaceUnlessPreexisting,
+							"Changing it re-creates a task the provider created; never an imported or adopted one.",
+							"Changing it re-creates a task the provider created; never an imported or adopted one."),
 					},
 				},
 				"binding": optionalString("Binding (binding): loose or tight. When unset midPoint defaults it " +
-					"(loose) and it is not compared."),
+					"(loose) and it is not compared. An imported task reads it back as null until it is configured, " +
+					"so a config that sets it plans one no-op update after the import."),
 				"recurrence": optionalString("Recurrence (recurrence): single or recurring."),
 				"schedule": optionalDynamic("Schedule (schedule) in midPoint naming, e.g. " +
 					"{ recurrence = \"recurring\", interval = 3600 }."),
@@ -173,7 +178,6 @@ func NewTaskResource() resource.Resource {
 		onImport: func(ctx context.Context, resp *resource.ImportStateResponse) {
 			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("initial_execution_state"),
 				types.StringValue(executionSuspended))...)
-			resp.Diagnostics.Append(resp.Private.SetKey(ctx, importedKey, []byte("true"))...)
 		},
 	}
 }

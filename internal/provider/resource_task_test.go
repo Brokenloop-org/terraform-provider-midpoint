@@ -323,3 +323,84 @@ func TestTask_importedIsNeverReplaced(t *testing.T) {
 		},
 	})
 }
+
+// After a run midPoint has assigned the task its archetype; with no
+// assignment configured that is no drift and never deleted.
+func TestTask_runArchetypeAssignmentIsNotDrift(t *testing.T) {
+	s := newTestStub(t)
+	cfg := func(desc string) string { return taskConfig(desc, "") }
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{Config: cfg("v1")},
+			{
+				PreConfig: func() {
+					b := stubBody(s, "tasks", stubTaskOID)
+					b["assignment"] = []any{archetypeAssignment("00000000-0000-0000-0000-000000000502")}
+					serverFillsTask(s, b)
+				},
+				Config:   cfg("v1"),
+				PlanOnly: true,
+			},
+			refreshIsClean(),
+			{
+				Config: cfg("v2"),
+				Check: checkStub(func() error {
+					for _, p := range requests(s, "PATCH") {
+						for _, d := range asList(p.Body["objectModification"].(map[string]any)["itemDelta"]) {
+							if path := d.(map[string]any)["path"]; path != "description" {
+								return fmt.Errorf("PATCH touched %v", path)
+							}
+						}
+					}
+					if a := asList(stubBody(s, "tasks", stubTaskOID)["assignment"]); len(a) != 1 {
+						return fmt.Errorf("stored assignments = %v, want the archetype one kept", a)
+					}
+					return nil
+				}),
+			},
+			refreshIsClean(),
+		},
+	})
+}
+
+// An adopted task was not created by the provider: removing
+// initial_execution_state (a change back to the default) is a no-op
+// update, never a re-creation.
+func TestTask_adoptedIsNeverReplaced(t *testing.T) {
+	s := newTestStub(t)
+	const addr = "midpoint_task.t"
+	serverFillsTask(s, map[string]any{
+		"oid": stubTaskOID, "name": "recompute nobody", "description": "v1", "activity": taskActivity,
+		"executionState": "runnable", "schedulingState": "ready",
+	})
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{
+				Config: taskConfig("v1", "  adopt_existing = true\n  initial_execution_state = \"runnable\""),
+				Check: checkStub(func() error {
+					if n := len(requests(s, "POST")); n != 0 {
+						return fmt.Errorf("%d POST requests, want none (adopted)", n)
+					}
+					return nil
+				}),
+			},
+			{
+				Config: taskConfig("v1", "  adopt_existing = true"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)},
+				},
+				Check: checkStub(func() error {
+					for _, m := range []string{"POST", "DELETE"} {
+						if n := len(requests(s, m)); n != 0 {
+							return fmt.Errorf("%d %s requests, want none", n, m)
+						}
+					}
+					return nil
+				}),
+			},
+			refreshIsClean(),
+		},
+	})
+}

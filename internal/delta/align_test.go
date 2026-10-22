@@ -179,3 +179,48 @@ func dump(t *testing.T, v any) string {
 	}
 	return string(b)
 }
+
+func TestAlignForType(t *testing.T) {
+	archetype := `{"@id":4,"targetRef":{"oid":"00000000-0000-0000-0000-000000000502","type":"ArchetypeType","relation":"org:default"}}`
+	tests := []struct {
+		name, restType, desired, actual, wantActual string
+	}{
+		{
+			name:       "task_unconfigured_assignment_dropped",
+			restType:   "tasks",
+			desired:    `{"name":"t"}`,
+			actual:     `{"name":"t","assignment":[` + archetype + `],"ownerRef":{"oid":"u1"}}`,
+			wantActual: `{"name":"t"}`,
+		},
+		{
+			name:       "task_configured_assignment_compared_whole",
+			restType:   "tasks",
+			desired:    `{"name":"t","assignment":[{"targetRef":{"oid":"r1","type":"RoleType","relation":"org:default"}}]}`,
+			actual:     `{"name":"t","assignment":[` + archetype + `]}`,
+			wantActual: `{"name":"t","assignment":[` + archetype + `]}`,
+		},
+		{
+			name:       "role_unconfigured_assignment_kept",
+			restType:   "roles",
+			desired:    `{"name":"r"}`,
+			actual:     `{"name":"r","assignment":[` + archetype + `]}`,
+			wantActual: `{"name":"r","assignment":[` + archetype + `]}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			desired, actual := mustJSON(t, tt.desired), mustJSON(t, tt.actual)
+			pristineA := mustJSON(t, tt.actual)
+			d, a := AlignForType(tt.restType, desired, actual)
+			if !reflect.DeepEqual(actual, pristineA) {
+				t.Fatal("AlignForType mutated its input")
+			}
+			if want := mustJSON(t, tt.wantActual); !reflect.DeepEqual(a, want) {
+				t.Errorf("aligned actual =\n%s\nwant\n%s", dump(t, a), dump(t, want))
+			}
+			if d2, a2 := AlignForType(tt.restType, d, a); !reflect.DeepEqual(d2, d) || !reflect.DeepEqual(a2, a) {
+				t.Errorf("AlignForType is not idempotent: second pass gave %s", dump(t, a2))
+			}
+		})
+	}
+}
