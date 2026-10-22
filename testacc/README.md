@@ -51,6 +51,8 @@ environment (midPoint 4.9), recorded with `Accept: application/json` and no
 | `org-fixture.json` | `GET /ws/rest/orgs/{oid}` after `POST /ws/rest/orgs` with `{"org":{"name":"fixture-org","assignment":{"targetRef":{"oid":"00000000-0000-0000-0000-000000000329","type":"ArchetypeType"}}}}` |
 | `task-fixture.json` | `GET /ws/rest/tasks/{oid}` after `POST /ws/rest/tasks` and `POST /ws/rest/tasks/{oid}/suspend` |
 | `search-roles-superuser.json` | `POST /ws/rest/roles/search?returnTotalCount=true` (see below) |
+| `resource-csv.json` | `GET /ws/rest/resources/{oid}?options=noFetch` after creating the acceptance CSV resource (below) and `POST /ws/rest/resources/{oid}/test` |
+| `resource-csv-synchronization.json` | `GET /ws/rest/resources/{oid}?options=noFetch` after creating the resource of `examples/resources/midpoint_resource` (no test) |
 
 The task was created with this body (no `ownerRef` and no `executionState`, so
 the fixture shows what the server fills in):
@@ -75,6 +77,47 @@ process timestamps), not `oid`.
 To re-record, run `make env-down && make env-up`, repeat the requests above
 with `curl -u administrator:Test5ecr3t -H 'Accept: application/json'`, pipe
 the output through `jq .`, and delete the org and task afterwards.
+
+The CSV resources were created with `POST /ws/rest/resources?options=isImport&options=reevaluateSearchFilters`,
+their YAML parts converted to JSON, and `connectorRef` written as the filter
+`connectorType = "com.evolveum.polygon.connector.csv.CsvConnector" and connectorVersion = "2.8"`.
+`resource-csv.json` uses `testacc/fixtures/csv-resource/connector-configuration.yaml`
+and `schema-handling.yaml` (name `fixture-csv`, description `CSV fixture`);
+the connection test made midPoint cache `schema/definition` with
+`schema/cachingMetadata`, add `capabilities/native` with
+`capabilities/cachingMetadata`, and record `operationalState` and
+`operationalStateHistory`. `resource-csv-synchronization.json` adds the
+example's capabilities and generation constraints. Both resources were
+deleted after recording; the connector OID in them is this environment's.
+
+## Connector resources
+
+`midpoint_server` mounts `testacc/fixtures/data` read-only at
+`/opt/midpoint/var/data`; `accounts.csv` there is the data of the CSV
+resource the `TestAccResource_*` tests create. Observed on midPoint 4.9 with
+the bundled CSV connector 2.8:
+
+- `configurationProperties` need `"@ns"` set to the connector namespace
+  (`http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon.connector.csv.CsvConnector`).
+  Without it midPoint stores the properties unqualified (`"#filePath"`) and
+  the connection test fails with "No configuration properties found. Wrong
+  namespace?". `"@ns"` must be the first key of its JSON object ("Namespace
+  declared after other fields").
+- On a read-only mount the connector needs `readOnly: true` and a writable
+  `tmpFolder` (`/tmp`), or initialization fails with "Can't write to file"
+  / "Can't write to tmp folder".
+- `schema/definition` must be written as `{"@ns": "http://www.w3.org/2001/XMLSchema", "schema": "<xsd:schema ...>"}`;
+  without the `"@ns"` both create and modify fail with "Cannot parse
+  schema". A one-line schema round-trips verbatim; an indented one comes back
+  trimmed and with `xml:space="preserve"` added to the root element.
+- `POST /ws/rest/resources/{oid}/import/AccountObjectClass` answers `303` to
+  the import task, which finishes within a second and creates the two
+  shadows. Deleting the resource leaves the shadows in the repository.
+- A shadow search across a resource works with `options=raw`; with
+  `options=noFetch` alone it fails ("Couldn't search objects in
+  provisioning").
+- Every modification moves a resource's `version` by two (the operation
+  execution record is a second repository update).
 
 ## Search response shape
 

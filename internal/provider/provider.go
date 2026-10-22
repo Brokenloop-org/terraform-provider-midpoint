@@ -237,6 +237,7 @@ func (p *midpointProvider) Resources(_ context.Context) []func() resource.Resour
 		NewObjectTemplateResource,
 		NewMarkResource,
 		NewTaskResource,
+		NewResourceResource,
 	}
 }
 

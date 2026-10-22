@@ -1,0 +1,21 @@
+# schema-handling.yaml plus a second inbound mapping on ri:fullName; the
+# acceptance test applies it as an update that must be one narrow add.
+objectType:
+  - kind: account
+    intent: default
+    default: true
+    objectClass: ri:AccountObjectClass
+    attribute:
+      - ref: ri:login
+        inbound:
+          - name: login-to-name
+            target:
+              path: name
+      - ref: ri:fullName
+        inbound:
+          - name: fullname-to-fullname
+            target:
+              path: fullName
+          - name: fullname-to-description
+            target:
+              path: description

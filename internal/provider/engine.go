@@ -57,6 +57,11 @@ type engine struct {
 	c        *client.Client
 	defaults map[string][]string
 	spec     engineSpec
+	// observe, when set, receives the canonical body of every successful
+	// readInto (refresh, import and the read-back after a write), whether
+	// or not it differs from the desired body. Resources use it for
+	// computed attributes, e.g. a resource's connector_oid.
+	observe func(actual map[string]any)
 }
 
 // newEngine returns the engine for spec using the configured provider.
@@ -290,6 +295,9 @@ func (e *engine) readInto(ctx context.Context, oid string, desired map[string]an
 	actual, found, diags := e.read(ctx, oid)
 	if diags.HasError() || !found {
 		return found, diags
+	}
+	if e.observe != nil {
+		e.observe(actual)
 	}
 	cd, ca := e.canonicalPair(desired, actual)
 	d, a := delta.AlignForType(e.spec.RestType, cd, ca)

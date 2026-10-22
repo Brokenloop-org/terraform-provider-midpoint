@@ -1,0 +1,12 @@
+# Connector configuration of the HR resource (connectorConfiguration).
+# "@ns" puts the properties in the CSV connector's namespace; without it
+# midPoint stores them unqualified and the connector finds no configuration.
+configurationProperties:
+  "@ns": "http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon.connector.csv.CsvConnector"
+  filePath: /opt/midpoint/var/hr/employees.csv
+  encoding: utf-8
+  fieldDelimiter: ","
+  uniqueAttribute: login
+  nameAttribute: login
+  readOnly: true
+  tmpFolder: /tmp

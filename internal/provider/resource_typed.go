@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -52,6 +53,11 @@ type typedResource[S any] struct {
 	// onImport sets kind-specific attributes after an import by OID (which
 	// also marks the object preexisting); nil for none.
 	onImport func(ctx context.Context, resp *resource.ImportStateResponse)
+	// observe sets the computed attributes of s from actual, the canonical
+	// body of every read (refresh, import, the read-back after a write),
+	// and with a nil actual to null before a create records the object, so
+	// that a failed read-back leaves nothing unknown; nil for none.
+	observe func(s *S, actual map[string]any)
 
 	data *providerData
 }
@@ -128,6 +134,15 @@ func (r *typedResource[S]) Configure(_ context.Context, req resource.ConfigureRe
 
 func (r *typedResource[S]) engine() *engine {
 	return newEngine(r.data, r.spec)
+}
+
+// observingEngine is the engine whose reads run observe on s.
+func (r *typedResource[S]) observingEngine(s *S) *engine {
+	eng := r.engine()
+	if r.observe != nil {
+		eng.observe = func(actual map[string]any) { r.observe(s, actual) }
+	}
+	return eng
 }
 
 func (r *typedResource[S]) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
@@ -207,7 +222,7 @@ func (r *typedResource[S]) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	eng := r.engine()
+	eng := r.observingEngine(&s)
 	st.Body = created
 	oid, adopted, diags := eng.create(ctx, st)
 	resp.Diagnostics.Append(diags...)
@@ -224,9 +239,22 @@ func (r *typedResource[S]) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.Append(markPreexisting(ctx, resp.Private)...)
 	}
 	// Recorded before the read-back, so the object is never orphaned.
+	if r.observe != nil {
+		r.observe(&s, nil)
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &s)...)
 	resp.Diagnostics.Append(setOID(ctx, &resp.State, oid)...)
 	resp.Diagnostics.Append(eng.readAfterWrite(ctx, oid, desired, true)...)
+	r.recordObserved(ctx, &s, &resp.State, oid, &resp.Diagnostics)
+}
+
+// recordObserved records s again after a read-back that ran observe on it.
+func (r *typedResource[S]) recordObserved(ctx context.Context, s *S, state *tfsdk.State, oid string, diags *diag.Diagnostics) {
+	if r.observe == nil {
+		return
+	}
+	diags.Append(state.Set(ctx, s)...)
+	diags.Append(setOID(ctx, state, oid)...)
 }
 
 func (r *typedResource[S]) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -245,7 +273,7 @@ func (r *typedResource[S]) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	eng := r.engine()
+	eng := r.observingEngine(&s)
 	resp.Diagnostics.Append(eng.update(ctx, oid.ValueString(), desired, st.Options)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -253,6 +281,7 @@ func (r *typedResource[S]) Update(ctx context.Context, req resource.UpdateReques
 	resp.Diagnostics.Append(resp.State.Set(ctx, &s)...)
 	resp.Diagnostics.Append(setOID(ctx, &resp.State, oid.ValueString())...)
 	resp.Diagnostics.Append(eng.readAfterWrite(ctx, oid.ValueString(), desired, false)...)
+	r.recordObserved(ctx, &s, &resp.State, oid.ValueString(), &resp.Diagnostics)
 }
 
 func (r *typedResource[S]) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -271,7 +300,7 @@ func (r *typedResource[S]) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	found, diags := r.engine().readInto(ctx, oid.ValueString(), desired, false, func(actual map[string]any) {
+	found, diags := r.observingEngine(&s).readInto(ctx, oid.ValueString(), desired, false, func(actual map[string]any) {
 		resp.Diagnostics.Append(r.fromBody(ctx, &s, actual)...)
 	})
 	resp.Diagnostics.Append(diags...)

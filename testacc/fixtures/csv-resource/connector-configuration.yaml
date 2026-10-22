@@ -1,0 +1,14 @@
+# connector_configuration of the acceptance-test CSV resource. The "@ns"
+# key is required: it puts the properties in the CSV connector's namespace
+# (without it midPoint stores them unqualified and the connector finds no
+# configuration). The data directory is mounted read-only, so the connector
+# runs read-only and keeps its temporary files in /tmp.
+configurationProperties:
+  "@ns": "http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon.connector.csv.CsvConnector"
+  filePath: /opt/midpoint/var/data/accounts.csv
+  encoding: utf-8
+  fieldDelimiter: ","
+  uniqueAttribute: login
+  nameAttribute: login
+  readOnly: true
+  tmpFolder: /tmp

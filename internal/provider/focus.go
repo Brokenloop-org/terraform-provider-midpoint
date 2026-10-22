@@ -363,14 +363,25 @@ func priorExtraValues(ctx context.Context, restType string, extra types.Dynamic)
 // value of root item (or of the extra items when item is ""): prior when
 // it is canonically equal, so a refresh keeps the configured types.
 func keepOrConvert(ctx context.Context, restType, item string, prior types.Dynamic, actual any) (types.Dynamic, diag.Diagnostics) {
+	var at []string
+	if item != "" {
+		at = []string{item}
+	}
+	return keepOrConvertAt(ctx, restType, at, prior, actual)
+}
+
+// keepOrConvertAt is keepOrConvert for the item at path, a path of
+// single-valued items from the root (e.g. capabilities/configured); an
+// empty path means the extra items.
+func keepOrConvertAt(ctx context.Context, restType string, at []string, prior types.Dynamic, actual any) (types.Dynamic, diag.Diagnostics) {
 	if !prior.IsNull() && !prior.IsUnknown() {
 		if pv, d := dynToGo(ctx, prior); !d.HasError() {
 			wrap := func(v any) map[string]any {
-				if item == "" {
-					m, _ := v.(map[string]any)
-					return m
+				for i := len(at) - 1; i >= 0; i-- {
+					v = map[string]any{at[i]: v}
 				}
-				return map[string]any{item: v}
+				m, _ := v.(map[string]any)
+				return m
 			}
 			pd := normalize.Canonical(restType, pruneEmpty(wrap(pv)))
 			pa := normalize.Canonical(restType, wrap(actual))

@@ -1,0 +1,50 @@
+# Schema handling of the HR resource (schemaHandling): employee accounts
+# create and update users. Every action names itself so that no container is
+# empty (an empty object is left out of the configuration).
+objectType:
+  - kind: account
+    intent: default
+    displayName: Employee
+    default: true
+    objectClass: ri:AccountObjectClass
+    focus:
+      type: UserType
+    attribute:
+      - ref: ri:login
+        inbound:
+          - name: login-to-name
+            target:
+              path: name
+      - ref: ri:fullName
+        inbound:
+          - name: fullname-to-fullname
+            target:
+              path: fullName
+      - ref: ri:email
+        inbound:
+          - name: email-to-emailaddress
+            target:
+              path: emailAddress
+    correlation:
+      correlators:
+        items:
+          - name: by-login
+            item:
+              - ref: name
+    synchronization:
+      reaction:
+        - name: linked
+          situation: linked
+          actions:
+            synchronize:
+              name: synchronize
+        - name: unlinked
+          situation: unlinked
+          actions:
+            link:
+              name: link
+        - name: unmatched
+          situation: unmatched
+          actions:
+            addFocus:
+              name: add-user

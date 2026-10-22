@@ -68,6 +68,9 @@ services:
       - MP_SET_midpoint_administrator_initialPassword=Test5ecr3t
     volumes:
       - midpoint_home:/opt/midpoint/var
+      # CSV files for the connector-resource acceptance tests
+      # (midpoint_resource); read-only, the tests never write them.
+      - ./fixtures/data:/opt/midpoint/var/data:ro
 
 volumes:
   midpoint_data:
