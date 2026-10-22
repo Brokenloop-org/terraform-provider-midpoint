@@ -1,0 +1,10 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "binding"
+  },
+  {
+    "modificationType": "replace",
+    "path": "ownerRef"
+  }
+]

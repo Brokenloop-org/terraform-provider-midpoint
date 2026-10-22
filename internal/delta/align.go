@@ -11,9 +11,7 @@ import (
 // them), but when the desired body does not set one, the server's value is
 // not a difference.
 var compareOnlyWhenConfigured = []string{
-	"oid",      // midPoint generates the OID when the user leaves it unset
-	"ownerRef", // TaskType.ownerRef: midPoint sets it to the calling user
-	"binding",  // TaskType.binding: midPoint defaults it to "loose"
+	"oid", // midPoint generates the OID when the user leaves it unset
 }
 
 // compareOnlyWhenConfiguredByType are items, per REST type, that midPoint
@@ -28,7 +26,9 @@ var compareOnlyWhenConfigured = []string{
 var compareOnlyWhenConfiguredByType = map[string][]string{
 	// TaskType.assignment: when a task runs, midPoint assigns it the
 	// archetype of its activity (e.g. Recomputation task, ...0502).
-	"tasks": {"assignment"},
+	// TaskType.ownerRef: midPoint sets it to the calling user.
+	// TaskType.binding: midPoint defaults it to "loose".
+	"tasks": {"assignment", "ownerRef", "binding"},
 	// ResourceType.schema.definition: midPoint fetches the resource schema
 	// from the connector (on a connection test, an import, any provisioning
 	// operation) and caches it here, next to schema/cachingMetadata. A

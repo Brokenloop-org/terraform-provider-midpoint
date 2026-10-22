@@ -112,10 +112,12 @@ func TestAlign(t *testing.T) {
 			wantActual: `{"authorization":[{"@id":1,"decision":"allow","action":["read","add"]}]}`,
 		},
 		{
+			// Only oid is compared only when configured for every type;
+			// ownerRef and binding are so for tasks (TestAlignForType).
 			name:       "compare_only_when_configured_dropped",
 			desired:    `{"name":"t"}`,
 			actual:     `{"name":"t","oid":"o1","ownerRef":{"oid":"u1","type":"UserType","relation":"org:default"},"binding":"loose"}`,
-			wantActual: `{"name":"t"}`,
+			wantActual: `{"name":"t","ownerRef":{"oid":"u1","type":"UserType","relation":"org:default"},"binding":"loose"}`,
 		},
 		{
 			name:       "compare_only_when_configured_kept",
@@ -216,6 +218,28 @@ func TestAlignForType(t *testing.T) {
 			desired:    `{"name":"t"}`,
 			actual:     `{"name":"t","assignment":[` + archetype + `],"ownerRef":{"oid":"u1"}}`,
 			wantActual: `{"name":"t"}`,
+		},
+		{
+			name:       "task_unconfigured_owner_and_binding_dropped",
+			restType:   "tasks",
+			desired:    `{"name":"t"}`,
+			actual:     `{"name":"t","oid":"o1","ownerRef":{"oid":"u1","type":"UserType","relation":"org:default"},"binding":"loose"}`,
+			wantActual: `{"name":"t"}`,
+		},
+		{
+			name:       "task_configured_owner_and_binding_compared",
+			restType:   "tasks",
+			desired:    `{"name":"t","ownerRef":{"oid":"u2","type":"UserType","relation":"org:default"},"binding":"tight"}`,
+			actual:     `{"name":"t","ownerRef":{"oid":"u1","type":"UserType","relation":"org:default"},"binding":"loose"}`,
+			wantActual: `{"name":"t","ownerRef":{"oid":"u1","type":"UserType","relation":"org:default"},"binding":"loose"}`,
+		},
+		{
+			// ownerRef and binding of other types are configuration.
+			name:       "object_owner_and_binding_kept",
+			restType:   "objectCollections",
+			desired:    `{"name":"c"}`,
+			actual:     `{"name":"c","ownerRef":{"oid":"u1","type":"UserType","relation":"org:default"},"binding":"loose"}`,
+			wantActual: `{"name":"c","ownerRef":{"oid":"u1","type":"UserType","relation":"org:default"},"binding":"loose"}`,
 		},
 		{
 			name:       "task_configured_assignment_compared_whole",
