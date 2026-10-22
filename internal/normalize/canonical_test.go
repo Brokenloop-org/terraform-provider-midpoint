@@ -45,6 +45,8 @@ var requiredCases = []string{
 	"real_superuser_role",
 	"real_task",
 	"qname_values_normalized",
+	"real_resource_csv",
+	"real_resource_csv_synchronization",
 }
 
 func TestCanonical(t *testing.T) {
@@ -200,5 +202,57 @@ func TestServerManaged_everyRuleHasReason(t *testing.T) {
 		if r.Path == "" || strings.HasSuffix(r.Path, "/") || strings.Contains(r.Path, "//") {
 			t.Errorf("rule %q has a malformed path", r.Path)
 		}
+	}
+}
+
+// A resource schema definition keeps its "@ns": midPoint parses the XML
+// schema only with it, and the delta that replaces a definition carries the
+// canonical value. Elsewhere "@ns" is still dropped.
+func TestCanonical_resourceSchemaDefinitionKeepsNamespace(t *testing.T) {
+	const xsd = "http://www.w3.org/2001/XMLSchema"
+	body := map[string]any{
+		"@ns": "http://midpoint.evolveum.com/xml/ns/public/common/common-3",
+		"schema": map[string]any{
+			"definition": map[string]any{"@ns": xsd, "schema": "<xsd:schema/>"},
+		},
+		"connectorConfiguration": map[string]any{
+			"@ns":                     "http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/connector-schema-3",
+			"configurationProperties": map[string]any{"@ns": "urn:csv", "filePath": "/f.csv"},
+		},
+	}
+	want := map[string]any{
+		"schema": map[string]any{
+			"definition": map[string]any{"@ns": xsd, "schema": "<xsd:schema/>"},
+		},
+		"connectorConfiguration": map[string]any{
+			"configurationProperties": map[string]any{"filePath": "/f.csv"},
+		},
+	}
+	if got := Canonical("resources", body); !reflect.DeepEqual(got, want) {
+		t.Errorf("Canonical(resources) = %v, want %v", got, want)
+	}
+	wantRole := map[string]any{"schema": map[string]any{"definition": map[string]any{"schema": "<xsd:schema/>"}}}
+	if got := Canonical("roles", map[string]any{"schema": body["schema"]}); !reflect.DeepEqual(got, wantRole) {
+		t.Errorf("Canonical(roles) = %v, want %v", got, wantRole)
+	}
+}
+
+// Correlators and synchronization actions are multi-valued containers that
+// midPoint 4.9 returns as a single object when there is one value
+// (testdata/real/resource-csv-synchronization.json); a configured list of
+// one must compare equal.
+func TestCanonical_resourceCorrelatorsAndActionsAreLists(t *testing.T) {
+	one := map[string]any{"name": "x"}
+	body := map[string]any{"schemaHandling": map[string]any{"objectType": map[string]any{
+		"correlation":     map[string]any{"correlators": map[string]any{"items": one}},
+		"synchronization": map[string]any{"reaction": map[string]any{"actions": map[string]any{"synchronize": one, "addFocus": one}}},
+	}}}
+	list := []any{map[string]any{"name": "x"}}
+	want := map[string]any{"schemaHandling": map[string]any{"objectType": []any{map[string]any{
+		"correlation":     map[string]any{"correlators": map[string]any{"items": list}},
+		"synchronization": map[string]any{"reaction": []any{map[string]any{"actions": map[string]any{"synchronize": list, "addFocus": list}}}},
+	}}}}
+	if got := Canonical("resources", body); !reflect.DeepEqual(got, want) {
+		t.Errorf("Canonical = %v, want %v", got, want)
 	}
 }

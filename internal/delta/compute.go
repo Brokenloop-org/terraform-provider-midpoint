@@ -30,6 +30,7 @@ var structuredProperties = map[string]bool{
 	"filter":     true, // SearchFilterType: object selectors, references, queries
 	"query":      true, // QueryType: activity object sets, collection queries
 	"target":     true, // VariableBindingDefinitionType: mapping target
+	"definition": true, // ResourceType.schema.definition (SchemaDefinitionType): an XML schema; midPoint cannot address the xsd:schema inside it and parses it only with its "@ns", which a whole-value replace carries
 }
 
 // containerUnder names items that structuredProperties lists but that are

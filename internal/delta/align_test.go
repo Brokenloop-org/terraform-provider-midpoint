@@ -181,6 +181,9 @@ func dump(t *testing.T, v any) string {
 }
 
 func TestAlignForType(t *testing.T) {
+	// The schema midPoint fetches from the connector and caches in the
+	// resource (recorded in normalize/testdata/real/resource-csv.json).
+	const cachedDefinition = `{"@ns":"http://www.w3.org/2001/XMLSchema","schema":"<xsd:schema/>"}`
 	archetype := `{"@id":4,"targetRef":{"oid":"00000000-0000-0000-0000-000000000502","type":"ArchetypeType","relation":"org:default"}}`
 	tests := []struct {
 		name, restType, desired, actual, wantActual string
@@ -198,6 +201,34 @@ func TestAlignForType(t *testing.T) {
 			desired:    `{"name":"t","assignment":[{"targetRef":{"oid":"r1","type":"RoleType","relation":"org:default"}}]}`,
 			actual:     `{"name":"t","assignment":[` + archetype + `]}`,
 			wantActual: `{"name":"t","assignment":[` + archetype + `]}`,
+		},
+		{
+			name:       "resource_unconfigured_schema_definition_dropped",
+			restType:   "resources",
+			desired:    `{"name":"r"}`,
+			actual:     `{"name":"r","schema":{"definition":` + cachedDefinition + `}}`,
+			wantActual: `{"name":"r"}`,
+		},
+		{
+			name:       "resource_unconfigured_schema_definition_dropped_generation_constraints_kept",
+			restType:   "resources",
+			desired:    `{"name":"r","schema":{"generationConstraints":{"generateObjectClass":["ri:A"]}}}`,
+			actual:     `{"name":"r","schema":{"generationConstraints":{"generateObjectClass":["ri:A"]},"definition":` + cachedDefinition + `}}`,
+			wantActual: `{"name":"r","schema":{"generationConstraints":{"generateObjectClass":["ri:A"]}}}`,
+		},
+		{
+			name:       "resource_configured_schema_definition_compared",
+			restType:   "resources",
+			desired:    `{"name":"r","schema":{"definition":{"schema":"<mine/>"}}}`,
+			actual:     `{"name":"r","schema":{"definition":` + cachedDefinition + `}}`,
+			wantActual: `{"name":"r","schema":{"definition":` + cachedDefinition + `}}`,
+		},
+		{
+			name:       "task_schema_definition_kept",
+			restType:   "tasks",
+			desired:    `{"name":"t"}`,
+			actual:     `{"name":"t","schema":{"definition":` + cachedDefinition + `}}`,
+			wantActual: `{"name":"t","schema":{"definition":` + cachedDefinition + `}}`,
 		},
 		{
 			name:       "role_unconfigured_assignment_kept",

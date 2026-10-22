@@ -1,0 +1,171 @@
+{
+  "restType": "resources",
+  "body": {
+    "@metadata": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 1,
+      "storage": {
+        "createTimestamp": "2026-10-22T16:14:47.332Z",
+        "creatorRef": {
+          "oid": "00000000-0000-0000-0000-000000000002",
+          "relation": "org:default",
+          "type": "c:UserType"
+        },
+        "createChannel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#rest"
+      },
+      "process": {
+        "requestTimestamp": "2026-10-22T16:14:47.328Z",
+        "requestorRef": {
+          "oid": "00000000-0000-0000-0000-000000000002",
+          "relation": "org:default",
+          "type": "c:UserType"
+        }
+      }
+    },
+    "oid": "3d332958-49f7-4304-969f-513a40dfacac",
+    "version": "2",
+    "name": "fixture-csv",
+    "description": "CSV fixture",
+    "operationExecution": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 7,
+      "recordType": "simple",
+      "timestamp": "2026-10-22T16:14:47.336Z",
+      "operation": {
+        "objectDelta": {
+          "changeType": "add",
+          "objectType": "c:ResourceType"
+        },
+        "executionResult": {
+          "operation": "com.evolveum.midpoint.model.impl.lens.ChangeExecutor.executeDelta",
+          "status": "success",
+          "importance": "normal",
+          "token": 1000000000000001597
+        },
+        "objectName": "fixture-csv"
+      },
+      "status": "success",
+      "initiatorRef": {
+        "oid": "00000000-0000-0000-0000-000000000002",
+        "relation": "org:default",
+        "type": "c:UserType"
+      },
+      "channel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#rest"
+    },
+    "iteration": 0,
+    "iterationToken": "",
+    "operationalState": {
+      "lastAvailabilityStatus": "up",
+      "message": "Status set to UP because resource schema was successfully fetched",
+      "timestamp": "2026-10-22T16:14:47.396Z",
+      "nodeId": "DefaultNode"
+    },
+    "operationalStateHistory": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 10,
+      "lastAvailabilityStatus": "up",
+      "message": "Status set to UP because resource schema was successfully fetched",
+      "timestamp": "2026-10-22T16:14:47.396Z",
+      "nodeId": "DefaultNode"
+    },
+    "connectorRef": {
+      "oid": "a1eb24c5-c8e9-422a-a0a8-ed09893dc402",
+      "relation": "org:default",
+      "type": "c:ConnectorType",
+      "filter": {
+        "text": "connectorType = \"com.evolveum.polygon.connector.csv.CsvConnector\" and connectorVersion = \"2.8\""
+      }
+    },
+    "connectorConfiguration": {
+      "@ns": "http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/connector-schema-3",
+      "configurationProperties": {
+        "@ns": "http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon.connector.csv.CsvConnector",
+        "fieldDelimiter": ",",
+        "filePath": "/opt/midpoint/var/data/accounts.csv",
+        "readOnly": true,
+        "encoding": "utf-8",
+        "tmpFolder": "/tmp",
+        "nameAttribute": "login",
+        "uniqueAttribute": "login"
+      }
+    },
+    "schema": {
+      "cachingMetadata": {
+        "retrievalTimestamp": "2026-10-22T16:14:47.395Z",
+        "serialNumber": "810542884456d08d-f405abd99846b93d"
+      },
+      "definition": {
+        "@ns": "http://www.w3.org/2001/XMLSchema",
+        "schema": "<xsd:schema xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:a=\"http://prism.evolveum.com/xml/ns/public/annotation-3\" xmlns:ra=\"http://midpoint.evolveum.com/xml/ns/public/resource/annotation-3\" xmlns:tns=\"http://midpoint.evolveum.com/xml/ns/public/resource/instance-3\" elementFormDefault=\"qualified\" targetNamespace=\"http://midpoint.evolveum.com/xml/ns/public/resource/instance-3\"><xsd:import namespace=\"http://prism.evolveum.com/xml/ns/public/annotation-3\"/><xsd:import namespace=\"http://midpoint.evolveum.com/xml/ns/public/resource/annotation-3\"/><xsd:complexType name=\"AccountObjectClass\"><xsd:annotation><xsd:appinfo><a:container>true</a:container><ra:resourceObject>true</ra:resourceObject><ra:nativeObjectClass>__ACCOUNT__</ra:nativeObjectClass><ra:default>true</ra:default><ra:auxiliary>false</ra:auxiliary><ra:embedded>false</ra:embedded><ra:namingAttribute xmlns:ri=\"http://midpoint.evolveum.com/xml/ns/public/resource/instance-3\">ri:login</ra:namingAttribute><ra:displayNameAttribute xmlns:ri=\"http://midpoint.evolveum.com/xml/ns/public/resource/instance-3\">ri:login</ra:displayNameAttribute><ra:identifier xmlns:ri=\"http://midpoint.evolveum.com/xml/ns/public/resource/instance-3\">ri:login</ra:identifier></xsd:appinfo></xsd:annotation><xsd:sequence><xsd:element name=\"login\" type=\"xsd:string\"><xsd:annotation><xsd:appinfo><a:displayOrder>100</a:displayOrder><ra:nativeAttributeName>login</ra:nativeAttributeName><ra:frameworkAttributeName>__NAME__</ra:frameworkAttributeName><ra:returnedByDefault>true</ra:returnedByDefault></xsd:appinfo></xsd:annotation></xsd:element><xsd:element minOccurs=\"0\" name=\"email\" type=\"xsd:string\"><xsd:annotation><xsd:appinfo><a:displayOrder>120</a:displayOrder><ra:nativeAttributeName>email</ra:nativeAttributeName><ra:frameworkAttributeName>email</ra:frameworkAttributeName><ra:returnedByDefault>true</ra:returnedByDefault></xsd:appinfo></xsd:annotation></xsd:element><xsd:element minOccurs=\"0\" name=\"fullName\" type=\"xsd:string\"><xsd:annotation><xsd:appinfo><a:displayOrder>130</a:displayOrder><ra:nativeAttributeName>fullName</ra:nativeAttributeName><ra:frameworkAttributeName>fullName</ra:frameworkAttributeName><ra:returnedByDefault>true</ra:returnedByDefault></xsd:appinfo></xsd:annotation></xsd:element></xsd:sequence></xsd:complexType></xsd:schema>"
+      }
+    },
+    "schemaHandling": {
+      "objectType": {
+        "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+        "@id": 2,
+        "kind": "account",
+        "intent": "default",
+        "default": true,
+        "objectClass": "ri:AccountObjectClass",
+        "attribute": [
+          {
+            "@id": 3,
+            "ref": "ri:login",
+            "inbound": {
+              "@id": 4,
+              "name": "login-to-name",
+              "target": {
+                "path": "name"
+              }
+            }
+          },
+          {
+            "@id": 5,
+            "ref": "ri:fullName",
+            "inbound": {
+              "@id": 6,
+              "name": "fullname-to-fullname",
+              "target": {
+                "path": "fullName"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "capabilities": {
+      "cachingMetadata": {
+        "retrievalTimestamp": "2026-10-22T16:14:47.390Z",
+        "serialNumber": "c7637df16226691e-b7ba6dd4ef7caf83"
+      },
+      "native": {
+        "schema": {},
+        "discoverConfiguration": {},
+        "liveSync": {},
+        "create": {},
+        "read": {
+          "returnDefaultAttributesOption": false
+        },
+        "update": {
+          "addRemoveAttributeValues": true
+        },
+        "delete": {},
+        "testConnection": {},
+        "script": {
+          "host": [
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 8,
+              "type": "resource"
+            },
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 9,
+              "type": "connector"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

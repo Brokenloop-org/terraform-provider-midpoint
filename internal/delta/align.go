@@ -1,5 +1,7 @@
 package delta
 
+import "strings"
+
 // compareOnlyWhenConfigured are root items midPoint fills in when the
 // configuration leaves them out. They are configuration (Canonical keeps
 // them), but when the desired body does not set one, the server's value is
@@ -10,10 +12,11 @@ var compareOnlyWhenConfigured = []string{
 	"binding",  // TaskType.binding: midPoint defaults it to "loose"
 }
 
-// compareOnlyWhenConfiguredByType are root items, per REST type, that
-// midPoint fills in on objects of that type: compared only when the desired
-// body sets them, like compareOnlyWhenConfigured. The whole item is
-// compared as soon as the desired body has any value of it.
+// compareOnlyWhenConfiguredByType are items, per REST type, that midPoint
+// fills in on objects of that type: compared only when the desired body
+// sets them, like compareOnlyWhenConfigured. An item is a root item name or
+// a path of single-valued containers ("schema/definition"). The whole item
+// is compared as soon as the desired body has any value of it.
 //
 // Documented limitation: an assignment added to a task by hand is not
 // drift unless the task configures assignments (a block or
@@ -22,6 +25,12 @@ var compareOnlyWhenConfiguredByType = map[string][]string{
 	// TaskType.assignment: when a task runs, midPoint assigns it the
 	// archetype of its activity (e.g. Recomputation task, ...0502).
 	"tasks": {"assignment"},
+	// ResourceType.schema.definition: midPoint fetches the resource schema
+	// from the connector (on a connection test, an import, any provisioning
+	// operation) and caches it here, next to schema/cachingMetadata. A
+	// configured (static) schema is compared; a cached one is not
+	// configuration (recorded in normalize/testdata/real/resource-csv.json).
+	"resources": {"schema/definition"},
 }
 
 // Align returns copies of desired and actual in which the actual body is
@@ -63,12 +72,35 @@ func AlignForType(restType string, desired, actual map[string]any) (d, a map[str
 	if a == nil {
 		return d, a
 	}
-	for _, name := range compareOnlyWhenConfiguredByType[restType] {
+	for _, item := range compareOnlyWhenConfiguredByType[restType] {
+		dropUnconfigured(desired, a, strings.Split(item, "/"))
+	}
+	return d, a
+}
+
+// dropUnconfigured deletes the item at path from a, an aligned copy that
+// AlignForType owns, when desired does not set it. A container that the
+// deletion leaves empty (nothing but "@id") is deleted too.
+func dropUnconfigured(desired, a map[string]any, path []string) {
+	name := path[0]
+	if len(path) == 1 {
 		if desired[name] == nil {
 			delete(a, name)
 		}
+		return
 	}
-	return d, a
+	am, ok := a[name].(map[string]any)
+	if !ok {
+		return
+	}
+	dm, _ := desired[name].(map[string]any)
+	dropUnconfigured(dm, am, path[1:])
+	for k := range am {
+		if k != "@id" {
+			return
+		}
+	}
+	delete(a, name)
 }
 
 // alignValue returns a copy of a, the actual value of item name, aligned to

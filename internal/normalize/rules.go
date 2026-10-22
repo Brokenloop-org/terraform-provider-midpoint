@@ -113,6 +113,7 @@ var ServerManaged = []Rule{
 var configurationOverrides = []Rule{
 	{Path: "behavior", Types: []string{"reports"}, Reason: "ReportType.behavior (ReportBehaviorType: direction, import options) is configuration; the behavior rule targets FocusType.behavior"},
 	{Path: "**/identityProvider/metadata", Reason: "Saml2ProviderAuthenticationModuleType.metadata (IdP metadata in a security policy SAML2 module) is configuration; **/metadata targets MetadataType"},
+	{Path: "schema/definition/@ns", Types: []string{"resources"}, Reason: "the XML Schema namespace of a resource schema definition (SchemaDefinitionType) is part of the value: midPoint 4.9 rejects a definition written without it (\"Cannot parse schema\"), and a delta that replaces the definition carries the canonical value; **/@ns targets serialization annotations (recorded in testdata/real/resource-csv.json)"},
 }
 
 // Type QName values ("#UserType", "c:UserType", "UserType") are not a rule
@@ -150,6 +151,9 @@ var MultiValued = map[string]bool{
 	"allowedValues":              true, // connector configuration property restriction (connector schema, unbounded)
 	"trigger":                    true, // ObjectType.trigger (TriggerType)
 	"link":                       true, // SynchronizationActionsType.link (LinkSynchronizationActionType)
+	"synchronize":                true, // SynchronizationActionsType.synchronize, unbounded; 4.9 returns one as an object (real/resource-csv-synchronization.json)
+	"addFocus":                   true, // SynchronizationActionsType.addFocus, unbounded; 4.9 returns one as an object (real/resource-csv-synchronization.json)
+	"items":                      true, // CorrelatorsType.items (ItemsCorrelatorType), unbounded; 4.9 returns one as an object (real/resource-csv-synchronization.json)
 	"property":                   true, // PropertyReferenceListType.property (ItemPathType)
 	"panel":                      true, // GuiObjectDetailsPageType.panel (ContainerPanelConfigurationType); archetype-application fixture
 	"supportedTypes":             true, // ObjectTypeSearchItemConfigurationType.supportedTypes (QName); archetype-application fixture
