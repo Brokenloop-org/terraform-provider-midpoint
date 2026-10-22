@@ -19,7 +19,9 @@ can point `MIDPOINT_URL` at another server.
 
 `wait.sh` polls `GET /midpoint/ws/rest/self` every 5 s for up to 10 minutes.
 On timeout it prints the last 50 lines of the `midpoint_server` log and exits
-non-zero.
+non-zero. It reads `MIDPOINT_URL`, `MIDPOINT_USERNAME` and `MIDPOINT_PASSWORD`
+(defaults: `http://localhost:8080`, `administrator`, `Test5ecr3t`), the same
+variables the provider and `make testacc` use.
 
 ## Administrator password
 
