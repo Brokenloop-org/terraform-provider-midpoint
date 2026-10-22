@@ -304,6 +304,7 @@ make env-down
   `evolveum/midpoint:${MIDPOINT_VERSION}-alpine`, default `4.9`). Run
   `make env-down` first so the repository is created fresh.
 - More on the environment: [`testacc/README.md`](testacc/README.md).
+- Versions tested, with results: [`docs/compatibility.md`](docs/compatibility.md).
 
 ### CI
 
