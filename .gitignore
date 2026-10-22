@@ -1,0 +1,6 @@
+terraform-provider-midpoint
+dist/
+.terraform/
+*.tfstate*
+testacc/.env
+.superpowers/
