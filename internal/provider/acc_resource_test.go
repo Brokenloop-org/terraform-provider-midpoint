@@ -28,26 +28,51 @@ import (
 	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
 )
 
-// The CSV connector that ships with the midPoint 4.9 image.
-const (
-	accCSVConnectorType    = "com.evolveum.polygon.connector.csv.CsvConnector"
-	accCSVConnectorVersion = "2.8"
-)
+// The CSV connector that ships with the midPoint image.
+const accCSVConnectorType = "com.evolveum.polygon.connector.csv.CsvConnector"
 
-// accCSVFixtures is the absolute path of testacc/fixtures/csv-resource.
-func accCSVFixtures(t *testing.T) string {
+// accCSV is the CSV resource fixture and the CSV connector of this
+// environment.
+type accCSV struct {
+	dir string // absolute path of testacc/fixtures/csv-resource
+	// connectorVersion is the version of the one CSV connector the image
+	// ships; it differs between midPoint releases (2.8 in 4.9, 2.9 in
+	// 4.10), so it is looked up, never hard-coded.
+	connectorVersion string
+}
+
+// accCSVFixtures returns the CSV fixture directory and looks up the version
+// of the CSV connector installed in the environment, of which there must be
+// exactly one.
+func accCSVFixtures(t *testing.T, c *client.Client) accCSV {
 	t.Helper()
 	dir, err := filepath.Abs(filepath.Join("..", "..", "testacc", "fixtures", "csv-resource"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return dir
+	return accCSV{dir: dir, connectorVersion: accCSVConnectorVersion(t, c)}
+}
+
+// accCSVConnectorVersion is the version of the one CSV connector midPoint
+// discovered in this environment.
+func accCSVConnectorVersion(t *testing.T, c *client.Client) string {
+	t.Helper()
+	connectors, _, err := c.Search(context.Background(), "connectors",
+		fmt.Sprintf(`connectorType = %q`, accCSVConnectorType), 2, nil)
+	if err != nil || len(connectors) != 1 {
+		t.Fatalf("looking up the CSV connector: %v (found %d, want 1)", err, len(connectors))
+	}
+	version, _ := connectors[0].Body["connectorVersion"].(string)
+	if version == "" {
+		t.Fatalf("the CSV connector %s has no connectorVersion", connectors[0].OID)
+	}
+	return version
 }
 
 // accCSVResourceConfig is a midpoint_resource "csv" for the CSV fixture
 // (testacc/fixtures/data/accounts.csv, mounted into the server) with the
 // given schema handling file and extra attribute lines.
-func accCSVResourceConfig(fixtures, name, schemaHandling, attrs string) string {
+func accCSVResourceConfig(fixtures accCSV, name, schemaHandling, attrs string) string {
 	return fmt.Sprintf(`
 resource "midpoint_resource" "csv" {
   name        = %q
@@ -60,8 +85,8 @@ resource "midpoint_resource" "csv" {
   schema_handling         = yamldecode(file(%q))
 %s
 }
-`, name, accCSVConnectorType, accCSVConnectorVersion,
-		filepath.Join(fixtures, "connector-configuration.yaml"), filepath.Join(fixtures, schemaHandling), attrs)
+`, name, accCSVConnectorType, fixtures.connectorVersion,
+		filepath.Join(fixtures.dir, "connector-configuration.yaml"), filepath.Join(fixtures.dir, schemaHandling), attrs)
 }
 
 // accGetResource reads resources/oid with noFetch (no connector call, so
@@ -197,14 +222,17 @@ func keysOf(m map[string]any) []string {
 func TestAccResource_csv(t *testing.T) {
 	testAccPreCheck(t)
 	c := accClient(t)
-	fixtures := accCSVFixtures(t)
+	fixtures := accCSVFixtures(t, c)
 	name := acctest.RandomWithPrefix("tf-acc-csv")
+	// The narrow-update step counts the operations an apply sent by their
+	// operationExecution records.
+	accRecordSuccessfulOperations(t, c)
 	const addr = "midpoint_resource.csv"
 
 	// The connector OID of this environment, looked up the way midPoint
 	// resolves the filter; never hard-coded.
 	connectors, _, err := c.Search(context.Background(), "connectors",
-		fmt.Sprintf(`connectorType = %q and connectorVersion = %q`, accCSVConnectorType, accCSVConnectorVersion), 2, nil)
+		fmt.Sprintf(`connectorType = %q and connectorVersion = %q`, accCSVConnectorType, fixtures.connectorVersion), 2, nil)
 	if err != nil || len(connectors) != 1 {
 		t.Fatalf("looking up the CSV connector: %v (found %d)", err, len(connectors))
 	}
@@ -483,6 +511,41 @@ func accResourceExecutions(c *client.Client, oid string) ([]execution, error) {
 	return out, nil
 }
 
+// accSystemConfigurationOID is the OID of midPoint's system configuration.
+const accSystemConfigurationOID = "00000000-0000-0000-0000-000000000001"
+
+// accRecordSuccessfulOperations makes midPoint record successful operations
+// in operationExecution until the test ends. midPoint 4.9 records them; the
+// initial system configuration of a midPoint 4.10 repository sets
+// internals/operationExecutionRecording/skipWhenSuccess, so only failures
+// are recorded there. The setting is restored at cleanup.
+func accRecordSuccessfulOperations(t *testing.T, c *client.Client) {
+	t.Helper()
+	ctx := context.Background()
+	obj, err := c.Get(ctx, "systemConfigurations", accSystemConfigurationOID, client.GetOptions{})
+	if err != nil {
+		t.Fatalf("reading the system configuration: %v", err)
+	}
+	internals, _ := obj.Body["internals"].(map[string]any)
+	recording, _ := internals["operationExecutionRecording"].(map[string]any)
+	if recording["skipWhenSuccess"] != true {
+		return
+	}
+	const path = "internals/operationExecutionRecording/skipWhenSuccess"
+	set := func(skip bool) error {
+		return c.Modify(ctx, "systemConfigurations", accSystemConfigurationOID,
+			[]client.ItemDelta{{ModificationType: "replace", Path: path, Value: skip}}, nil)
+	}
+	if err := set(false); err != nil {
+		t.Fatalf("enabling the recording of successful operations: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := set(true); err != nil {
+			t.Errorf("cleanup: restoring %s: %v", path, err)
+		}
+	})
+}
+
 // newExecutions returns the records of after that are later than every
 // record of before (midPoint may prune old records).
 func newExecutions(before, after []execution) []execution {
@@ -506,7 +569,7 @@ func newExecutions(before, after []execution) []execution {
 func TestAccResource_forceDestroyWithShadows(t *testing.T) {
 	testAccPreCheck(t)
 	c := accClient(t)
-	fixtures := accCSVFixtures(t)
+	fixtures := accCSVFixtures(t, c)
 	name := acctest.RandomWithPrefix("tf-acc-csv-shadows")
 	var oid, importTask string
 	// The resource delete leaves the shadows in the repository (midPoint
@@ -574,7 +637,7 @@ func TestAccResource_forceDestroyWithShadows(t *testing.T) {
 			{
 				Config:      accCSVResourceConfig(fixtures, name, "schema-handling.yaml", ""),
 				Destroy:     true,
-				ExpectError: regexp.MustCompile(`still reference it`),
+				ExpectError: regexp.MustCompile(`still\s+reference\s+it`),
 			},
 			{Config: accCSVResourceConfig(fixtures, name, "schema-handling.yaml", "  force_destroy = true")},
 		},
@@ -586,6 +649,10 @@ func shadowsFilter(oid string) string {
 	_, filter := shadowsCheck(oid)
 	return filter
 }
+
+// exampleConnectorVersion matches the connector version line of the
+// midpoint_resource example.
+var exampleConnectorVersion = regexp.MustCompile(`(?m)^(\s*version\s*=\s*)"[^"]*"`)
 
 // The documented example (examples/resources/midpoint_resource, with its
 // YAML parts: correlation and synchronization reactions) applies and reads
@@ -609,6 +676,12 @@ func TestAccResource_example(t *testing.T) {
 	}
 	cfg := strings.ReplaceAll(string(raw), "${path.module}", dir)
 	cfg = strings.Replace(cfg, exampleName, fmt.Sprintf("name        = %q", acctest.RandomWithPrefix("tf-acc-example")), 1)
+	// The example pins the CSV connector of the 4.9 image; the test pins
+	// the one this environment ships, so it runs on every midPoint version.
+	if n := len(exampleConnectorVersion.FindAllString(cfg, -1)); n != 1 {
+		t.Fatalf("the example sets the connector version %d times, want 1", n)
+	}
+	cfg = exampleConnectorVersion.ReplaceAllString(cfg, fmt.Sprintf("${1}%q", accCSVConnectorVersion(t, c)))
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,

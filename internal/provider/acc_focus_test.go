@@ -428,7 +428,7 @@ resource "midpoint_role" "r" {
 				},
 				Config:      cfg,
 				Destroy:     true,
-				ExpectError: regexp.MustCompile(`still reference it`),
+				ExpectError: regexp.MustCompile(`still\s+reference\s+it`),
 			},
 			{
 				PreConfig: func() {
