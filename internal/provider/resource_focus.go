@@ -89,8 +89,10 @@ func focusSchema(kind focusKind, attributes map[string]schema.Attribute) schema.
 		"archetype": str("OID of the archetype, written as an assignment to it. On read that assignment is shown here " +
 			"(after an import, or when archetype was set); do not also write it as an assignment block."),
 		"extension": schema.DynamicAttribute{
-			Description: "Schema extension items, e.g. { costCenter = \"CC-123\" }. Values are scalars or lists.",
-			Optional:    true,
+			Description: "Schema extension items, e.g. { costCenter = \"CC-123\" }. Values are scalars or lists. Each item " +
+				"must be defined by a midPoint schema extension: midPoint rejects an undefined item on a write that is not " +
+				"raw, and a raw write stores it undefined, returned as \"#costCenter\", which never matches the configuration.",
+			Optional: true,
 		},
 		"extra": schema.DynamicAttribute{
 			Description: "Other midPoint items, merged at the object root, in midPoint naming (camelCase, as in the " +

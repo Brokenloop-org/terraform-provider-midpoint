@@ -50,7 +50,7 @@ resource "midpoint_org" "acme_it" {
 - `delegable` (Boolean) Whether its holders can delegate it.
 - `description` (String) Description.
 - `display_name` (String) Display name (displayName).
-- `extension` (Dynamic) Schema extension items, e.g. { costCenter = "CC-123" }. Values are scalars or lists.
+- `extension` (Dynamic) Schema extension items, e.g. { costCenter = "CC-123" }. Values are scalars or lists. Each item must be defined by a midPoint schema extension: midPoint rejects an undefined item on a write that is not raw, and a raw write stores it undefined, returned as "#costCenter", which never matches the configuration.
 - `extra` (Dynamic) Other midPoint items, merged at the object root, in midPoint naming (camelCase, as in the REST API), e.g. yamldecode(file("extra.yaml")). An item must not also be set by a typed attribute; assignment and inducement values here are added to the blocks (they hold the values a block cannot express).
 - `force_destroy` (Boolean) Delete the object even while objects assigned to it or holding it in roleMembershipRef (members) exist. Without it, the delete fails and names the first few members. It also allows deleting an object adopted with adopt_existing = true, which is refused otherwise. Defaults to false.
 - `identifier` (String) Identifier.

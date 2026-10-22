@@ -204,7 +204,14 @@ list sends no options.
   | Tasks | `taskIdentifier`, `executionState`, `schedulingState`, `stateBeforeSuspend`, `schedulingStateBeforeSuspend`, `node`, `nodeAsObserved`, run timestamps, `result`, `resultStatus`, `progress`, `expectedTotal`, `operationStats`, `activityState`, `affectedObjects`, `unpauseAction` |
   | Function libraries | `function/parameter/@type` |
 
-  `behavior` stays configuration on reports.
+  Exemptions: these match a broader rule above but are configuration, so
+  they are compared:
+
+  | Item | Why it is configuration |
+  |---|---|
+  | `behavior` on reports | `ReportBehaviorType` (direction, import options); the `behavior` rule targets `FocusType.behavior`. |
+  | `identityProvider/metadata` (any depth) | The IdP metadata of a SAML2 authentication module in a security policy; the `metadata` rule targets `MetadataType`. |
+  | resource `schema/definition/@ns` | The XML Schema namespace is part of the schema definition: midPoint rejects a definition written without it. The `@ns` rule targets serialization annotations. |
 - **Compared only when configured.** midPoint fills these in when the
   configuration leaves them out. The server value is drift only once the
   configuration sets the item:
@@ -223,12 +230,19 @@ list sends no options.
 - **After a write**, the provider reads the object back. If midPoint
   normalized the written value differently from the configuration, a warning
   names the differing items, state keeps the configured values, and the next
-  plan shows the difference.
+  plan shows the difference. When the configuration and midPoint differ but
+  no item delta can express the difference, the apply sends nothing and warns,
+  naming the items; the plan keeps showing them.
 - **Multi-valued containers** (assignments, inducements, schema handling
   object types, attributes, mappings) are matched by content, not by
   position: assignments by target, construction (`resource`, `kind`, `intent`)
   and `order`; object types by `kind`/`intent`; attributes by `ref`. Order is
-  not significant.
+  not significant. A change inside a matched value (a construction `body`, a
+  `condition`, an `extra` item) is a narrow delta on that value. A change to
+  an identity field of an assignment or inducement (`target`, the
+  construction `resource`, `kind` or `intent`, or `order`) is a different
+  value: it is applied as a delete of the old value and an add of the new
+  one, so the container id changes.
 
 ## HCL conventions
 
@@ -250,6 +264,7 @@ list sends no options.
   | `UserType`, `#UserType`, `c:UserType` | `#UserType` | `UserType` |
   | `name = "x"` | `{orig = "x", norm = "x"}` | `"x"` |
   | one value of a multi-valued item | an object | a one-element list |
+  | `costCenter = ["a"]` (one-element list of a scalar, any item) | `"a"` | equal |
 
   QName folding applies to every string value of the form `#` or `c:`
   followed by a capitalized name ending in `Type`, wherever it appears. A
@@ -290,6 +305,8 @@ list sends no options.
 | Resource import | `connector` reads back null (the resolved connector is `connector_oid`), so a config plans one no-op update after an import. A schema definition midPoint cached is not imported. |
 | Task `initial_execution_state` | Applies on create only. A change re-creates a task the provider created; imported or adopted tasks are never replaced for it. |
 | Task import | `owner` and `binding` read back as null until configured, so a config that sets them plans one no-op update after an import. |
+| `archetype` with raw writes | Service, role and archetype write with `raw` by default, which skips midPoint's recompute. A create writes `archetypeRef` and `roleMembershipRef` with the archetype assignment; changing `archetype` later only changes the assignment, so `archetypeRef` and `roleMembershipRef` keep the old archetype until midPoint recomputes the object. Both are server-managed and never compared. |
+| `extension` needs a schema extension | Extension items must be defined by a midPoint schema extension. Without one, midPoint rejects the item on a write that is not raw ("No definition in PP(costCenter)"; the provider reports it and creates nothing). A raw write (the default for service, role and archetype; org writes are not raw) stores it without a definition, and midPoint returns it as `#costCenter`, which never matches the configuration: the plan keeps showing it. Verified on midPoint 4.9 by `TestAccRole_extension`. |
 | Delete checks on midPoint 4.9 | midPoint 4.9 never returns `X-Total-Count`, so a refused delete reports "at least N" members or shadows. Members are searched in `assignmentHolders` and shadows in `shadows`, both with `raw` (a `noFetch` shadow search fails on 4.9). |
 | Test password | midPoint 4.9's default password policy rejects `5ecr3t`; the acceptance environment uses `Test5ecr3t`. |
 
