@@ -74,7 +74,7 @@ resource "midpoint_role" "platform_team" {
 ### Optional
 
 - `activation` (Block, Optional) Activation. Other activation items (validity) go in extra. (see [below for nested schema](#nestedblock--activation))
-- `adopt_existing` (Boolean) When an object with the configured oid already exists, adopt it into state and apply the configured content as an update (the plan warns that it will be adopted) instead of failing. Without it, creating an object whose oid already exists fails and nothing is written. Defaults to false.
+- `adopt_existing` (Boolean) When an object with the configured oid already exists, adopt it into state and apply the configuration to it as an update instead of failing. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warns that the object will be adopted and lists the changes the update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an object whose oid already exists fails and nothing is written. Defaults to false.
 - `archetype` (String) OID of the archetype, written as an assignment to it. On read that assignment is shown here (after an import, or when archetype was set); do not also write it as an assignment block.
 - `assignment` (Block List) An assignment (membership, archetype, org). Values are matched to midPoint by content (target, construction, order), not by position. (see [below for nested schema](#nestedblock--assignment))
 - `authorization` (Dynamic) Authorizations (authorization), a list in midPoint naming, e.g. [{ action = ["http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read"] }].

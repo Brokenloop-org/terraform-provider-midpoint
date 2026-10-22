@@ -18,6 +18,9 @@ item deltas.
 Safety rules that apply to every resource:
 
 - Creating an object whose `oid` already exists fails unless `adopt_existing = true`.
+  An adopted object takes the whole configuration: items it does not
+  configure are removed on the first apply, and the plan warning lists the
+  changes.
 - Deleting a role, service, org or archetype that still has members, or a
   resource that still has shadows, fails unless `force_destroy = true`.
 - `overwrite` is never sent unless it is listed in a resource's `options`.

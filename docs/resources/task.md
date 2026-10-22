@@ -31,11 +31,13 @@ resource "midpoint_task" "recompute_contractors" {
   }
 }
 
-# A nightly reconciliation task, created runnable, owned by a service user.
+# A recurring recompute of all users at 02:00, owned by the administrator.
+# It is created suspended: resume it in midPoint to start the schedule
+# (initial_execution_state = "runnable" would start it on create).
 resource "midpoint_task" "nightly" {
   name                    = "Nightly recompute"
   owner                   = "00000000-0000-0000-0000-000000000002" # administrator
-  initial_execution_state = "runnable"
+  initial_execution_state = "suspended"
   binding                 = "loose"
 
   schedule = {
@@ -63,7 +65,7 @@ resource "midpoint_task" "nightly" {
 ### Optional
 
 - `activity` (Dynamic) Activity definition (activity) in midPoint naming, e.g. yamldecode(file("recompute.yaml")).
-- `adopt_existing` (Boolean) When an object with the configured oid already exists, adopt it into state and apply the configured content as an update (the plan warns that it will be adopted) instead of failing. Without it, creating an object whose oid already exists fails and nothing is written. Defaults to false.
+- `adopt_existing` (Boolean) When an object with the configured oid already exists, adopt it into state and apply the configuration to it as an update instead of failing. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warns that the object will be adopted and lists the changes the update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an object whose oid already exists fails and nothing is written. Defaults to false.
 - `binding` (String) Binding (binding): loose or tight. When unset midPoint defaults it (loose) and it is not compared. An imported task reads it back as null until it is configured, so a config that sets it plans one no-op update after the import.
 - `description` (String) Description.
 - `extra` (Dynamic) Other midPoint items, merged at the object root, in midPoint naming (camelCase, as in the REST API), e.g. yamldecode(file("extra.yaml")). An item must not also be set by a typed attribute.

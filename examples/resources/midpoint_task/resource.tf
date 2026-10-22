@@ -16,11 +16,13 @@ resource "midpoint_task" "recompute_contractors" {
   }
 }
 
-# A nightly reconciliation task, created runnable, owned by a service user.
+# A recurring recompute of all users at 02:00, owned by the administrator.
+# It is created suspended: resume it in midPoint to start the schedule
+# (initial_execution_state = "runnable" would start it on create).
 resource "midpoint_task" "nightly" {
   name                    = "Nightly recompute"
   owner                   = "00000000-0000-0000-0000-000000000002" # administrator
-  initial_execution_state = "runnable"
+  initial_execution_state = "suspended"
   binding                 = "loose"
 
   schedule = {

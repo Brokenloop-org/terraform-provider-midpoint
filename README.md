@@ -114,11 +114,43 @@ Both data sources fail when nothing matches or more than one object matches.
 | Rule | Behaviour |
 |---|---|
 | No silent overwrite | Creating an object whose `oid` already exists fails and writes nothing; the error says to import it. |
-| `adopt_existing = true` | The existing object is adopted into state instead, and only the configured difference is applied, as an update. The plan warns that the object will be adopted. Meant for customizing midPoint built-ins (`00000000-0000-0000-0000-*`). Default `false`. |
+| `adopt_existing = true` | The existing object is adopted into state instead, and the configuration is applied to it as an update. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warning lists the changes the update will send. Meant for the midPoint built-ins the catalogue customizes (`00000000-0000-0000-0000-*`). Default `false`. See [Adopting a built-in](#adopting-a-built-in). |
 | `force_destroy = true` | Required to delete a service, role, org or archetype that still has members (objects assigned to it or holding it in `roleMembershipRef`), or a resource that still has shadows. Without it the delete fails and names the first few. `midpoint_object` applies the same check for `roles`, `services`, `orgs`, `archetypes` and `resources`. Marks, tasks and object templates are deleted without a check. Default `false`. |
 | `overwrite` never sent | Only when listed in a resource's `options`. |
 | Read-back is not fatal after a create | Every write is followed by a read. If that read fails after a successful create or adoption, it is a warning: the object stays in state (no taint, no replace) and the next refresh reconciles it. |
 | Tasks are not started or stopped | `initial_execution_state` is written on create only; see [Drift semantics](#drift-semantics). |
+
+### Adopting a built-in
+
+```hcl
+# Customize the built-in End user role. body must hold the whole role, as
+# exported from this server: anything it leaves out is removed on the first
+# apply.
+resource "midpoint_object" "end_user" {
+  type           = "roles"
+  oid            = "00000000-0000-0000-0000-000000000008"
+  adopt_existing = true
+  body           = yamldecode(file("${path.module}/end-user-role.yaml"))
+}
+```
+
+Export the object from the server you will apply to (its content differs
+between midPoint versions), for example the `body` of a `data.midpoint_object`
+for that oid written out with `yamlencode`, then edit it. The plan lists what
+the adoption will change, without values:
+
+```
+Warning: Existing object will be adopted
+
+midpoint_object roles/00000000-0000-0000-0000-000000000008 exists and will be
+adopted; applying the configuration will send these changes:
+  replace description
+  replace riskLevel (removes it)
+```
+
+The list shows at most 20 changes, then "and N more". When a configured
+value is known only during apply, the warning says that the changes cannot
+be listed.
 
 ### Execution options
 
