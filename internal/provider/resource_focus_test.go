@@ -426,3 +426,68 @@ resource "midpoint_role" "r" {
 		t.Errorf("an invalid configuration must not reach midPoint, got %+v", s.Requests())
 	}
 }
+
+// TestRole_importConditionIsSemanticJSON imports a role whose inducement
+// has a condition. The imported JSON text verifies against the applied
+// jsonencode text and an import block with that config plans no change,
+// whatever order the HCL writes the keys in. A configured literal with its
+// own key order and spacing is kept as written across apply and refresh.
+// (An import block with such a literal plans one update that sends nothing:
+// Terraform requires a configured value to be planned as written, and the
+// framework applies semantic equality only to provider responses.)
+func TestRole_importConditionIsSemanticJSON(t *testing.T) {
+	s := newTestStub(t)
+	const addr = "midpoint_role.r"
+	cfg := func(condition string) string {
+		return fmt.Sprintf(`
+resource "midpoint_role" "r" {
+  name = "conditional"
+
+  inducement {
+    target {
+      oid  = %q
+      type = "ServiceType"
+    }
+    condition = %s
+  }
+}
+`, stubServiceOID, condition)
+	}
+	encoded := cfg(`jsonencode({
+      source     = [{ path = "name" }]
+      expression = { script = [{ code = "name != null" }] }
+    })`)
+	reordered := cfg(`jsonencode({
+      expression = { script = [{ code = "name != null" }] }
+      source     = [{ path = "name" }]
+    })`)
+	const literalText = `{ "source": [ { "path": "name" } ],
+  "expression": { "script": [ { "code": "name != null" } ] } }`
+	literal := cfg(fmt.Sprintf("%q", literalText))
+	var oid string
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{Config: encoded, Check: captureOID(addr, &oid)},
+			{ResourceName: addr, ImportState: true, ImportStateVerify: true},
+			{Config: encoded, ResourceName: addr, ImportState: true, ImportStateKind: resource.ImportBlockWithID},
+			{Config: reordered, ResourceName: addr, ImportState: true, ImportStateKind: resource.ImportBlockWithID},
+			{
+				// Same condition, other text: an update that sends nothing.
+				Config: literal,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(addr, "inducement.0.condition", literalText),
+					checkStub(func() error {
+						if patches := requests(s, "PATCH"); len(patches) != 0 {
+							return fmt.Errorf("a reformatted condition must not PATCH, got %+v", patches)
+						}
+						return nil
+					}),
+				),
+			},
+			refreshIsClean(),
+			{Config: literal, PlanOnly: true},
+		},
+		CheckDestroy: checkGone(s, "roles", &oid),
+	})
+}

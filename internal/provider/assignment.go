@@ -8,6 +8,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -20,25 +21,25 @@ import (
 
 // assignmentModel maps one assignment or inducement block.
 //
-// condition, policy_rule, extra and construction.body are JSON text, not
-// dynamic values: terraform-plugin-framework does not support dynamic
-// attributes inside repeatable blocks (Terraform turns such a block list
-// into a tuple).
+// condition, policy_rule, extra and construction.body are JSON text
+// (jsontypes.Normalized: compared semantically at plan time), not dynamic
+// values: terraform-plugin-framework does not support dynamic attributes
+// inside repeatable blocks (Terraform turns such a block list into a tuple).
 type assignmentModel struct {
-	Target       *targetRef         `tfsdk:"target"`
-	Construction *constructionModel `tfsdk:"construction"`
-	Order        types.Int64        `tfsdk:"order"`
-	Condition    types.String       `tfsdk:"condition"`
-	PolicyRule   types.String       `tfsdk:"policy_rule"`
-	Extra        types.String       `tfsdk:"extra"`
+	Target       *targetRef           `tfsdk:"target"`
+	Construction *constructionModel   `tfsdk:"construction"`
+	Order        types.Int64          `tfsdk:"order"`
+	Condition    jsontypes.Normalized `tfsdk:"condition"`
+	PolicyRule   jsontypes.Normalized `tfsdk:"policy_rule"`
+	Extra        jsontypes.Normalized `tfsdk:"extra"`
 }
 
 // constructionModel maps a construction block.
 type constructionModel struct {
-	Resource types.String `tfsdk:"resource"`
-	Kind     types.String `tfsdk:"kind"`
-	Intent   types.String `tfsdk:"intent"`
-	Body     types.String `tfsdk:"body"`
+	Resource types.String         `tfsdk:"resource"`
+	Kind     types.String         `tfsdk:"kind"`
+	Intent   types.String         `tfsdk:"intent"`
+	Body     jsontypes.Normalized `tfsdk:"body"`
 }
 
 // assignmentItems are the container items an assignment block claims; its
@@ -52,6 +53,7 @@ func assignmentBlock(description string) schema.ListNestedBlock {
 			Description: what + " JSON text in midPoint naming (camelCase, as in the REST API), e.g. " +
 				"jsonencode({...}) or jsonencode(yamldecode(file(\"x.yaml\"))).",
 			Optional:   true,
+			CustomType: jsontypes.NormalizedType{},
 			Validators: []validator.String{jsonTextValidator{}},
 		}
 	}
@@ -86,7 +88,7 @@ func assignmentBlock(description string) schema.ListNestedBlock {
 // assignmentToJSON is the midPoint container value of block a at p.
 func assignmentToJSON(a assignmentModel, p path.Path) (map[string]any, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	out, d := jsonObjectAttr(a.Extra, p.AtName("extra"))
+	out, d := jsonObjectAttr(a.Extra.StringValue, p.AtName("extra"))
 	diags.Append(d...)
 	for _, k := range assignmentItems {
 		if _, ok := out[k]; ok {
@@ -99,7 +101,7 @@ func assignmentToJSON(a assignmentModel, p path.Path) (map[string]any, diag.Diag
 	}
 	if c := a.Construction; c != nil {
 		cp := p.AtName("construction")
-		cons, d := jsonObjectAttr(c.Body, cp.AtName("body"))
+		cons, d := jsonObjectAttr(c.Body.StringValue, cp.AtName("body"))
 		diags.Append(d...)
 		for name, v := range map[string]types.String{"resourceRef": c.Resource, "kind": c.Kind, "intent": c.Intent} {
 			if v.IsNull() {
@@ -120,7 +122,7 @@ func assignmentToJSON(a assignmentModel, p path.Path) (map[string]any, diag.Diag
 	if !a.Order.IsNull() && !a.Order.IsUnknown() {
 		out["order"] = json.Number(strconv.FormatInt(a.Order.ValueInt64(), 10))
 	}
-	for name, v := range map[string]types.String{"condition": a.Condition, "policyRule": a.PolicyRule} {
+	for name, v := range map[string]types.String{"condition": a.Condition.StringValue, "policyRule": a.PolicyRule.StringValue} {
 		if val, ok, d := jsonAttr(v, p.AtName(snake(name))); ok {
 			out[name] = val
 		} else {
@@ -144,7 +146,7 @@ func snake(item string) string {
 // the resource extra. JSON text of prior blocks with the same identity is
 // kept when it is canonically equal, so a refresh does not reformat it.
 func assignmentFromJSON(restType, item string, v map[string]any, prior map[string]assignmentModel) (a assignmentModel, ok bool) {
-	a = assignmentModel{Order: types.Int64Null(), Condition: types.StringNull(), PolicyRule: types.StringNull(), Extra: types.StringNull()}
+	a = assignmentModel{Order: types.Int64Null(), Condition: jsontypes.NewNormalizedNull(), PolicyRule: jsontypes.NewNormalizedNull(), Extra: jsontypes.NewNormalizedNull()}
 	rest := make(map[string]any, len(v))
 	for k, e := range v {
 		rest[k] = e
@@ -174,11 +176,11 @@ func assignmentFromJSON(restType, item string, v map[string]any, prior map[strin
 		delete(rest, "order")
 	}
 	p, hasPrior := prior[delta.Key(item, v)]
-	same := func(field string, priorText types.String, actual any) bool {
+	same := func(field string, priorText jsontypes.Normalized, actual any) bool {
 		if !hasPrior {
 			return false
 		}
-		pv, ok, _ := jsonAttr(priorText, path.Empty())
+		pv, ok, _ := jsonAttr(priorText.StringValue, path.Empty())
 		return ok && sameValue(restType, item, field, pv, actual)
 	}
 	if c, present := rest["construction"]; present {
@@ -191,12 +193,12 @@ func assignmentFromJSON(restType, item string, v map[string]any, prior map[strin
 			if hasPrior && p.Construction != nil && same("construction", p.Construction.Body, body) {
 				a.Construction.Body = p.Construction.Body
 			} else {
-				a.Construction.Body = types.StringValue(renderJSON(body))
+				a.Construction.Body = jsontypes.NewNormalizedValue(renderJSON(body))
 			}
 		}
 		delete(rest, "construction")
 	}
-	for name, dst := range map[string]*types.String{"condition": &a.Condition, "policyRule": &a.PolicyRule} {
+	for name, dst := range map[string]*jsontypes.Normalized{"condition": &a.Condition, "policyRule": &a.PolicyRule} {
 		val, present := rest[name]
 		if !present {
 			continue
@@ -209,14 +211,14 @@ func assignmentFromJSON(restType, item string, v map[string]any, prior map[strin
 		if same(name, priorText, val) {
 			*dst = priorText
 		} else {
-			*dst = types.StringValue(renderJSON(val))
+			*dst = jsontypes.NewNormalizedValue(renderJSON(val))
 		}
 	}
 	if len(rest) > 0 {
 		if same("", p.Extra, rest) {
 			a.Extra = p.Extra
 		} else {
-			a.Extra = types.StringValue(renderJSON(rest))
+			a.Extra = jsontypes.NewNormalizedValue(renderJSON(rest))
 		}
 	}
 	return a, true
@@ -225,7 +227,7 @@ func assignmentFromJSON(restType, item string, v map[string]any, prior map[strin
 // constructionFromJSON is the construction block for the canonical
 // construction m; constructionRest holds what goes in its body.
 func constructionFromJSON(m map[string]any) *constructionModel {
-	c := &constructionModel{Resource: types.StringNull(), Kind: types.StringNull(), Intent: types.StringNull(), Body: types.StringNull()}
+	c := &constructionModel{Resource: types.StringNull(), Kind: types.StringNull(), Intent: types.StringNull(), Body: jsontypes.NewNormalizedNull()}
 	if oid, ok := plainResourceRef(m["resourceRef"]); ok {
 		c.Resource = types.StringValue(oid)
 	}
@@ -399,7 +401,7 @@ func validateAssignment(a assignmentModel, p path.Path) diag.Diagnostics {
 	if a.Target == nil && a.Construction == nil && a.Condition.IsNull() && a.PolicyRule.IsNull() && a.Extra.IsNull() {
 		diags.AddAttributeError(p, "Empty block", "the block needs a target, a construction, a policy_rule or extra")
 	}
-	if extra, d := jsonObjectAttr(a.Extra, p.AtName("extra")); !d.HasError() {
+	if extra, d := jsonObjectAttr(a.Extra.StringValue, p.AtName("extra")); !d.HasError() {
 		for _, k := range assignmentItems {
 			if _, ok := extra[k]; ok {
 				diags.AddAttributeError(p.AtName("extra"), "Conflicting assignment item",
@@ -408,7 +410,7 @@ func validateAssignment(a assignmentModel, p path.Path) diag.Diagnostics {
 		}
 	}
 	if c := a.Construction; c != nil {
-		if body, d := jsonObjectAttr(c.Body, p.AtName("construction").AtName("body")); !d.HasError() {
+		if body, d := jsonObjectAttr(c.Body.StringValue, p.AtName("construction").AtName("body")); !d.HasError() {
 			for _, k := range []string{"kind", "intent"} {
 				if _, ok := body[k]; ok {
 					diags.AddAttributeError(p.AtName("construction").AtName("body"), "Conflicting construction item",

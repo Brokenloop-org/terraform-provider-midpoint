@@ -230,7 +230,18 @@ func TestAccRole_singleInducement(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             accFocusGone(c),
 		Steps: []resource.TestStep{
-			{Config: roleWithServiceConfig(name, "")},
+			{
+				// focusType is a QName: midPoint stores "#UserType".
+				Config: roleWithServiceConfig(name, `
+  inducement {
+    target {
+      oid  = "`+endUserRoleOID+`"
+      type = "RoleType"
+    }
+    extra = jsonencode({ focusType = "UserType", description = "for users only" })
+  }
+`),
+			},
 			emptyPlanAfterRefresh(),
 		},
 	})
@@ -472,6 +483,11 @@ resource "midpoint_archetype" "cluster" {
   name        = %q
   holder_type = ["RoleType"]
 
+  authorization = [{
+    name   = "read-clusters"
+    action = ["http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read"]
+  }]
+
   archetype_policy = {
     display = {
       label       = %q
@@ -489,10 +505,16 @@ resource "midpoint_archetype" "cluster" {
 		Steps: []resource.TestStep{
 			{
 				Config: cfg("Cluster"),
-				Check: accFocusItem(c, addr, "assignment", []any{map[string]any{
-					"identifier":         "holderType",
-					"assignmentRelation": []any{map[string]any{"holderType": []any{"#RoleType"}}},
-				}}),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					accFocusItem(c, addr, "assignment", []any{map[string]any{
+						"identifier":         "holderType",
+						"assignmentRelation": []any{map[string]any{"holderType": []any{"RoleType"}}},
+					}}),
+					accFocusItem(c, addr, "authorization", []any{map[string]any{
+						"name":   "read-clusters",
+						"action": []any{"http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read"},
+					}}),
+				),
 			},
 			emptyPlanAfterRefresh(),
 			{

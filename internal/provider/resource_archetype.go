@@ -14,24 +14,26 @@ var archetypeKind = focusKind{
 		CreateOptions: []string{"isImport", "raw"}, UpdateOptions: []string{"raw"},
 		MembersCheck: roleMembersCheck,
 	},
-	Archetype: true,
+	Authorization: true,
+	Archetype:     true,
 }
 
 type archetypeState struct {
 	focusModel
+	Authorization   types.Dynamic `tfsdk:"authorization"`
 	HolderType      types.List    `tfsdk:"holder_type"`
 	ArchetypePolicy types.Dynamic `tfsdk:"archetype_policy"`
 }
 
 func (s *archetypeState) model() focusModel {
 	m := s.focusModel
-	m.HolderType, m.ArchetypePolicy = s.HolderType, s.ArchetypePolicy
+	m.Authorization, m.HolderType, m.ArchetypePolicy = s.Authorization, s.HolderType, s.ArchetypePolicy
 	return m
 }
 
 func (s *archetypeState) setModel(m focusModel) {
 	s.focusModel = m
-	s.HolderType, s.ArchetypePolicy = m.HolderType, m.ArchetypePolicy
+	s.Authorization, s.HolderType, s.ArchetypePolicy = m.Authorization, m.HolderType, m.ArchetypePolicy
 }
 
 // NewArchetypeResource returns the midpoint_archetype resource.
@@ -39,6 +41,7 @@ func NewArchetypeResource() resource.Resource {
 	return &focusResource[archetypeState, *archetypeState]{
 		kind: archetypeKind,
 		attributes: map[string]schema.Attribute{
+			"authorization": authorizationAttribute(),
 			"holder_type": schema.ListAttribute{
 				Description: "Object types that may hold the archetype, e.g. [\"RoleType\"]; written as the " +
 					"assignmentRelation assignment (holderType #RoleType).",

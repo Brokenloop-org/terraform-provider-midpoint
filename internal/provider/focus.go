@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	"github.com/jplana/terraform-provider-midpoint/internal/delta"
 	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
@@ -51,7 +52,7 @@ type focusModel struct {
 	ForceDestroy   types.Bool        `tfsdk:"force_destroy"`
 	Options        types.List        `tfsdk:"options"`
 
-	Authorization   types.Dynamic `tfsdk:"-"` // service, role, org
+	Authorization   types.Dynamic `tfsdk:"-"` // all four kinds
 	Tenant          types.Bool    `tfsdk:"-"` // org
 	HolderType      types.List    `tfsdk:"-"` // archetype
 	ArchetypePolicy types.Dynamic `tfsdk:"-"` // archetype
@@ -204,6 +205,11 @@ func holderTypeQName(s string) string {
 	return "#" + s
 }
 
+// qnameLocal is a type QName without its "#" or "c:" prefix.
+func qnameLocal(s string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(s, "#"), "c:")
+}
+
 func asList(v any) []any {
 	switch t := v.(type) {
 	case nil:
@@ -265,6 +271,7 @@ func focusFromBody(ctx context.Context, actual map[string]any, prior focusModel,
 
 	foldArchetype := importing || !prior.Archetype.IsNull()
 	foldHolder := kind.Archetype && (importing || !prior.HolderType.IsNull())
+	inPriorExtra := priorExtraValues(ctx, restType, prior.Extra)
 	for _, item := range []string{"assignment", "inducement"} {
 		values := asList(rest[item])
 		delete(rest, item)
@@ -277,6 +284,13 @@ func focusFromBody(ctx context.Context, actual map[string]any, prior focusModel,
 		for _, v := range values {
 			vm, isMap := v.(map[string]any)
 			if !isMap {
+				unexpressed = append(unexpressed, v)
+				continue
+			}
+			// A value the prior state held in extra stays there, even when
+			// a block could express it.
+			if k := delta.Key(item, vm); inPriorExtra[item][k] > 0 {
+				inPriorExtra[item][k]--
 				unexpressed = append(unexpressed, v)
 				continue
 			}
@@ -325,6 +339,24 @@ func focusFromBody(ctx context.Context, actual map[string]any, prior focusModel,
 		diags.Append(d...)
 	}
 	return m, diags
+}
+
+// priorExtraValues counts, per item ("assignment", "inducement") and value
+// identity (delta.Key), the values the prior extra holds.
+func priorExtraValues(ctx context.Context, restType string, extra types.Dynamic) map[string]map[string]int {
+	out := map[string]map[string]int{"assignment": {}, "inducement": {}}
+	v, diags := dynToGo(ctx, extra)
+	em, ok := v.(map[string]any)
+	if diags.HasError() || !ok {
+		return out
+	}
+	for item := range out {
+		c := normalize.Canonical(restType, pruneEmpty(map[string]any{item: asList(em[item])}))
+		for _, e := range asList(c[item]) {
+			out[item][delta.Key(item, e)]++
+		}
+	}
+	return out
 }
 
 // keepOrConvert is the dynamic attribute value for actual, the canonical
@@ -388,7 +420,7 @@ func holderTypeAssignment(v map[string]any) ([]string, bool) {
 		if !ok {
 			return nil, false
 		}
-		names = append(names, strings.TrimPrefix(s, "#"))
+		names = append(names, qnameLocal(s))
 	}
 	return names, len(names) > 0
 }
@@ -401,7 +433,7 @@ func holderTypeList(names []string, prior types.List) types.List {
 		if d := prior.ElementsAs(context.Background(), &p, false); !d.HasError() && len(p) == len(names) {
 			same := true
 			for i := range p {
-				if holderTypeQName(p[i]) != holderTypeQName(names[i]) {
+				if qnameLocal(p[i]) != qnameLocal(names[i]) {
 					same = false
 				}
 			}
@@ -443,6 +475,9 @@ func validateFocus(ctx context.Context, m focusModel, kind focusKind) diag.Diagn
 			}
 		}
 	}
+	if m.Activation != nil && m.Activation.AdministrativeStatus.IsNull() {
+		diags.AddAttributeError(path.Root("activation"), "Incomplete activation", "activation requires administrative_status")
+	}
 	if m.Extra.IsNull() || m.Extra.IsUnknown() || m.Extra.IsUnderlyingValueUnknown() {
 		return diags
 	}
@@ -451,27 +486,77 @@ func validateFocus(ctx context.Context, m focusModel, kind focusKind) diag.Diagn
 		diags.AddAttributeError(path.Root("extra"), "Invalid extra", "extra must be an object of midPoint items")
 		return diags
 	}
-	typed := map[string]bool{"activation": m.Activation != nil}
-	for item, v := range focusStrings(&m) {
-		typed[item] = !v.IsNull()
-	}
-	for item, v := range focusBools(&m, kind) {
-		typed[item] = !v.IsNull()
-	}
-	for item, v := range focusDynamics(&m, kind) {
-		typed[item] = !v.IsNull()
-	}
 	for k, v := range attrs {
 		if v.IsNull() {
 			continue
 		}
-		switch {
-		case k == "oid":
+		if k == "oid" {
 			diags.AddAttributeError(path.Root("extra"), "Conflicting oid", "extra must not hold oid; use the oid attribute")
-		case typed[k]:
-			diags.AddAttributeError(path.Root("extra"), "Conflicting item",
-				fmt.Sprintf("extra holds %q, which a typed attribute of this resource already sets; set it in one place", k))
+			continue
+		}
+		if name, typed := typedItem(kind, k, v); typed {
+			diags.AddAttributeError(path.Root("extra"), "Typed item in extra",
+				fmt.Sprintf("%s is a typed attribute of midpoint_%s (%s); set it there instead of in extra", k, kind.Name, name))
 		}
 	}
 	return diags
+}
+
+// typedItem reports whether the root item k with value v belongs to a
+// typed attribute of kind (and names it): any value of a dynamic attribute
+// item, and a value of a scalar or activation item that the attribute can
+// express (a string, a bool, an activation with only administrativeStatus;
+// unknown counts). A value the attribute cannot express (e.g. activation
+// with validity) belongs in extra, where a read places it too.
+func typedItem(kind focusKind, k string, v attr.Value) (string, bool) {
+	if d, ok := v.(basetypes.DynamicValue); ok {
+		if d.IsUnderlyingValueUnknown() {
+			return focusAttrName(k), isTypedItem(kind, k)
+		}
+		v = d.UnderlyingValue()
+	}
+	unknown := v.IsUnknown()
+	var m focusModel
+	if _, ok := focusStrings(&m)[k]; ok {
+		_, isStr := v.(basetypes.StringValue)
+		return focusAttrName(k), unknown || isStr
+	}
+	if _, ok := focusBools(&m, kind)[k]; ok {
+		_, isBool := v.(basetypes.BoolValue)
+		return focusAttrName(k), unknown || isBool
+	}
+	if _, ok := focusDynamics(&m, kind)[k]; ok {
+		return focusAttrName(k), true
+	}
+	if k == "activation" {
+		act, ok := bodyAttributes(types.DynamicValue(v))
+		if unknown || !ok {
+			return "activation", unknown
+		}
+		_, isStr := act["administrativeStatus"].(basetypes.StringValue)
+		return "activation", len(act) == 1 && isStr
+	}
+	return "", false
+}
+
+func isTypedItem(kind focusKind, k string) bool {
+	var m focusModel
+	_, s := focusStrings(&m)[k]
+	_, b := focusBools(&m, kind)[k]
+	_, d := focusDynamics(&m, kind)[k]
+	return s || b || d || k == "activation"
+}
+
+// focusAttrName is the attribute name of root item k, e.g. display_name for
+// displayName.
+func focusAttrName(item string) string {
+	var b strings.Builder
+	for _, r := range item {
+		if r >= 'A' && r <= 'Z' {
+			b.WriteByte('_')
+			r += 'a' - 'A'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }

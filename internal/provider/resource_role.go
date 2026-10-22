@@ -35,8 +35,8 @@ func (s *roleLikeState) setModel(m focusModel) {
 	s.Authorization = m.Authorization
 }
 
-// authorizationAttribute is the authorization attribute of service, role
-// and org.
+// authorizationAttribute is the authorization attribute of all four
+// role-like resources.
 func authorizationAttribute() schema.Attribute {
 	return schema.DynamicAttribute{
 		Description: "Authorizations (authorization), a list in midPoint naming, e.g. " +

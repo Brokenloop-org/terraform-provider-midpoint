@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -23,6 +24,10 @@ const (
 )
 
 func str(s string) types.String { return types.StringValue(s) }
+
+func jsonText(s string) jsontypes.Normalized { return jsontypes.NewNormalizedValue(s) }
+
+func jsonNull() jsontypes.Normalized { return jsontypes.NewNormalizedNull() }
 
 // dyn builds a dynamic value from a Go value in the normalize shape.
 func dyn(t *testing.T, v any) types.Dynamic {
@@ -63,7 +68,7 @@ func filterTarget(filter, typ string) *targetRef {
 func block(tg *targetRef) assignmentModel {
 	return assignmentModel{
 		Target: tg, Order: types.Int64Null(),
-		Condition: types.StringNull(), PolicyRule: types.StringNull(), Extra: types.StringNull(),
+		Condition: jsonNull(), PolicyRule: jsonNull(), Extra: jsonNull(),
 	}
 }
 
@@ -132,17 +137,17 @@ func focusCases() []focusCase {
 				m.Name = str("business")
 				ind := block(filterTarget(`name = "vault / operator"`, "RoleType"))
 				ind.Order = types.Int64Value(2)
-				ind.Condition = str(`{"expression":{"script":[{"code":"true"}]}}`)
+				ind.Condition = jsonText(`{"expression":{"script":[{"code":"true"}]}}`)
 				m.Inducements = []assignmentModel{ind, {
 					Construction: &constructionModel{
 						Resource: str(fResourceOID), Kind: str("account"), Intent: str("default"),
-						Body: str(`{"attribute":[{"ref":"ri:cn"}]}`),
+						Body: jsonText(`{"attribute":[{"ref":"ri:cn"}]}`),
 					},
-					Order: types.Int64Null(), Condition: types.StringNull(), PolicyRule: types.StringNull(),
-					Extra: str(`{"description":"ldap account"}`),
+					Order: types.Int64Null(), Condition: jsonNull(), PolicyRule: jsonNull(),
+					Extra: jsonText(`{"description":"ldap account"}`),
 				}, {
-					Order: types.Int64Null(), Condition: types.StringNull(), Extra: types.StringNull(),
-					PolicyRule: str(`{"name":"no-sod","policyConstraints":{"exclusion":[{"targetRef":{"oid":"` + fRoleOID + `","type":"RoleType"}}]}}`),
+					Order: types.Int64Null(), Condition: jsonNull(), Extra: jsonNull(),
+					PolicyRule: jsonText(`{"name":"no-sod","policyConstraints":{"exclusion":[{"targetRef":{"oid":"` + fRoleOID + `","type":"RoleType"}}]}}`),
 				}}
 				return m
 			},
@@ -196,6 +201,7 @@ func focusCases() []focusCase {
 				m.Name = str("Cluster")
 				m.HolderType = types.ListValueMust(types.StringType, []attr.Value{str("RoleType")})
 				m.ArchetypePolicy = dyn(t, map[string]any{"display": map[string]any{"label": "Cluster"}})
+				m.Authorization = dyn(t, []any{map[string]any{"action": []any{"urn:x#read"}}})
 				return m
 			},
 			want: map[string]any{
@@ -205,6 +211,28 @@ func focusCases() []focusCase {
 					"assignmentRelation": []any{map[string]any{"holderType": []any{"#RoleType"}}},
 				}},
 				"archetypePolicy": map[string]any{"display": map[string]any{"label": "Cluster"}},
+				"authorization":   []any{map[string]any{"action": []any{"urn:x#read"}}},
+			},
+		},
+		{
+			// A value a block could express, written in extra: it stays in
+			// extra on read (round trip); an import makes it a block.
+			name: "extra_holds_expressible_inducement", kind: roleKind,
+			m: func(t *testing.T) focusModel {
+				m := baseModel()
+				m.Name = str("x")
+				m.Inducements = []assignmentModel{block(target(fRoleOID, "RoleType"))}
+				m.Extra = dyn(t, map[string]any{"inducement": []any{
+					map[string]any{"targetRef": map[string]any{"oid": fServiceOID, "type": "ServiceType"}},
+				}})
+				return m
+			},
+			want: map[string]any{
+				"name": "x",
+				"inducement": []any{
+					map[string]any{"targetRef": map[string]any{"oid": fRoleOID, "type": "RoleType"}},
+					map[string]any{"targetRef": map[string]any{"oid": fServiceOID, "type": "ServiceType"}},
+				},
 			},
 		},
 		{
@@ -458,7 +486,7 @@ func TestFocusFromBody(t *testing.T) {
 		ind := block(target(fServiceOID, "ServiceType"))
 		// Spacing, key order and a single value where midPoint returns a
 		// list: canonically equal, so the configured text stays.
-		ind.Condition = str(`{ "source": {"path": "name"}, "expression": {"script": [{"code": "true"}]} }`)
+		ind.Condition = jsonText(`{ "source": {"path": "name"}, "expression": {"script": [{"code": "true"}]} }`)
 		m.Inducements = []assignmentModel{ind}
 		body, diags := focusToBody(ctx, m, roleKind, false)
 		noErrors(t, diags)
@@ -471,6 +499,40 @@ func TestFocusFromBody(t *testing.T) {
 		}
 		if got.Description.ValueString() != "changed in the GUI" {
 			t.Errorf("description = %s", got.Description)
+		}
+	})
+
+	t.Run("extra_inducement_placement_follows_prior", func(t *testing.T) {
+		m := baseModel()
+		m.Name = str("r")
+		m.Extra = dyn(t, map[string]any{"inducement": []any{
+			map[string]any{"targetRef": map[string]any{"oid": fServiceOID, "type": "ServiceType"}},
+		}})
+		body, diags := focusToBody(ctx, m, roleKind, false)
+		noErrors(t, diags)
+		actual := serverView(t, "roles", body)
+		actual["description"] = "drift elsewhere"
+
+		got, diags := focusFromBody(ctx, actual, m, roleKind)
+		noErrors(t, diags)
+		if len(got.Inducements) != 0 || !got.Extra.Equal(m.Extra) {
+			t.Errorf("prior extra: inducements = %+v, extra = %v; want none and the prior extra", got.Inducements, got.Extra)
+		}
+
+		got, diags = focusFromBody(ctx, actual, importStub(), roleKind)
+		noErrors(t, diags)
+		if len(got.Inducements) != 1 || got.Inducements[0].Target.OID.ValueString() != fServiceOID || !got.Extra.IsNull() {
+			t.Errorf("import: inducements = %+v, extra = %v; want one block and no extra", got.Inducements, got.Extra)
+		}
+
+		// Without the value in the prior extra (e.g. added in the GUI), a
+		// value a block can express becomes a block.
+		prior := baseModel()
+		prior.Name = str("r")
+		got, diags = focusFromBody(ctx, actual, prior, roleKind)
+		noErrors(t, diags)
+		if len(got.Inducements) != 1 || !got.Extra.IsNull() {
+			t.Errorf("no prior extra: inducements = %+v, extra = %v", got.Inducements, got.Extra)
 		}
 	})
 
@@ -530,6 +592,57 @@ func TestFocusValidate_archetypeConflict(t *testing.T) {
 	}
 }
 
+func TestFocusValidate_typedItemsInExtra(t *testing.T) {
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name    string
+		kind    focusKind
+		extra   map[string]any
+		wantErr string
+	}{
+		{"description_unset_typed", roleKind, map[string]any{"description": "x"}, "description is a typed attribute of midpoint_role (description)"},
+		{"display_name", serviceKind, map[string]any{"displayName": "x"}, "displayName is a typed attribute of midpoint_service (display_name)"},
+		{"requestable", roleKind, map[string]any{"requestable": true}, "requestable is a typed attribute"},
+		{"tenant_on_org", orgKind, map[string]any{"tenant": true}, "tenant is a typed attribute of midpoint_org"},
+		{"authorization_on_archetype", archetypeKind, map[string]any{"authorization": []any{map[string]any{"action": []any{"a"}}}}, "authorization is a typed attribute of midpoint_archetype"},
+		{"archetype_policy", archetypeKind, map[string]any{"archetypePolicy": map[string]any{}}, "archetypePolicy is a typed attribute"},
+		{"extension", roleKind, map[string]any{"extension": map[string]any{"a": "b"}}, "extension is a typed attribute"},
+		{"expressible_activation", roleKind, map[string]any{"activation": map[string]any{"administrativeStatus": "enabled"}}, "activation is a typed attribute"},
+		// Allowed: not typed for this kind, or not expressible by the
+		// typed attribute (a read places these in extra too).
+		{"tenant_on_role", roleKind, map[string]any{"tenant": true}, ""},
+		{"activation_with_validity", roleKind, map[string]any{"activation": map[string]any{"administrativeStatus": "enabled", "validFrom": "2026-01-01T00:00:00Z"}}, ""},
+		{"polystring_name_with_translation", roleKind, map[string]any{"name": map[string]any{"orig": "x", "translation": map[string]any{"key": "k"}}}, ""},
+		{"expressible_inducement", roleKind, map[string]any{"inducement": []any{map[string]any{"targetRef": map[string]any{"oid": fRoleOID, "type": "RoleType"}}}}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := baseModel()
+			m.Name = str("r")
+			m.Extra = dyn(t, tc.extra)
+			diags := validateFocus(ctx, m, tc.kind)
+			if tc.wantErr == "" {
+				noErrors(t, diags)
+				return
+			}
+			if !diags.HasError() || !strings.Contains(diagText(diags), tc.wantErr) {
+				t.Errorf("want an error containing %q, got %q", tc.wantErr, diagText(diags))
+			}
+		})
+	}
+}
+
+func TestFocusValidate_emptyActivation(t *testing.T) {
+	m := baseModel()
+	m.Name = str("r")
+	m.Activation = &activationModel{AdministrativeStatus: types.StringNull()}
+	diags := validateFocus(context.Background(), m, roleKind)
+	if !diags.HasError() || !strings.Contains(diagText(diags), "activation requires administrative_status") {
+		t.Fatalf("want an activation error, got %q", diagText(diags))
+	}
+	m.Activation.AdministrativeStatus = types.StringUnknown()
+	noErrors(t, validateFocus(context.Background(), m, roleKind))
+}
+
 func TestFocusValidate_conflicts(t *testing.T) {
 	ctx := context.Background()
 	for name, mod := range map[string]func(m *focusModel){
@@ -542,14 +655,14 @@ func TestFocusValidate_conflicts(t *testing.T) {
 		},
 		"construction_body_kind": func(m *focusModel) {
 			m.Inducements = []assignmentModel{{
-				Construction: &constructionModel{Resource: str(fResourceOID), Kind: str("account"), Intent: types.StringNull(), Body: str(`{"kind":"entitlement"}`)},
-				Order:        types.Int64Null(), Condition: types.StringNull(), PolicyRule: types.StringNull(), Extra: types.StringNull(),
+				Construction: &constructionModel{Resource: str(fResourceOID), Kind: str("account"), Intent: types.StringNull(), Body: jsonText(`{"kind":"entitlement"}`)},
+				Order:        types.Int64Null(), Condition: jsonNull(), PolicyRule: jsonNull(), Extra: jsonNull(),
 			}}
 		},
 		"block_extra_condition": func(m *focusModel) {
 			b := block(target(fServiceOID, "ServiceType"))
-			b.Condition = str(`{}`)
-			b.Extra = str(`{"condition":{}}`)
+			b.Condition = jsonText(`{}`)
+			b.Extra = jsonText(`{"condition":{}}`)
 			m.Inducements = []assignmentModel{b}
 		},
 		"empty_assignment": func(m *focusModel) {
