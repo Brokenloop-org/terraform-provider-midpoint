@@ -17,6 +17,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	"github.com/jplana/terraform-provider-midpoint/internal/client"
 )
 
 // resourceShortNames are the keys accepted in default_options.
@@ -51,8 +53,7 @@ type providerConfig struct {
 
 // providerData is handed to resources and data sources via Configure.
 type providerData struct {
-	// Client is a placeholder until the client package exists.
-	Client         any
+	Client         *client.Client
 	Config         providerConfig
 	DefaultOptions map[string][]string
 }
@@ -132,7 +133,31 @@ func (p *midpointProvider) Configure(ctx context.Context, req provider.Configure
 		"insecure": cfg.Insecure,
 	})
 
-	data := &providerData{Config: cfg, DefaultOptions: defaults}
+	var caBundle []byte
+	if cfg.CABundle != "" {
+		caBundle = []byte(cfg.CABundle)
+	}
+	c, err := client.New(client.Config{
+		URL:       cfg.URL,
+		Username:  cfg.Username,
+		Password:  cfg.Password,
+		Insecure:  cfg.Insecure,
+		CABundle:  caBundle,
+		UserAgent: "terraform-provider-midpoint/" + p.version,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to create midPoint client", err.Error())
+		return
+	}
+
+	if version, err := c.ServerVersion(ctx); err != nil {
+		resp.Diagnostics.AddWarning("Unable to read midPoint server version",
+			"Reading the server version from "+cfg.URL+" failed; later requests may fail too: "+err.Error())
+	} else {
+		tflog.Info(ctx, "connected to midPoint", map[string]any{"url": cfg.URL, "version": version})
+	}
+
+	data := &providerData{Client: c, Config: cfg, DefaultOptions: defaults}
 	resp.ResourceData = data
 	resp.DataSourceData = data
 }

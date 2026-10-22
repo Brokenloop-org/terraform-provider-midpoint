@@ -2,8 +2,13 @@ package provider
 
 import (
 	"context"
+	"encoding/pem"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
+	"sync/atomic"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -77,12 +82,39 @@ func configure(t *testing.T, vals map[string]tftypes.Value) *provider.ConfigureR
 	return resp
 }
 
+// versionServer starts a stub midPoint answering GET /nodes/current with
+// status and counts the version requests it receives.
+func versionServer(t *testing.T, status int) (string, *atomic.Int32) {
+	t.Helper()
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/midpoint/ws/rest/nodes/current" {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		hits.Add(1)
+		w.WriteHeader(status)
+		if status == http.StatusOK {
+			_, _ = io.WriteString(w, `{"node":{"build":{"version":"4.9.9"}}}`)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL, &hits
+}
+
 func TestProviderConfigure(t *testing.T) {
 	str := func(v string) tftypes.Value { return tftypes.NewValue(tftypes.String, v) }
 	listType := tftypes.List{ElementType: tftypes.String}
 	optsType := tftypes.Map{ElementType: listType}
+
+	attrURL, attrHits := versionServer(t, http.StatusOK)
+	envURL, envHits := versionServer(t, http.StatusOK)
+	downURL, downHits := versionServer(t, http.StatusInternalServerError)
+	tlsSrv := httptest.NewTLSServer(http.NotFoundHandler())
+	t.Cleanup(tlsSrv.Close)
+	caPEM := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: tlsSrv.Certificate().Raw}))
+
 	credsEnv := map[string]string{
-		"MIDPOINT_URL":      "http://env:8080",
+		"MIDPOINT_URL":      envURL,
 		"MIDPOINT_USERNAME": "env-user",
 		"MIDPOINT_PASSWORD": "env-pass",
 	}
@@ -102,23 +134,26 @@ func TestProviderConfigure(t *testing.T) {
 		env          map[string]string
 		vals         map[string]tftypes.Value
 		wantErrs     int
+		wantWarnings int
+		wantHits     *atomic.Int32 // server that must receive the version request
 		wantConfig   providerConfig
 		wantDefaults map[string][]string
 	}{
 		{
 			name: "attributes",
 			vals: map[string]tftypes.Value{
-				"url":       str("http://attr:8080"),
+				"url":       str(attrURL),
 				"username":  str("attr-user"),
 				"password":  str("attr-pass"),
 				"insecure":  tftypes.NewValue(tftypes.Bool, true),
-				"ca_bundle": str("PEM"),
+				"ca_bundle": str(caPEM),
 				"default_options": tftypes.NewValue(optsType, map[string]tftypes.Value{
 					"role": tftypes.NewValue(listType, []tftypes.Value{str("raw")}),
 				}),
 			},
+			wantHits: attrHits,
 			wantConfig: providerConfig{
-				URL: "http://attr:8080", Username: "attr-user", Password: "attr-pass", Insecure: true, CABundle: "PEM",
+				URL: attrURL, Username: "attr-user", Password: "attr-pass", Insecure: true, CABundle: caPEM,
 			},
 			wantDefaults: map[string][]string{"role": {"raw"}},
 		},
@@ -126,15 +161,24 @@ func TestProviderConfigure(t *testing.T) {
 			name: "attributes take precedence over environment",
 			env:  withEnv(map[string]string{"MIDPOINT_INSECURE": "true"}),
 			vals: map[string]tftypes.Value{
-				"url":      str("http://attr:8080"),
+				"url":      str(attrURL),
 				"insecure": tftypes.NewValue(tftypes.Bool, false),
 			},
-			wantConfig: providerConfig{URL: "http://attr:8080", Username: "env-user", Password: "env-pass"},
+			wantHits:   attrHits,
+			wantConfig: providerConfig{URL: attrURL, Username: "env-user", Password: "env-pass"},
 		},
 		{
 			name:       "environment fallback",
 			env:        withEnv(map[string]string{"MIDPOINT_INSECURE": "true"}),
-			wantConfig: providerConfig{URL: "http://env:8080", Username: "env-user", Password: "env-pass", Insecure: true},
+			wantHits:   envHits,
+			wantConfig: providerConfig{URL: envURL, Username: "env-user", Password: "env-pass", Insecure: true},
+		},
+		{
+			name:         "server version failure is a warning",
+			env:          withEnv(map[string]string{"MIDPOINT_URL": downURL}),
+			wantWarnings: 1,
+			wantHits:     downHits,
+			wantConfig:   providerConfig{URL: downURL, Username: "env-user", Password: "env-pass"},
 		},
 		{
 			name:     "missing credentials",
@@ -145,6 +189,12 @@ func TestProviderConfigure(t *testing.T) {
 			env:      withEnv(map[string]string{"MIDPOINT_INSECURE": "notabool"}),
 			wantErrs: 1,
 		},
+		{
+			name:     "invalid ca_bundle",
+			env:      withEnv(nil),
+			vals:     map[string]tftypes.Value{"ca_bundle": str("not a PEM certificate")},
+			wantErrs: 1,
+		},
 	}
 
 	for _, tc := range tests {
@@ -152,10 +202,17 @@ func TestProviderConfigure(t *testing.T) {
 			for _, name := range []string{"MIDPOINT_URL", "MIDPOINT_USERNAME", "MIDPOINT_PASSWORD", "MIDPOINT_INSECURE"} {
 				t.Setenv(name, tc.env[name])
 			}
+			var hitsBefore int32
+			if tc.wantHits != nil {
+				hitsBefore = tc.wantHits.Load()
+			}
 			resp := configure(t, tc.vals)
 
 			if got := resp.Diagnostics.ErrorsCount(); got != tc.wantErrs {
 				t.Fatalf("got %d errors, want %d: %v", got, tc.wantErrs, resp.Diagnostics)
+			}
+			if got := resp.Diagnostics.WarningsCount(); got != tc.wantWarnings {
+				t.Errorf("got %d warnings, want %d: %v", got, tc.wantWarnings, resp.Diagnostics)
 			}
 			if tc.wantErrs > 0 {
 				if resp.ResourceData != nil {
@@ -172,6 +229,12 @@ func TestProviderConfigure(t *testing.T) {
 			}
 			if data.Config != tc.wantConfig {
 				t.Errorf("Config = %+v, want %+v", data.Config, tc.wantConfig)
+			}
+			if data.Client == nil {
+				t.Error("Client must be set")
+			}
+			if got := tc.wantHits.Load() - hitsBefore; got != 1 {
+				t.Errorf("server received %d version requests, want 1", got)
 			}
 			wantDefaults := tc.wantDefaults
 			if wantDefaults == nil {
