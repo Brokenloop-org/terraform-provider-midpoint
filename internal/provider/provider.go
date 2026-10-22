@@ -53,6 +53,7 @@ type providerConfig struct {
 type providerData struct {
 	// Client is a placeholder until the client package exists.
 	Client         any
+	Config         providerConfig
 	DefaultOptions map[string][]string
 }
 
@@ -131,7 +132,7 @@ func (p *midpointProvider) Configure(ctx context.Context, req provider.Configure
 		"insecure": cfg.Insecure,
 	})
 
-	data := &providerData{DefaultOptions: defaults}
+	data := &providerData{Config: cfg, DefaultOptions: defaults}
 	resp.ResourceData = data
 	resp.DataSourceData = data
 }
@@ -151,13 +152,15 @@ func resolveConfig(model providerModel) (providerConfig, diag.Diagnostics) {
 			"The provider cannot be configured with a value that is unknown until apply.")
 	case !model.Insecure.IsNull():
 		cfg.Insecure = model.Insecure.ValueBool()
-	case os.Getenv("MIDPOINT_INSECURE") != "":
-		v, err := strconv.ParseBool(os.Getenv("MIDPOINT_INSECURE"))
-		if err != nil {
-			diags.AddAttributeError(path.Root("insecure"), "Invalid MIDPOINT_INSECURE",
-				"MIDPOINT_INSECURE must be a boolean (true or false): "+err.Error())
+	default:
+		if env := os.Getenv("MIDPOINT_INSECURE"); env != "" {
+			v, err := strconv.ParseBool(env)
+			if err != nil {
+				diags.AddAttributeError(path.Root("insecure"), "Invalid MIDPOINT_INSECURE",
+					"MIDPOINT_INSECURE must be a boolean (true or false): "+err.Error())
+			}
+			cfg.Insecure = v
 		}
-		cfg.Insecure = v
 	}
 
 	if model.CABundle.IsUnknown() {

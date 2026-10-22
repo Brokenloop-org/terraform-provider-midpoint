@@ -77,74 +77,109 @@ func configure(t *testing.T, vals map[string]tftypes.Value) *provider.ConfigureR
 	return resp
 }
 
-func clearEnv(t *testing.T) {
-	t.Helper()
-	for _, name := range []string{"MIDPOINT_URL", "MIDPOINT_USERNAME", "MIDPOINT_PASSWORD", "MIDPOINT_INSECURE"} {
-		t.Setenv(name, "")
+func TestProviderConfigure(t *testing.T) {
+	str := func(v string) tftypes.Value { return tftypes.NewValue(tftypes.String, v) }
+	listType := tftypes.List{ElementType: tftypes.String}
+	optsType := tftypes.Map{ElementType: listType}
+	credsEnv := map[string]string{
+		"MIDPOINT_URL":      "http://env:8080",
+		"MIDPOINT_USERNAME": "env-user",
+		"MIDPOINT_PASSWORD": "env-pass",
 	}
-}
+	withEnv := func(extra map[string]string) map[string]string {
+		env := map[string]string{}
+		for k, v := range credsEnv {
+			env[k] = v
+		}
+		for k, v := range extra {
+			env[k] = v
+		}
+		return env
+	}
 
-func TestProviderConfigure_attributes(t *testing.T) {
-	clearEnv(t)
-	optsType := tftypes.Map{ElementType: tftypes.List{ElementType: tftypes.String}}
-	resp := configure(t, map[string]tftypes.Value{
-		"url":      tftypes.NewValue(tftypes.String, "http://localhost:8080"),
-		"username": tftypes.NewValue(tftypes.String, "administrator"),
-		"password": tftypes.NewValue(tftypes.String, "secret"),
-		"default_options": tftypes.NewValue(optsType, map[string]tftypes.Value{
-			"role": tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, []tftypes.Value{
-				tftypes.NewValue(tftypes.String, "raw"),
-			}),
-		}),
-	})
-	if resp.Diagnostics.HasError() {
-		t.Fatal(resp.Diagnostics)
+	tests := []struct {
+		name         string
+		env          map[string]string
+		vals         map[string]tftypes.Value
+		wantErrs     int
+		wantConfig   providerConfig
+		wantDefaults map[string][]string
+	}{
+		{
+			name: "attributes",
+			vals: map[string]tftypes.Value{
+				"url":       str("http://attr:8080"),
+				"username":  str("attr-user"),
+				"password":  str("attr-pass"),
+				"insecure":  tftypes.NewValue(tftypes.Bool, true),
+				"ca_bundle": str("PEM"),
+				"default_options": tftypes.NewValue(optsType, map[string]tftypes.Value{
+					"role": tftypes.NewValue(listType, []tftypes.Value{str("raw")}),
+				}),
+			},
+			wantConfig: providerConfig{
+				URL: "http://attr:8080", Username: "attr-user", Password: "attr-pass", Insecure: true, CABundle: "PEM",
+			},
+			wantDefaults: map[string][]string{"role": {"raw"}},
+		},
+		{
+			name: "attributes take precedence over environment",
+			env:  withEnv(map[string]string{"MIDPOINT_INSECURE": "true"}),
+			vals: map[string]tftypes.Value{
+				"url":      str("http://attr:8080"),
+				"insecure": tftypes.NewValue(tftypes.Bool, false),
+			},
+			wantConfig: providerConfig{URL: "http://attr:8080", Username: "env-user", Password: "env-pass"},
+		},
+		{
+			name:       "environment fallback",
+			env:        withEnv(map[string]string{"MIDPOINT_INSECURE": "true"}),
+			wantConfig: providerConfig{URL: "http://env:8080", Username: "env-user", Password: "env-pass", Insecure: true},
+		},
+		{
+			name:     "missing credentials",
+			wantErrs: 3,
+		},
+		{
+			name:     "invalid MIDPOINT_INSECURE",
+			env:      withEnv(map[string]string{"MIDPOINT_INSECURE": "notabool"}),
+			wantErrs: 1,
+		},
 	}
-	data, ok := resp.ResourceData.(*providerData)
-	if !ok {
-		t.Fatalf("ResourceData is %T, want *providerData", resp.ResourceData)
-	}
-	if resp.DataSourceData != resp.ResourceData {
-		t.Error("DataSourceData must be the same providerData as ResourceData")
-	}
-	want := map[string][]string{"role": {"raw"}}
-	if !reflect.DeepEqual(data.DefaultOptions, want) {
-		t.Errorf("DefaultOptions = %v, want %v", data.DefaultOptions, want)
-	}
-}
 
-func TestProviderConfigure_envFallback(t *testing.T) {
-	t.Setenv("MIDPOINT_URL", "http://localhost:8080")
-	t.Setenv("MIDPOINT_USERNAME", "administrator")
-	t.Setenv("MIDPOINT_PASSWORD", "secret")
-	t.Setenv("MIDPOINT_INSECURE", "true")
-	resp := configure(t, nil)
-	if resp.Diagnostics.HasError() {
-		t.Fatal(resp.Diagnostics)
-	}
-	if _, ok := resp.ResourceData.(*providerData); !ok {
-		t.Fatalf("ResourceData is %T, want *providerData", resp.ResourceData)
-	}
-}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, name := range []string{"MIDPOINT_URL", "MIDPOINT_USERNAME", "MIDPOINT_PASSWORD", "MIDPOINT_INSECURE"} {
+				t.Setenv(name, tc.env[name])
+			}
+			resp := configure(t, tc.vals)
 
-func TestProviderConfigure_missingCredentials(t *testing.T) {
-	clearEnv(t)
-	resp := configure(t, nil)
-	if got := resp.Diagnostics.ErrorsCount(); got != 3 {
-		t.Fatalf("got %d errors, want 3 (url, username, password): %v", got, resp.Diagnostics)
-	}
-	if resp.ResourceData != nil {
-		t.Error("ResourceData must not be set when configuration fails")
-	}
-}
-
-func TestProviderConfigure_invalidInsecureEnv(t *testing.T) {
-	t.Setenv("MIDPOINT_URL", "http://localhost:8080")
-	t.Setenv("MIDPOINT_USERNAME", "administrator")
-	t.Setenv("MIDPOINT_PASSWORD", "secret")
-	t.Setenv("MIDPOINT_INSECURE", "notabool")
-	resp := configure(t, nil)
-	if !resp.Diagnostics.HasError() {
-		t.Fatal("expected an error for an invalid MIDPOINT_INSECURE value")
+			if got := resp.Diagnostics.ErrorsCount(); got != tc.wantErrs {
+				t.Fatalf("got %d errors, want %d: %v", got, tc.wantErrs, resp.Diagnostics)
+			}
+			if tc.wantErrs > 0 {
+				if resp.ResourceData != nil {
+					t.Error("ResourceData must not be set when configuration fails")
+				}
+				return
+			}
+			data, ok := resp.ResourceData.(*providerData)
+			if !ok {
+				t.Fatalf("ResourceData is %T, want *providerData", resp.ResourceData)
+			}
+			if resp.DataSourceData != resp.ResourceData {
+				t.Error("DataSourceData must be the same providerData as ResourceData")
+			}
+			if data.Config != tc.wantConfig {
+				t.Errorf("Config = %+v, want %+v", data.Config, tc.wantConfig)
+			}
+			wantDefaults := tc.wantDefaults
+			if wantDefaults == nil {
+				wantDefaults = map[string][]string{}
+			}
+			if !reflect.DeepEqual(data.DefaultOptions, wantDefaults) {
+				t.Errorf("DefaultOptions = %v, want %v", data.DefaultOptions, wantDefaults)
+			}
+		})
 	}
 }
