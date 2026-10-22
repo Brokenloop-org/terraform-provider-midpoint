@@ -2,7 +2,7 @@ TESTARGS ?= -run TestAcc
 
 export MIDPOINT_URL ?= http://localhost:8080
 export MIDPOINT_USERNAME ?= administrator
-export MIDPOINT_PASSWORD ?= 5ecr3t
+export MIDPOINT_PASSWORD ?= Test5ecr3t
 
 .PHONY: build test testacc lint docs env-up env-down
 
@@ -23,7 +23,7 @@ docs:
 	go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate
 
 env-up:
-	@echo "env-up: see Task 3"
+	docker compose -f testacc/docker-compose.yml up -d && ./testacc/wait.sh
 
 env-down:
-	@echo "env-down: see Task 3"
+	docker compose -f testacc/docker-compose.yml down -v

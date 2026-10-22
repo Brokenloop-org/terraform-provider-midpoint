@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 // testAccProtoV6ProviderFactories instantiates the provider for acceptance
@@ -37,6 +38,19 @@ func testAccPreCheck(t *testing.T) {
 			t.Fatalf("%s must be set for acceptance tests", name)
 		}
 	}
+}
+
+// TestAccProvider_configure checks that the provider serves a plan for a
+// config with no resources. Terraform prunes a provider nothing uses, so
+// Configure is not invoked here; resource acceptance tests cover it.
+func TestAccProvider_configure(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: `provider "midpoint" {}`},
+		},
+	})
 }
 
 func TestProviderSchema(t *testing.T) {
