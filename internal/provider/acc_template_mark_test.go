@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -75,13 +76,20 @@ func TestAccObjectTemplate_mapping(t *testing.T) {
 	testAccPreCheck(t)
 	c := accClient(t)
 	name := acctest.RandomWithPrefix("tf-acc-tpl")
-	cfg := func(strength string) string {
+	// asList writes the multi-valued mapping and expression script as
+	// one-element lists, the form a read and an import produce; otherwise
+	// each is the single object.
+	cfgAs := func(strength string, asList bool) string {
+		open, closing, item := "", "", ""
+		if asList {
+			open, closing, item = "[", "]", "- "
+		}
 		return fmt.Sprintf(`
 resource "midpoint_object_template" "user" {
   name            = %q
   description     = "Acceptance user template"
   lifecycle_state = "active"
-  mapping = yamldecode(<<-EOT
+  mapping = %syamldecode(<<-EOT
     name: full-name
     strength: %s
     source:
@@ -89,16 +97,18 @@ resource "midpoint_object_template" "user" {
       - path: familyName
     expression:
       script:
-        code: "basic.concatName(givenName, familyName)"
+        %scode: "basic.concatName(givenName, familyName)"
     target:
       path: fullName
   EOT
-  )
+  )%s
   iteration_specification = { maxIterations = 5 }
 }
-`, name, strength)
+`, name, open, strength, item, closing)
 	}
+	cfg := func(strength string) string { return cfgAs(strength, false) }
 	const addr = "midpoint_object_template.user"
+	var oid, version string
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -110,6 +120,7 @@ resource "midpoint_object_template" "user" {
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("extra"), knownvalue.Null()),
 				},
 				Check: resource.ComposeAggregateTestCheckFunc(
+					captureOID(addr, &oid),
 					accSimpleItem(c, addr, "lifecycleState", "active"),
 					accSimpleItem(c, addr, "iterationSpecification", map[string]any{"maxIterations": json.Number("5")}),
 					accSimpleItem(c, addr, "mapping", []any{map[string]any{
@@ -140,12 +151,26 @@ resource "midpoint_object_template" "user" {
 			},
 			emptyPlanAfterRefresh(),
 			{
-				ResourceName:      addr,
-				ImportState:       true,
-				ImportStateVerify: true,
-				// Imported, the single mapping reads back in canonical
-				// (list) form.
-				ImportStateVerifyIgnore: []string{"mapping"},
+				// The list form is the same mapping: nothing is sent.
+				PreConfig: func() { version = accVersion(t, c, "objectTemplates", oid) },
+				Config:    cfgAs("strong", true),
+				Check: func(*terraform.State) error {
+					if v := accVersion(t, c, "objectTemplates", oid); v != version {
+						return fmt.Errorf("version = %s after the list-form apply, want %s (no write)", v, version)
+					}
+					return nil
+				},
+			},
+			emptyPlanAfterRefresh(),
+			// Imported, the mapping reads back as a list: the list-form
+			// state verifies, and an import block with the list-form
+			// configuration plans no change.
+			{ResourceName: addr, ImportState: true, ImportStateVerify: true},
+			{
+				Config:          cfgAs("strong", true),
+				ResourceName:    addr,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithID,
 			},
 		},
 	})
@@ -203,4 +228,16 @@ resource "midpoint_mark" "m" {
 			},
 		},
 	})
+}
+
+// accVersion returns the version of restType/oid; it fails the test when
+// the object cannot be read.
+func accVersion(t *testing.T, c *client.Client, restType, oid string) string {
+	t.Helper()
+	obj, err := c.Get(context.Background(), restType, oid, client.GetOptions{})
+	if err != nil {
+		t.Fatalf("reading %s/%s: %v", restType, oid, err)
+	}
+	v, _ := obj.Body["version"].(string)
+	return v
 }
