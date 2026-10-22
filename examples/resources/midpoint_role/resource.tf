@@ -43,6 +43,7 @@ resource "midpoint_role" "platform_team" {
     condition = jsonencode(yamldecode(file("${path.module}/only-employees.yaml")))
   }
 
+  # costCenter must be defined by a schema extension in midPoint.
   extension = {
     costCenter = "CC-123"
   }
