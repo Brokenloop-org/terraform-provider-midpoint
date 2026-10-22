@@ -190,7 +190,9 @@ func (e *engine) reconcile(_ context.Context, desired, actual map[string]any) (e
 // update reads the object oid and, when it differs from desired, sends one
 // PATCH with the item deltas, using the effective update options (options is
 // the resource attribute, nil when unset) plus reevaluateSearchFilters when a
-// delta adds a filter-only reference. Nothing is sent when they are equal.
+// delta adds a filter-only reference. Nothing is sent when they are equal;
+// when they differ but no item delta expresses the difference, nothing is
+// sent either and a warning names the differing items.
 func (e *engine) update(ctx context.Context, oid string, desired map[string]any, options []string) diag.Diagnostics {
 	actual, found, diags := e.read(ctx, oid)
 	if diags.HasError() {
@@ -205,7 +207,19 @@ func (e *engine) update(ctx context.Context, oid string, desired map[string]any,
 		diags.AddError("Cannot compute the changes", fmt.Sprintf("updating %s: %s", e.ref(oid), err))
 		return diags
 	}
-	if equal || len(deltas) == 0 {
+	if equal {
+		return diags
+	}
+	if len(deltas) == 0 {
+		// Unequal, yet no item delta expresses the difference: nothing is
+		// sent, and the next plan shows the same change again.
+		items := "the object"
+		if names := e.differingItems(desired, actual); len(names) > 0 {
+			items = strings.Join(names, ", ")
+		}
+		diags.AddWarning("Change not sent to midPoint",
+			fmt.Sprintf("%s: the configuration differs from midPoint in %s but no item delta can express the change; "+
+				"nothing was sent, and the plan will keep showing it", e.ref(oid), items))
 		return diags
 	}
 
@@ -347,6 +361,13 @@ func (e *engine) readAfterWrite(ctx context.Context, oid string, desired map[str
 			strings.TrimSuffix(d.Detail(), "."), e.ref(oid)))
 	}
 	return out
+}
+
+// differingItems lists the top-level items in which desired and actual
+// (either raw or canonical) differ once canonicalized and aligned.
+func (e *engine) differingItems(desired, actual map[string]any) []string {
+	cd, ca := e.canonicalPair(desired, actual)
+	return differingItems(delta.AlignForType(e.spec.RestType, cd, ca))
 }
 
 // differingItems lists, sorted, the top-level items (not "@" annotations)

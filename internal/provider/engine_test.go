@@ -681,3 +681,35 @@ func TestEngine_taskArchetypeAssignmentIsNotADifference(t *testing.T) {
 		t.Errorf("PATCH body = %v, want %v", got, want)
 	}
 }
+
+// TestEngineUpdate_differenceWithoutDeltaWarns: an empty list midPoint
+// returns for an item the configuration leaves out is a difference (Equal)
+// that no item delta expresses (Compute sends nothing for an absent item).
+// The update sends nothing and says so, naming the item.
+func TestEngineUpdate_differenceWithoutDeltaWarns(t *testing.T) {
+	e, s := testEngine(t, testRoleSpec, nil)
+	seeded := seededRole()
+	seeded["subtype"] = []any{}
+	s.Put("roles", seeded)
+	diags := e.update(context.Background(), engRoleOID, desiredRole(), nil)
+	noErrors(t, diags)
+	if p := requests(s, http.MethodPatch); len(p) != 0 {
+		t.Fatalf("sent %d PATCHes: %+v", len(p), p)
+	}
+	if diags.WarningsCount() != 1 {
+		t.Fatalf("want one warning, got:\n%s", diagText(diags))
+	}
+	w := diags.Warnings()[0]
+	want := "roles/" + engRoleOID + ": the configuration differs from midPoint in subtype but no item delta can express the change"
+	if w.Summary() != "Change not sent to midPoint" || !strings.Contains(w.Detail(), want) {
+		t.Errorf("warning = %q: %q, want detail containing %q", w.Summary(), w.Detail(), want)
+	}
+
+	// Equal bodies: no warning.
+	s.Put("roles", seededRole())
+	diags = e.update(context.Background(), engRoleOID, desiredRole(), nil)
+	noErrors(t, diags)
+	if diags.WarningsCount() != 0 {
+		t.Errorf("unexpected warnings:\n%s", diagText(diags))
+	}
+}
