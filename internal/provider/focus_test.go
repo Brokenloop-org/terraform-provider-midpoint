@@ -140,6 +140,9 @@ func focusCases() []focusCase {
 					},
 					Order: types.Int64Null(), Condition: types.StringNull(), PolicyRule: types.StringNull(),
 					Extra: str(`{"description":"ldap account"}`),
+				}, {
+					Order: types.Int64Null(), Condition: types.StringNull(), Extra: types.StringNull(),
+					PolicyRule: str(`{"name":"no-sod","policyConstraints":{"exclusion":[{"targetRef":{"oid":"` + fRoleOID + `","type":"RoleType"}}]}}`),
 				}}
 				return m
 			},
@@ -159,6 +162,12 @@ func focusCases() []focusCase {
 						},
 						"description": "ldap account",
 					},
+					map[string]any{"policyRule": map[string]any{
+						"name": "no-sod",
+						"policyConstraints": map[string]any{"exclusion": []any{map[string]any{
+							"targetRef": map[string]any{"oid": fRoleOID, "type": "RoleType"},
+						}}},
+					}},
 				},
 			},
 		},
