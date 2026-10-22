@@ -228,7 +228,9 @@ func stringOrEnv(v types.String, env, attr string, diags *diag.Diagnostics) stri
 }
 
 func (p *midpointProvider) Resources(_ context.Context) []func() resource.Resource {
-	return []func() resource.Resource{}
+	return []func() resource.Resource{
+		NewObjectResource,
+	}
 }
 
 func (p *midpointProvider) DataSources(_ context.Context) []func() datasource.DataSource {
