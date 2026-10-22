@@ -16,8 +16,9 @@ var compareOnlyWhenConfigured = []string{
 //
 //   - a reference whose desired value has a filter and no oid loses the
 //     server-resolved oid; one whose desired value has an oid and no filter
-//     loses the filter; type is dropped when the desired value has none, and
-//     relation "org:default" when the desired value has no relation;
+//     loses the filter; type and the "@type" annotation are dropped when the
+//     desired value has none, and relation "org:default" when the desired
+//     value has no relation;
 //   - the values of a multi-valued item are paired by Key and the actual
 //     list is reordered to the desired order (unpaired actual values last),
 //     because the values of a multi-valued item are a set;
@@ -85,6 +86,11 @@ func alignReference(d, a map[string]any) map[string]any {
 	}
 	if d["type"] == nil {
 		delete(out, "type")
+	}
+	// Canonical keeps nested "@type"; the server may annotate a reference
+	// with "ObjectReferenceType" that the configuration never states.
+	if d["@type"] == nil {
+		delete(out, "@type")
 	}
 	if d["relation"] == nil && out["relation"] == defaultRelation {
 		delete(out, "relation")

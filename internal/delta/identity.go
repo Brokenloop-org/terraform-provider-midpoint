@@ -13,6 +13,10 @@ import (
 	"strings"
 )
 
+// fallbackKeyPrefix starts the Key of a value identified by its whole
+// content.
+const fallbackKeyPrefix = "value:"
+
 // defaultRelation is the relation midPoint gives a reference that has none.
 const defaultRelation = "org:default"
 
@@ -32,7 +36,7 @@ const defaultRelation = "org:default"
 func Key(itemName string, v any) string {
 	m, ok := v.(map[string]any)
 	if !ok {
-		return "value:" + fingerprint(v)
+		return fallbackKeyPrefix + fingerprint(v)
 	}
 	switch {
 	case isReference(itemName):
@@ -46,7 +50,7 @@ func Key(itemName string, v any) string {
 			return "itemRef:" + fingerprint(m["ref"])
 		}
 	}
-	return "value:" + fingerprint(m)
+	return fallbackKeyPrefix + fingerprint(m)
 }
 
 // refKey identifies a reference by oid (or filter when there is no oid),
@@ -83,7 +87,7 @@ func assignmentKey(m map[string]any) string {
 		}
 		return "assignment:" + tuple("construction", resource, c["kind"], c["intent"], order)
 	}
-	return "value:" + fingerprint(m)
+	return fallbackKeyPrefix + fingerprint(m)
 }
 
 // isReference reports whether item name holds ObjectReferenceType values

@@ -1,0 +1,15 @@
+{
+  "name": "ldap",
+  "connectorConfiguration": {
+    "configurationProperties": {
+      "host": "h",
+      "credentials": {
+        "encryptedData": {
+          "cipherData": {
+            "cipherValue": "abc"
+          }
+        }
+      }
+    }
+  }
+}

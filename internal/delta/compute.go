@@ -26,11 +26,22 @@ const (
 // listing.
 var structuredProperties = map[string]bool{
 	"expression": true, // ExpressionType: mapping and condition expressions
-	"condition":  true, // MappingType.condition is ExpressionType; AssignmentType.condition (a MappingType container) is replaced whole
+	"condition":  true, // MappingType.condition (ExpressionType); see containerUnder for AssignmentType.condition
 	"filter":     true, // SearchFilterType: object selectors, references, queries
 	"query":      true, // QueryType: activity object sets, collection queries
 	"target":     true, // VariableBindingDefinitionType: mapping target
 }
+
+// containerUnder names items that structuredProperties lists but that are
+// containers below the given parent items, where midPoint can address the
+// items inside them.
+var containerUnder = map[string][]string{
+	"condition": {"assignment", "inducement"}, // AssignmentType.condition is a MappingType container
+}
+
+// protectedStringKeys mark a ProtectedStringType value (passwords, connector
+// secrets): a property whose parts are never addressed separately.
+var protectedStringKeys = []string{"clearValue", "encryptedData", "hashedData", "externalData"}
 
 // Compute returns the item deltas that turn actual into desired. Both are
 // canonical bodies (normalize.Canonical output); actual keeps the container
@@ -46,7 +57,7 @@ func Compute(desired, actual map[string]any) ([]client.ItemDelta, error) {
 		return nil, fmt.Errorf("delta: object annotations differ; a whole-object replace is never sent")
 	}
 	var c collector
-	if err := c.compareMap("", d, a); err != nil {
+	if err := c.compareMap("", "", d, a); err != nil {
 		return nil, err
 	}
 	out := make([]client.ItemDelta, 0, len(c.deletes)+len(c.replaces)+len(c.adds))
@@ -73,10 +84,10 @@ func (c *collector) emit(mod, path string, value any) {
 	}
 }
 
-// compareMap compares the items of two container values at prefix (empty at
-// the object root). Annotations ("@" keys) are not items; callers compare
-// them before descending.
-func (c *collector) compareMap(prefix string, d, a map[string]any) error {
+// compareMap compares the items of two values of container item parent (both
+// empty at the object root) at prefix. Annotations ("@" keys) are not items;
+// callers compare them before descending.
+func (c *collector) compareMap(prefix, parent string, d, a map[string]any) error {
 	keys := make([]string, 0, len(d)+len(a))
 	for k := range d {
 		keys = append(keys, k)
@@ -104,7 +115,7 @@ func (c *collector) compareMap(prefix string, d, a map[string]any) error {
 			// midPoint treats a replace with no value as removing the item.
 			c.emit(modReplace, path, nil)
 		default:
-			if err := c.compareItem(path, k, dv, av); err != nil {
+			if err := c.compareItem(path, parent, k, dv, av); err != nil {
 				return err
 			}
 		}
@@ -112,9 +123,9 @@ func (c *collector) compareMap(prefix string, d, a map[string]any) error {
 	return nil
 }
 
-// compareItem compares the desired and actual values of item name at path,
-// both present.
-func (c *collector) compareItem(path, name string, dv, av any) error {
+// compareItem compares the desired and actual values of item name (inside a
+// value of container item parent) at path, both present.
+func (c *collector) compareItem(path, parent, name string, dv, av any) error {
 	if normalize.Equal(dv, av) {
 		return nil
 	}
@@ -122,7 +133,7 @@ func (c *collector) compareItem(path, name string, dv, av any) error {
 	al, aIsList := av.([]any)
 	if dIsList && aIsList {
 		if hasMap(dl) || hasMap(al) {
-			return c.compareValues(path, name, dl, al)
+			return c.compareValues(path, parent, name, dl, al)
 		}
 		// Lists of scalars are replaced whole.
 		c.emit(modReplace, path, dv)
@@ -130,8 +141,8 @@ func (c *collector) compareItem(path, name string, dv, av any) error {
 	}
 	dm, dIsMap := dv.(map[string]any)
 	am, aIsMap := av.(map[string]any)
-	if dIsMap && aIsMap && descendable(name, dm, am) {
-		return c.compareMap(path, dm, am)
+	if dIsMap && aIsMap && descendable(parent, name, dm, am) {
+		return c.compareMap(path, name, dm, am)
 	}
 	c.emit(modReplace, path, itemValue(name, dv))
 	return nil
@@ -142,12 +153,27 @@ func (c *collector) compareItem(path, name string, dv, av any) error {
 // desired values are added and unpaired actual values deleted, each in one
 // delta; paired values that differ are compared item by item inside the
 // container value when its "@id" is known, else deleted and re-added whole.
-func (c *collector) compareValues(path, name string, d, a []any) error {
-	// One value on each side and no id to address it by: this is often a
-	// single-valued item that MultiValued wraps by name, so replace it.
-	if len(d) == 1 && len(a) == 1 && idOf(a[0]) == nil {
-		c.emit(modReplace, path, d)
-		return nil
+func (c *collector) compareValues(path, parent, name string, d, a []any) error {
+	if len(d) == 1 && len(a) == 1 {
+		id := idOf(a[0])
+		// One value on each side and no id to address it by: this is often
+		// a single-valued item that MultiValued wraps by name, so replace it.
+		if id == nil {
+			c.emit(modReplace, path, d)
+			return nil
+		}
+		// One value on each side, addressable by id, and no identity other
+		// than its whole content (outbound, inbound, mapping, ...): it is
+		// the same value modified, so change it in place.
+		dm, dIsMap := d[0].(map[string]any)
+		am, aIsMap := a[0].(map[string]any)
+		if dIsMap && aIsMap && strings.HasPrefix(Key(name, dm), fallbackKeyPrefix) && descendable(parent, name, dm, am) {
+			n, err := containerID(id)
+			if err != nil {
+				return fmt.Errorf("delta: %s: %w", path, err)
+			}
+			return c.compareMap(path+"["+n+"]", name, dm, am)
+		}
 	}
 	pairs, unpaired := pair(name, d, a)
 	var deletes, adds []any
@@ -161,12 +187,12 @@ func (c *collector) compareValues(path, name string, d, a []any) error {
 		}
 		dm, dIsMap := d[i].(map[string]any)
 		am, aIsMap := a[j].(map[string]any)
-		if id := idOf(a[j]); id != nil && dIsMap && aIsMap && descendable(name, dm, am) {
+		if id := idOf(a[j]); id != nil && dIsMap && aIsMap && descendable(parent, name, dm, am) {
 			n, err := containerID(id)
 			if err != nil {
 				return fmt.Errorf("delta: %s: %w", path, err)
 			}
-			if err := c.compareMap(path+"["+n+"]", dm, am); err != nil {
+			if err := c.compareMap(path+"["+n+"]", name, dm, am); err != nil {
 				return err
 			}
 			continue
@@ -195,11 +221,24 @@ func (c *collector) compareValues(path, name string, d, a []any) error {
 }
 
 // descendable reports whether a difference between two map values of item
-// name may be expressed by deltas on the items inside them: they must be
-// container values, not references or structured properties, and carry the
-// same annotations (a different "@type" is a different value).
-func descendable(name string, d, a map[string]any) bool {
-	return !isReference(name) && !structuredProperties[name] && !annotationsDiffer(d, a)
+// name, inside a value of container item parent, may be expressed by deltas
+// on the items inside them: they must be container values (not references,
+// structured properties or protected strings) and carry the same
+// annotations (a different "@type" is a different value).
+func descendable(parent, name string, d, a map[string]any) bool {
+	if isReference(name) || isProtectedString(d) || isProtectedString(a) || annotationsDiffer(d, a) {
+		return false
+	}
+	return !structuredProperties[name] || slices.Contains(containerUnder[name], parent)
+}
+
+func isProtectedString(m map[string]any) bool {
+	for _, k := range protectedStringKeys {
+		if _, ok := m[k]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 // annotationsDiffer reports whether the "@" keys other than "@id" differ.

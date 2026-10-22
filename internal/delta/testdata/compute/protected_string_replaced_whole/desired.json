@@ -1,0 +1,11 @@
+{
+  "name": "ldap",
+  "connectorConfiguration": {
+    "configurationProperties": {
+      "host": "h",
+      "credentials": {
+        "clearValue": "new"
+      }
+    }
+  }
+}

@@ -51,6 +51,18 @@ func TestAlign(t *testing.T) {
 			wantActual: `{"targetRef":{"oid":"r1","relation":"org:default"}}`,
 		},
 		{
+			name:       "missing_type_annotation_dropped",
+			desired:    `{"resourceRef":{"oid":"res1","type":"ResourceType","relation":"org:default"}}`,
+			actual:     `{"resourceRef":{"@type":"ObjectReferenceType","oid":"res1","type":"ResourceType","relation":"org:default"}}`,
+			wantActual: `{"resourceRef":{"oid":"res1","type":"ResourceType","relation":"org:default"}}`,
+		},
+		{
+			name:       "configured_type_annotation_kept",
+			desired:    `{"resourceRef":{"@type":"ObjectReferenceType","oid":"res1"}}`,
+			actual:     `{"resourceRef":{"@type":"ObjectReferenceType","oid":"res1","relation":"org:default"}}`,
+			wantActual: `{"resourceRef":{"@type":"ObjectReferenceType","oid":"res1"}}`,
+		},
+		{
 			name:       "missing_relation_dropped_when_default",
 			desired:    `{"targetRef":{"oid":"r1","type":"RoleType"}}`,
 			actual:     `{"targetRef":{"oid":"r1","type":"RoleType","relation":"org:default"}}`,

@@ -1,0 +1,23 @@
+{
+  "name": "u",
+  "assignment": [
+    {
+      "@id": 3,
+      "targetRef": {
+        "oid": "a1",
+        "type": "RoleType",
+        "relation": "org:default"
+      },
+      "condition": {
+        "strength": "normal",
+        "expression": {
+          "script": [
+            {
+              "code": "return false"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
