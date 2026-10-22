@@ -263,6 +263,20 @@ func (e *engine) delete(ctx context.Context, oid string, force bool) diag.Diagno
 	return diags
 }
 
+// refuseAdopted returns an error when the object oid was adopted (its prior
+// state has adopt_existing = true) and force is not set: an adopted object
+// (typically a midPoint built-in) is not Terraform's to delete. Removing it
+// from state with a removed block (destroy = false) leaves it in midPoint.
+func (e *engine) refuseAdopted(oid string, adopted, force bool) diag.Diagnostics {
+	var diags diag.Diagnostics
+	if adopted && !force {
+		diags.AddError("Adopted object not deleted",
+			fmt.Sprintf("%s was adopted from midPoint; refusing to delete it. Remove it from state with a "+
+				"`removed { lifecycle { destroy = false } }` block, or set force_destroy = true to delete it anyway.", e.ref(oid)))
+	}
+	return diags
+}
+
 // membersMessage explains a refused delete. total is the server's count, or
 // -1 when it reported none (then len(objs) is a lower bound).
 func membersMessage(ref string, objs []client.Object, total int) string {

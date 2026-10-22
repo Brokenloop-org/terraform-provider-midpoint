@@ -41,12 +41,12 @@ resource "midpoint_mark" "protected" {
 
 ### Optional
 
-- `adopt_existing` (Boolean) When an object with the configured oid already exists, adopt it into state and apply the configuration to it as an update instead of failing. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warns that the object will be adopted and lists the changes the update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an object whose oid already exists fails and nothing is written. Defaults to false.
+- `adopt_existing` (Boolean) When an object with the configured oid already exists, adopt it into state and apply the configuration to it as an update instead of failing. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warns that the object will be adopted and lists the changes the update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an object whose oid already exists fails and nothing is written. While it is true, destroying the object fails unless force_destroy is set: an adopted object is not Terraform's to delete. Remove it from state with a removed block (lifecycle { destroy = false }) to stop managing it. Defaults to false.
 - `description` (String) Description.
 - `display` (Dynamic) Display properties (display) in midPoint naming, e.g. { label = "Protected", icon = { cssClass = "fa fa-lock" } }.
 - `event` (Dynamic) Event mark information (eventMark) in midPoint naming, e.g. { enabledByDefault = true }.
 - `extra` (Dynamic) Other midPoint items, merged at the object root, in midPoint naming (camelCase, as in the REST API), e.g. yamldecode(file("extra.yaml")). An item must not also be set by a typed attribute.
-- `force_destroy` (Boolean) Has no effect on this type: it is deleted without a reference check. Defaults to false.
+- `force_destroy` (Boolean) Delete the object even when it was adopted with adopt_existing = true, which is refused otherwise. There is no reference check for this type. Defaults to false.
 - `oid` (String) Object OID. When unset midPoint generates one. Changing it replaces the object. Creating an object whose oid already exists fails unless adopt_existing is set.
 - `options` (List of String) midPoint execution options sent on create and update, e.g. raw, isImport, reevaluateSearchFilters. When unset, the provider default_options entry for mark applies, else the built-in defaults: isImport on create and none on update. An empty list sends no options. overwrite is sent only when listed here; reevaluateSearchFilters is added to any write that sends a reference with a filter and no oid.
 

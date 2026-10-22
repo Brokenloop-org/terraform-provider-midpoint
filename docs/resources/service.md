@@ -32,7 +32,7 @@ resource "midpoint_service" "dev_k8s" {
 ### Optional
 
 - `activation` (Block, Optional) Activation. Other activation items (validity) go in extra. (see [below for nested schema](#nestedblock--activation))
-- `adopt_existing` (Boolean) When an object with the configured oid already exists, adopt it into state and apply the configuration to it as an update instead of failing. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warns that the object will be adopted and lists the changes the update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an object whose oid already exists fails and nothing is written. Defaults to false.
+- `adopt_existing` (Boolean) When an object with the configured oid already exists, adopt it into state and apply the configuration to it as an update instead of failing. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warns that the object will be adopted and lists the changes the update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an object whose oid already exists fails and nothing is written. While it is true, destroying the object fails unless force_destroy is set: an adopted object is not Terraform's to delete. Remove it from state with a removed block (lifecycle { destroy = false }) to stop managing it. Defaults to false.
 - `archetype` (String) OID of the archetype, written as an assignment to it. On read that assignment is shown here (after an import, or when archetype was set); do not also write it as an assignment block.
 - `assignment` (Block List) An assignment (membership, archetype, org). Values are matched to midPoint by content (target, construction, order), not by position. (see [below for nested schema](#nestedblock--assignment))
 - `authorization` (Dynamic) Authorizations (authorization), a list in midPoint naming, e.g. [{ action = ["http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read"] }].
@@ -41,7 +41,7 @@ resource "midpoint_service" "dev_k8s" {
 - `display_name` (String) Display name (displayName).
 - `extension` (Dynamic) Schema extension items, e.g. { costCenter = "CC-123" }. Values are scalars or lists.
 - `extra` (Dynamic) Other midPoint items, merged at the object root, in midPoint naming (camelCase, as in the REST API), e.g. yamldecode(file("extra.yaml")). An item must not also be set by a typed attribute; assignment and inducement values here are added to the blocks (they hold the values a block cannot express).
-- `force_destroy` (Boolean) Delete the object even while objects assigned to it or holding it in roleMembershipRef (members) exist. Without it, the delete fails and names the first few members. Defaults to false.
+- `force_destroy` (Boolean) Delete the object even while objects assigned to it or holding it in roleMembershipRef (members) exist. Without it, the delete fails and names the first few members. It also allows deleting an object adopted with adopt_existing = true, which is refused otherwise. Defaults to false.
 - `identifier` (String) Identifier.
 - `inducement` (Block List) An inducement: what holders of this object get. Values are matched to midPoint by content (target, construction, order), not by position. (see [below for nested schema](#nestedblock--inducement))
 - `lifecycle_state` (String) Lifecycle state (lifecycleState), e.g. active, draft, proposed.
@@ -92,7 +92,7 @@ Optional:
 
 - `filter` (String) midPoint text query selecting the target, e.g. name = "vault / operator". midPoint resolves it when the object is written; with a filter only, Terraform knows no dependency on the target, so ordering is up to the configuration.
 - `oid` (String) Target object OID.
-- `relation` (String) Relation of the reference. Defaults to org:default.
+- `relation` (String) Relation of the reference, e.g. org:manager. Defaults to org:default. A name without a prefix is in the org: namespace, as midPoint stores it: manager is written org:manager.
 - `type` (String) Target object type, e.g. RoleType, ServiceType, OrgType, ArchetypeType.
 
 
@@ -127,7 +127,7 @@ Optional:
 
 - `filter` (String) midPoint text query selecting the target, e.g. name = "vault / operator". midPoint resolves it when the object is written; with a filter only, Terraform knows no dependency on the target, so ordering is up to the configuration.
 - `oid` (String) Target object OID.
-- `relation` (String) Relation of the reference. Defaults to org:default.
+- `relation` (String) Relation of the reference, e.g. org:manager. Defaults to org:default. A name without a prefix is in the org: namespace, as midPoint stores it: manager is written org:manager.
 - `type` (String) Target object type, e.g. RoleType, ServiceType, OrgType, ArchetypeType.
 
 ## Import

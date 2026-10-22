@@ -115,7 +115,8 @@ Both data sources fail when nothing matches or more than one object matches.
 |---|---|
 | No silent overwrite | Creating an object whose `oid` already exists fails and writes nothing; the error says to import it. |
 | `adopt_existing = true` | The existing object is adopted into state instead, and the configuration is applied to it as an update. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warning lists the changes the update will send. Meant for the midPoint built-ins the catalogue customizes (`00000000-0000-0000-0000-*`). Default `false`. See [Adopting a built-in](#adopting-a-built-in). |
-| `force_destroy = true` | Required to delete a service, role, org or archetype that still has members (objects assigned to it or holding it in `roleMembershipRef`), or a resource that still has shadows. Without it the delete fails and names the first few. `midpoint_object` applies the same check for `roles`, `services`, `orgs`, `archetypes` and `resources`. Marks, tasks and object templates are deleted without a check. Default `false`. |
+| Adopted objects are not destroyed | While a resource has `adopt_existing = true` in state, destroying it (or replacing it) fails and sends nothing: "<type>/<oid> was adopted from midPoint; refusing to delete it". To stop managing it, remove it from state with a `removed { lifecycle { destroy = false } }` block; set `force_destroy = true` to delete it anyway. |
+| `force_destroy = true` | Required to delete a service, role, org or archetype that still has members (objects assigned to it or holding it in `roleMembershipRef`), or a resource that still has shadows. Without it the delete fails and names the first few. `midpoint_object` applies the same check for `roles`, `services`, `orgs`, `archetypes` and `resources`. Marks, tasks and object templates are deleted without a check. It also lifts the refusal to delete an adopted object. Default `false`. |
 | `overwrite` never sent | Only when listed in a resource's `options`. |
 | Read-back is not fatal after a create | Every write is followed by a read. If that read fails after a successful create or adoption, it is a warning: the object stays in state (no taint, no replace) and the next refresh reconciles it. |
 | Tasks are not started or stopped | `initial_execution_state` is written on create only; see [Drift semantics](#drift-semantics). |
@@ -151,6 +152,19 @@ adopted; applying the configuration will send these changes:
 The list shows at most 20 changes, then "and N more". When a configured
 value is known only during apply, the warning says that the changes cannot
 be listed.
+
+An adopted object is never deleted by a destroy unless `force_destroy = true`.
+To stop managing it, drop it from state and leave it in midPoint:
+
+```hcl
+removed {
+  from = midpoint_object.end_user
+
+  lifecycle {
+    destroy = false
+  }
+}
+```
 
 ### Execution options
 

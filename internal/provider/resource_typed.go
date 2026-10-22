@@ -327,13 +327,18 @@ func (r *typedResource[S]) Read(ctx context.Context, req resource.ReadRequest, r
 
 func (r *typedResource[S]) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var oid types.String
-	var force types.Bool
+	var adopt, force types.Bool
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("oid"), &oid)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("adopt_existing"), &adopt)...)
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("force_destroy"), &force)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	resp.Diagnostics.Append(r.engine().delete(ctx, oid.ValueString(), force.ValueBool())...)
+	eng := r.engine()
+	if resp.Diagnostics.Append(eng.refuseAdopted(oid.ValueString(), adopt.ValueBool(), force.ValueBool())...); resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(eng.delete(ctx, oid.ValueString(), force.ValueBool())...)
 }
 
 // ImportState takes the object OID; Read then fills everything from the

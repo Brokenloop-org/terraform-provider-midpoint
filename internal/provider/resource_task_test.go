@@ -401,6 +401,12 @@ func TestTask_adoptedIsNeverReplaced(t *testing.T) {
 				}),
 			},
 			refreshIsClean(),
+			{
+				Config:      taskConfig("v1", "  adopt_existing = true"),
+				Destroy:     true,
+				ExpectError: adoptedDeleteRefused("tasks", stubTaskOID),
+			},
+			removedStep(s, addr, "tasks", stubTaskOID),
 		},
 	})
 }

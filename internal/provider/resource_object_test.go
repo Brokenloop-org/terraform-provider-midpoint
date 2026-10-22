@@ -51,6 +51,39 @@ func stubBody(s *mpstub.Server, restType, oid string) map[string]any {
 	return out
 }
 
+// removedStep stops managing addr with a removed block (destroy = false),
+// the way out for an adopted object, and checks that restType/oid is still
+// in the stub and that no DELETE was sent.
+func removedStep(s *mpstub.Server, addr, restType, oid string) resource.TestStep {
+	return resource.TestStep{
+		Config: fmt.Sprintf(`
+removed {
+  from = %s
+
+  lifecycle {
+    destroy = false
+  }
+}
+`, addr),
+		Check: checkStub(func() error {
+			if s.Get(restType, oid) == nil {
+				return fmt.Errorf("%s/%s was deleted", restType, oid)
+			}
+			if deletes := requests(s, "DELETE"); len(deletes) != 0 {
+				return fmt.Errorf("removing an adopted object from state sent %+v", deletes)
+			}
+			return nil
+		}),
+	}
+}
+
+// adoptedDeleteRefused is the error a destroy of the adopted restType/oid
+// fails with.
+func adoptedDeleteRefused(restType, oid string) *regexp.Regexp {
+	return regexp.MustCompile(regexp.QuoteMeta(restType+"/"+oid) + `\s+was\s+adopted\s+from\s+midPoint;\s+refusing\s+to\s+delete\s+it\.\s+Remove\s+it\s+from\s+state\s+with\s+a\s+` +
+		"`" + `removed\s+\{\s+lifecycle\s+\{\s+destroy\s+=\s+false\s+\}\s+\}` + "`" + `\s+block,\s+or\s+set\s+force_destroy\s+=\s+true\s+to\s+delete\s+it\s+anyway\.`)
+}
+
 func TestObject_createReadDelete(t *testing.T) {
 	s := newTestStub(t)
 	cfg := objectConfig(`
@@ -297,7 +330,58 @@ func TestObject_adoptExisting(t *testing.T) {
 					return nil
 				}),
 			),
-		}},
+		},
+			removedStep(s, objAddr, "roles", objRoleOID),
+		},
+	})
+}
+
+// TestObject_adoptedDeleteRefused: destroying an adopted object fails and
+// sends nothing; with force_destroy it is deleted.
+func TestObject_adoptedDeleteRefused(t *testing.T) {
+	s := newTestStub(t)
+	s.Put("roles", map[string]any{"oid": objRoleOID, "name": "Built-in"})
+	cfg := func(force bool) string {
+		return objectConfig(fmt.Sprintf(`
+  type           = "roles"
+  oid            = %q
+  adopt_existing = true
+  force_destroy  = %t
+  body           = { name = "Built-in" }
+`, objRoleOID, force))
+	}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{Config: cfg(false)},
+			{
+				Config:      cfg(false),
+				Destroy:     true,
+				ExpectError: adoptedDeleteRefused("roles", objRoleOID),
+			},
+			{
+				Config: cfg(false),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(objAddr, plancheck.ResourceActionNoop)},
+				},
+				Check: checkStub(func() error {
+					if s.Get("roles", objRoleOID) == nil {
+						return fmt.Errorf("the refused destroy deleted the role")
+					}
+					if deletes := requests(s, "DELETE"); len(deletes) != 0 {
+						return fmt.Errorf("the refused destroy sent %+v", deletes)
+					}
+					return nil
+				}),
+			},
+			{Config: cfg(true)},
+		},
+		CheckDestroy: func(*terraform.State) error {
+			if s.Get("roles", objRoleOID) != nil {
+				return fmt.Errorf("role still exists after a forced destroy")
+			}
+			return nil
+		},
 	})
 }
 
@@ -512,31 +596,36 @@ func TestObject_readBackFailureDoesNotTaint(t *testing.T) {
     description = "configured"
   }
 `, objRoleOID, tc.adopt))
-			resource.UnitTest(t, resource.TestCase{
-				ProtoV6ProviderFactories: stubProviderFactories(t, s),
-				Steps: []resource.TestStep{
-					{
-						Config: cfg,
-						Check: resource.ComposeAggregateTestCheckFunc(
-							resource.TestCheckResourceAttr(objAddr, "oid", objRoleOID),
-							checkStub(func() error {
-								if !fired() {
-									return fmt.Errorf("the read-back fault did not fire")
-								}
-								if got := stubBody(s, "roles", objRoleOID)["description"]; got != "configured" {
-									return fmt.Errorf("stored description = %v", got)
-								}
-								return nil
-							}),
-						),
-					},
-					{
-						Config: cfg,
-						ConfigPlanChecks: resource.ConfigPlanChecks{
-							PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(objAddr, plancheck.ResourceActionNoop)},
-						},
+			steps := []resource.TestStep{
+				{
+					Config: cfg,
+					Check: resource.ComposeAggregateTestCheckFunc(
+						resource.TestCheckResourceAttr(objAddr, "oid", objRoleOID),
+						checkStub(func() error {
+							if !fired() {
+								return fmt.Errorf("the read-back fault did not fire")
+							}
+							if got := stubBody(s, "roles", objRoleOID)["description"]; got != "configured" {
+								return fmt.Errorf("stored description = %v", got)
+							}
+							return nil
+						}),
+					),
+				},
+				{
+					Config: cfg,
+					ConfigPlanChecks: resource.ConfigPlanChecks{
+						PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(objAddr, plancheck.ResourceActionNoop)},
 					},
 				},
+			}
+			if tc.adopt {
+				// An adopted object is not destroyed; it leaves the state.
+				steps = append(steps, removedStep(s, objAddr, "roles", objRoleOID))
+			}
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: stubProviderFactories(t, s),
+				Steps:                    steps,
 			})
 		})
 	}

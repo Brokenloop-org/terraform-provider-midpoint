@@ -368,7 +368,11 @@ func (r *objectResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	resp.Diagnostics.Append(r.engine(state).delete(ctx, state.OID.ValueString(), state.ForceDestroy.ValueBool())...)
+	eng := r.engine(state)
+	if resp.Diagnostics.Append(eng.refuseAdopted(state.OID.ValueString(), state.AdoptExisting.ValueBool(), state.ForceDestroy.ValueBool())...); resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(eng.delete(ctx, state.OID.ValueString(), state.ForceDestroy.ValueBool())...)
 }
 
 // ImportState takes "<type>/<oid>", e.g. "functionLibraries/<oid>"; Read

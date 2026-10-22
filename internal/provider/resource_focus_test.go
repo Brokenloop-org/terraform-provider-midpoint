@@ -602,3 +602,48 @@ resource "midpoint_role" "r" {
 		CheckDestroy: checkGone(s, "roles", &oid),
 	})
 }
+
+// TestRole_adoptedDeleteRefused: a typed resource refuses to destroy an
+// adopted object and sends nothing; a removed block leaves it in midPoint;
+// with force_destroy a destroy deletes it.
+func TestRole_adoptedDeleteRefused(t *testing.T) {
+	s := newTestStub(t)
+	const addr = "midpoint_role.builtin"
+	cfg := func(force bool) string {
+		return fmt.Sprintf(`
+resource "midpoint_role" "builtin" {
+  oid            = %q
+  name           = "Built-in"
+  adopt_existing = true
+  force_destroy  = %t
+}
+`, stubOtherOID, force)
+	}
+	put := func() { s.Put("roles", map[string]any{"oid": stubOtherOID, "name": "Built-in"}) }
+	put()
+	stillThere := checkStub(func() error {
+		if s.Get("roles", stubOtherOID) == nil {
+			return fmt.Errorf("the adopted role was deleted")
+		}
+		if deletes := requests(s, "DELETE"); len(deletes) != 0 {
+			return fmt.Errorf("sent %+v", deletes)
+		}
+		return nil
+	})
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{Config: cfg(false)},
+			{Config: cfg(false), Destroy: true, ExpectError: adoptedDeleteRefused("roles", stubOtherOID)},
+			{Config: cfg(false), Check: stillThere},
+			removedStep(s, addr, "roles", stubOtherOID),
+			{Config: cfg(true), Check: stillThere},
+		},
+		CheckDestroy: func(*terraform.State) error {
+			if s.Get("roles", stubOtherOID) != nil {
+				return fmt.Errorf("role still exists after a forced destroy")
+			}
+			return nil
+		},
+	})
+}

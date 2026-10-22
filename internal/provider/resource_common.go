@@ -25,7 +25,9 @@ func commonAttributes(spec engineSpec) map[string]schema.Attribute {
 				"object: items midPoint holds that are not configured (other than server-managed ones) are removed " +
 				"on the first apply. The plan warns that the object will be adopted and lists the changes the " +
 				"update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an " +
-				"object whose oid already exists fails and nothing is written. Defaults to false.",
+				"object whose oid already exists fails and nothing is written. While it is true, destroying the object " +
+				"fails unless force_destroy is set: an adopted object is not Terraform's to delete. Remove it from state " +
+				"with a removed block (lifecycle { destroy = false }) to stop managing it. Defaults to false.",
 			Optional: true,
 			Computed: true,
 			Default:  booldefault.StaticBool(false),
@@ -49,19 +51,21 @@ func commonAttributes(spec engineSpec) map[string]schema.Attribute {
 func forceDestroyDescription(spec engineSpec) string {
 	const members = "objects assigned to it or holding it in roleMembershipRef (members)"
 	const shadows = "shadows of the resource"
+	const adopted = " It also allows deleting an object adopted with adopt_existing = true, which is refused otherwise."
 	switch {
 	case spec.ShortName == "object":
 		return "Delete the object even while other objects still reference it. Without it, deleting an object of " +
 			"type roles, services, orgs or archetypes fails while " + members + " exist, and deleting one of type " +
-			"resources fails while " + shadows + " exist; other types are deleted without a check. Defaults to false."
+			"resources fails while " + shadows + " exist; other types are deleted without a check." + adopted + " Defaults to false."
 	case spec.MembersCheck == nil:
-		return "Has no effect on this type: it is deleted without a reference check. Defaults to false."
+		return "Delete the object even when it was adopted with adopt_existing = true, which is refused otherwise. " +
+			"There is no reference check for this type. Defaults to false."
 	case spec.ShortName == "resource":
 		return "Delete the resource even while " + shadows + " exist. Without it, the delete fails and names " +
-			"the first few shadows. Defaults to false."
+			"the first few shadows." + adopted + " Defaults to false."
 	default:
 		return "Delete the object even while " + members + " exist. Without it, the delete fails and names " +
-			"the first few members. Defaults to false."
+			"the first few members." + adopted + " Defaults to false."
 	}
 }
 

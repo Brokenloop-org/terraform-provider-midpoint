@@ -23,6 +23,9 @@ Safety rules that apply to every resource:
   changes.
 - Deleting a role, service, org or archetype that still has members, or a
   resource that still has shadows, fails unless `force_destroy = true`.
+- Deleting an object adopted with `adopt_existing = true` fails unless
+  `force_destroy = true`; remove it from state with a `removed` block
+  (`lifecycle { destroy = false }`) to stop managing it.
 - `overwrite` is never sent unless it is listed in a resource's `options`.
 
 ## Example Usage
