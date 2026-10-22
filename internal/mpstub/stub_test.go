@@ -480,11 +480,17 @@ func TestStubRequests_recordsMethodPathQueryBody(t *testing.T) {
 	if err := c.Modify(ctx, "roles", roleOID, []client.ItemDelta{{ModificationType: "replace", Path: "description", Value: "x"}}, []string{"raw"}); err != nil {
 		t.Fatal(err)
 	}
-	reqs := s.Requests()
-	if len(reqs) != 2 {
-		t.Fatalf("recorded %d requests, want 2 (Put is not a request): %+v", len(reqs), reqs)
+	if _, err := c.Create(ctx, client.Object{Type: "roles", Body: map[string]any{"name": "r2", "assignment": []any{map[string]any{"description": "a"}}}}, nil); err != nil {
+		t.Fatal(err)
 	}
-	get, patch := reqs[0], reqs[1]
+	reqs := s.Requests()
+	if len(reqs) != 3 {
+		t.Fatalf("recorded %d requests, want 3 (Put is not a request): %+v", len(reqs), reqs)
+	}
+	get, patch, post := reqs[0], reqs[1], reqs[2]
+	// The record is what was sent, not the stored object with its generated
+	// oid and container ids.
+	assertJSONEqual(t, post.Body, map[string]any{"role": map[string]any{"name": "r2", "assignment": []any{map[string]any{"description": "a"}}}})
 	if get.Method != http.MethodGet || get.Path != "/roles/"+roleOID || get.Query.Get("options") != "noFetch" || get.Query.Get("exclude") != "metadata" || get.Body != nil {
 		t.Errorf("GET recorded as %+v", get)
 	}

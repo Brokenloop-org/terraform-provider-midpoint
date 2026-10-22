@@ -165,7 +165,12 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not a REST path: "+r.URL.Path)
 		return
 	}
-	s.requests = append(s.requests, Recorded{Method: r.Method, Path: rel, Query: r.URL.Query(), Body: body})
+	rec := Recorded{Method: r.Method, Path: rel, Query: r.URL.Query()}
+	if body != nil {
+		// The handlers store parts of body; the record must not change with them.
+		rec.Body = clone(body).(map[string]any)
+	}
+	s.requests = append(s.requests, rec)
 
 	seg := strings.Split(strings.Trim(rel, "/"), "/")
 	switch {
