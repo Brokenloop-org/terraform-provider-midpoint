@@ -280,7 +280,8 @@ resource "midpoint_role" "business" {
 			{
 				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckNoResourceAttr("midpoint_role.business", "inducement.0.target.oid"),
+					// The oid midPoint resolved the filter to is computed.
+					resource.TestCheckResourceAttrPair("midpoint_role.business", "inducement.0.target.oid", "midpoint_role.target", "oid"),
 					// midPoint resolved the filter to the target role.
 					func(st *terraform.State) error {
 						target, err := stateOID(st, "midpoint_role.target")
@@ -296,6 +297,16 @@ resource "midpoint_role" "business" {
 			},
 			emptyPlanAfterRefresh(),
 			{Config: cfg, PlanOnly: true},
+			// The migration path: importing the business role (its stored
+			// reference holds the filter and the resolved oid) with the
+			// filter-only configuration plans no change.
+			{ResourceName: "midpoint_role.business", ImportState: true, ImportStateVerify: true},
+			{
+				Config:          cfg,
+				ResourceName:    "midpoint_role.business",
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithID,
+			},
 		},
 	})
 }

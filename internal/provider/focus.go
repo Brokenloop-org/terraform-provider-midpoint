@@ -3,11 +3,13 @@ package provider
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
@@ -337,6 +339,101 @@ func focusFromBody(ctx context.Context, actual map[string]any, prior focusModel,
 		var d diag.Diagnostics
 		m.Extra, d = keepOrConvert(ctx, restType, "", prior.Extra, rest)
 		diags.Append(d...)
+	}
+	// A target the prior state held by filter only gets the oid midPoint
+	// resolved (the alignment above dropped it).
+	resolveTargetOIDs(restType, &m, actual)
+	return m, diags
+}
+
+// resolveTargetOIDs sets the computed oid of each target block of m that
+// has a known filter and no known oid: the oid of the actual value the
+// block pairs with (delta.Pair, the engine's matching), or null when there
+// is none or actual is nil. actual is the canonical body midPoint returned.
+// A known oid, configured or recorded before, is never changed: after a
+// write it is the planned value, and on a refresh a different server oid is
+// a difference that fromBody records.
+func resolveTargetOIDs(restType string, m *focusModel, actual map[string]any) {
+	m.Assignments = resolveBlockOIDs(restType, "assignment", m.Assignments, actual)
+	m.Inducements = resolveBlockOIDs(restType, "inducement", m.Inducements, actual)
+}
+
+// resolveBlockOIDs is resolveTargetOIDs for the blocks of item; it returns
+// a copy when it changes any.
+func resolveBlockOIDs(restType, item string, blocks []assignmentModel, actual map[string]any) []assignmentModel {
+	computed := func(t *targetRef) bool {
+		return t != nil && !t.Filter.IsNull() && !t.Filter.IsUnknown() && (t.OID.IsNull() || t.OID.IsUnknown())
+	}
+	var out []assignmentModel
+	desired := make([]any, len(blocks))
+	for i, b := range blocks {
+		if computed(b.Target) {
+			if out == nil {
+				out = slices.Clone(blocks)
+			}
+			t := *b.Target
+			t.OID = types.StringNull()
+			out[i].Target = &t
+			b = out[i]
+		}
+		// A block that does not convert pairs with nothing.
+		if v, diags := assignmentToJSON(b, path.Root(item)); !diags.HasError() {
+			if c, ok := normalize.Canonical(restType, map[string]any{item: []any{pruneEmpty(v)}})[item].([]any); ok && len(c) == 1 {
+				desired[i] = c[0]
+			}
+		}
+	}
+	if out == nil || actual == nil {
+		if out == nil {
+			return blocks
+		}
+		return out
+	}
+	values := asList(actual[item])
+	for i, j := range delta.Pair(item, desired, values) {
+		if j < 0 || !computed(blocks[i].Target) {
+			continue
+		}
+		v, _ := values[j].(map[string]any)
+		ref, _ := v["targetRef"].(map[string]any)
+		if oid, ok := ref["oid"].(string); ok {
+			out[i].Target.OID = types.StringValue(oid)
+		}
+	}
+	return out
+}
+
+// withoutComputedTargetOIDs is m, the plan, without the target oids that
+// config does not set: a computed oid (resolveTargetOIDs) is never sent, so
+// a filter-only target stays filter-only in midPoint. Blocks correspond to
+// the configuration's by index.
+func withoutComputedTargetOIDs(ctx context.Context, m focusModel, config tfsdk.Config) (focusModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	for _, item := range []string{"assignment", "inducement"} {
+		var configured []assignmentModel
+		diags.Append(config.GetAttribute(ctx, path.Root(item), &configured)...)
+		if diags.HasError() {
+			return m, diags
+		}
+		blocks := &m.Assignments
+		if item == "inducement" {
+			blocks = &m.Inducements
+		}
+		var out []assignmentModel
+		for i, b := range *blocks {
+			if i >= len(configured) || b.Target == nil || configured[i].Target == nil || !configured[i].Target.OID.IsNull() {
+				continue
+			}
+			if out == nil {
+				out = slices.Clone(*blocks)
+			}
+			t := *b.Target
+			t.OID = types.StringNull()
+			out[i].Target = &t
+		}
+		if out != nil {
+			*blocks = out
+		}
 	}
 	return m, diags
 }

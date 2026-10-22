@@ -209,7 +209,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && len(seg) == 2 && seg[1] == "search":
 		s.search(w, seg[0], body)
 	case r.Method == http.MethodPatch && len(seg) == 2:
-		s.modify(w, seg[0], seg[1], body)
+		s.modify(w, seg[0], seg[1], body, slices.Contains(r.URL.Query()["options"], "reevaluateSearchFilters"))
 	case r.Method == http.MethodDelete && len(seg) == 2:
 		s.delete(w, seg[0], seg[1])
 	default:
@@ -245,6 +245,9 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request, typ string, body
 			return
 		}
 	}
+	if slices.Contains(r.URL.Query()["options"], "reevaluateSearchFilters") {
+		s.resolveFilters(obj)
+	}
 	oid := s.store(typ, obj)
 	w.Header().Set("Location", s.ts.URL+restPath+"/"+typ+"/"+oid)
 	status := http.StatusCreated
@@ -254,7 +257,7 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request, typ string, body
 	w.WriteHeader(status)
 }
 
-func (s *Server) modify(w http.ResponseWriter, typ, oid string, body map[string]any) {
+func (s *Server) modify(w http.ResponseWriter, typ, oid string, body map[string]any, reevaluate bool) {
 	e, ok := s.objects[key{typ, oid}]
 	if !ok {
 		writeNotFound(w, typ, oid)
@@ -276,6 +279,9 @@ func (s *Server) modify(w http.ResponseWriter, typ, oid string, body map[string]
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("cannot apply %s of %s: %v", mt, path, err))
 			return
 		}
+	}
+	if reevaluate {
+		s.resolveFilters(updated)
 	}
 	assignIDs(updated)
 	e.body = updated
@@ -470,6 +476,41 @@ func (s *Server) annotateRefs(b map[string]any) {
 				if oid, ok := ref["oid"].(string); ok && k == "targetRef" {
 					if name := s.nameOf(oid); name != "" {
 						ref["targetName"] = name
+					}
+				}
+			}
+		}
+	})
+}
+
+// resolveFilters gives every reference in body that has a filter and no
+// oid the oid of the stored object the filter selects, as midPoint does with
+// the reevaluateSearchFilters option. The stub understands only name
+// filters (name = "x") on a reference with a type; a reference it cannot
+// resolve keeps no oid.
+func (s *Server) resolveFilters(body map[string]any) {
+	walkMaps(body, func(m map[string]any) {
+		for k, v := range m {
+			if !strings.HasSuffix(k, "Ref") {
+				continue
+			}
+			for _, r := range toList(v) {
+				ref, ok := r.(map[string]any)
+				if !ok || ref["oid"] != nil {
+					continue
+				}
+				filter, _ := ref["filter"].(map[string]any)
+				text, _ := filter["text"].(string)
+				match := nameFilter.FindStringSubmatch(text)
+				typ, _ := ref["type"].(string)
+				if match == nil || typ == "" {
+					continue
+				}
+				name := unquoteAxiom(match[1])
+				for _, k := range s.order {
+					if typeName(k.typ) == strings.TrimPrefix(typ, "c:") && nameString(s.objects[k].body["name"]) == name {
+						ref["oid"] = k.oid
+						break
 					}
 				}
 			}

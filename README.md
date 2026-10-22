@@ -246,6 +246,7 @@ list sends no options.
   | You write | midPoint returns | Compared as |
   |---|---|---|
   | reference without `relation` | `org:default` | `org:default` |
+  | `relation = "manager"` | `org:manager` | `org:manager` |
   | `UserType`, `#UserType`, `c:UserType` | `#UserType` | `UserType` |
   | `name = "x"` | `{orig = "x", norm = "x"}` | `"x"` |
   | one value of a multi-valued item | an object | a one-element list |
@@ -260,7 +261,12 @@ list sends no options.
   query such as `name = "vault / operator"`), or both, plus `type` and
   optional `relation`. With a filter only, Terraform knows no dependency on
   the target. Order it with `depends_on` when the target is in the same
-  configuration.
+  configuration. With a filter and no configured `oid`, `oid` is computed:
+  the OID midPoint resolved the filter to, recorded on apply, refresh and
+  import (so filter-only HCL plans clean after an import). It is kept while
+  `filter`, `type` and `relation` stay the same, is unknown in the plan when
+  one of them changes, and is never sent to midPoint. A `relation` without a
+  prefix is in the `org:` namespace (`manager` is `org:manager`).
 - **`archetype` shortcut** on service, role, org and archetype: an
   assignment holding only the archetype reference. On read it folds back into
   `archetype`. Setting `archetype` and also writing an explicit archetype
@@ -278,7 +284,6 @@ list sends no options.
 |---|---|
 | JSON text in blocks | Plan-time comparison of the in-block JSON strings is textual. `jsonencode(...)` output plans clean after an import; a hand-written JSON literal with a different key order plans one no-op update. |
 | Single-object multi-valued items | A single-object `mapping`/`item` (or other multi-valued item) in config imports with one no-op update. Write lists. |
-| Filter-only targets | Imported state carries both `oid` and `filter`, so filter-only HCL plans one no-op update after an import. |
 | Protected strings | A configured `clearValue` never equals the server's `encryptedData`, so it always plans a change. Use `expression.const` or midPoint secret providers. `midpoint_resource.connector_configuration` warns on `clearValue`. `data.midpoint_object` removes protected strings from `body`. |
 | Resource `@ns` | `connector_configuration` needs `"@ns"` (the connector namespace) on `configurationProperties`. `"@ns"` is never compared: a change to it alone is not detected. A delta that adds the whole container (adopting or importing a resource without one, or restoring it after it was removed in midPoint) writes the properties without their namespace. Set them in midPoint first in that case. |
 | Resource schema definition | An indented `schema.definition` never converges: midPoint adds `xml:space="preserve"` to it. Keep the exported one-line form. |

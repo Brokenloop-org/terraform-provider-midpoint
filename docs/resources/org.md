@@ -103,7 +103,7 @@ Optional:
 Optional:
 
 - `filter` (String) midPoint text query selecting the target, e.g. name = "vault / operator". midPoint resolves it when the object is written; with a filter only, Terraform knows no dependency on the target, so ordering is up to the configuration.
-- `oid` (String) Target object OID.
+- `oid` (String) Target object OID. With a filter and no oid configured, this is computed: the OID midPoint resolved the filter to, recorded on create, update, refresh and import. It is kept while filter, type and relation stay the same, and it is never sent to midPoint (midPoint keeps both the filter and the resolved OID on the reference).
 - `relation` (String) Relation of the reference, e.g. org:manager. Defaults to org:default. A name without a prefix is in the org: namespace, as midPoint stores it: manager is written org:manager.
 - `type` (String) Target object type, e.g. RoleType, ServiceType, OrgType, ArchetypeType.
 
@@ -138,7 +138,7 @@ Optional:
 Optional:
 
 - `filter` (String) midPoint text query selecting the target, e.g. name = "vault / operator". midPoint resolves it when the object is written; with a filter only, Terraform knows no dependency on the target, so ordering is up to the configuration.
-- `oid` (String) Target object OID.
+- `oid` (String) Target object OID. With a filter and no oid configured, this is computed: the OID midPoint resolved the filter to, recorded on create, update, refresh and import. It is kept while filter, type and relation stay the same, and it is never sent to midPoint (midPoint keeps both the filter and the resolved OID on the reference).
 - `relation` (String) Relation of the reference, e.g. org:manager. Defaults to org:default. A name without a prefix is in the org: namespace, as midPoint stores it: manager is written org:manager.
 - `type` (String) Target object type, e.g. RoleType, ServiceType, OrgType, ArchetypeType.
 

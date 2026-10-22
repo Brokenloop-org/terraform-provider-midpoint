@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -36,6 +37,19 @@ func newFocusResource[S any, P interface {
 			m, diags := focusFromBody(ctx, actual, P(s).model(), kind)
 			P(s).setModel(m)
 			return diags
+		},
+		// The oid of a target configured by filter only is computed: the
+		// oid midPoint resolved the filter to.
+		observe: func(s *S, actual map[string]any) {
+			m := P(s).model()
+			resolveTargetOIDs(kind.Spec.RestType, &m, actual)
+			P(s).setModel(m)
+		},
+		bodyModel: func(ctx context.Context, s *S, config tfsdk.Config) (*S, diag.Diagnostics) {
+			m, diags := withoutComputedTargetOIDs(ctx, P(s).model(), config)
+			out := *s
+			P(&out).setModel(m)
+			return &out, diags
 		},
 		validate: func(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 			// A dynamic block whose for_each is not known yet leaves the

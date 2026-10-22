@@ -58,8 +58,21 @@ type typedResource[S any] struct {
 	// and with a nil actual to null before a create records the object, so
 	// that a failed read-back leaves nothing unknown; nil for none.
 	observe func(s *S, actual map[string]any)
+	// bodyModel returns the model a create or an update builds the desired
+	// body from: s, the plan, without the computed values that config, the
+	// configuration, does not set (they are never sent); nil means s.
+	bodyModel func(ctx context.Context, s *S, config tfsdk.Config) (*S, diag.Diagnostics)
 
 	data *providerData
+}
+
+// configuredModel is the model a create or update builds the desired body
+// from (bodyModel).
+func (r *typedResource[S]) configuredModel(ctx context.Context, s *S, config tfsdk.Config) (*S, diag.Diagnostics) {
+	if r.bodyModel == nil {
+		return s, nil
+	}
+	return r.bodyModel(ctx, s, config)
 }
 
 // preexistingKey is the private state key that marks an object the
@@ -225,9 +238,14 @@ func (r *typedResource[S]) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 	raw := slices.Contains(effectiveOptions(r.data.DefaultOptions, r.spec.ShortName, st.Options, r.spec.CreateOptions), "raw")
-	created, diags := r.toBody(ctx, &s, true, raw)
+	bm, diags := r.configuredModel(ctx, &s, req.Config)
 	resp.Diagnostics.Append(diags...)
-	desired, diags := r.toBody(ctx, &s, false, false)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	created, diags := r.toBody(ctx, bm, true, raw)
+	resp.Diagnostics.Append(diags...)
+	desired, diags := r.toBody(ctx, bm, false, false)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -278,7 +296,12 @@ func (r *typedResource[S]) Update(ctx context.Context, req resource.UpdateReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	desired, diags := r.toBody(ctx, &s, false, false)
+	bm, diags := r.configuredModel(ctx, &s, req.Config)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	desired, diags := r.toBody(ctx, bm, false, false)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

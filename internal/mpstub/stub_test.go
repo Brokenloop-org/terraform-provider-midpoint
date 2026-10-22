@@ -543,3 +543,49 @@ func TestStubSetFault(t *testing.T) {
 		t.Fatalf("GET after clearing the fault: %v", err)
 	}
 }
+
+// TestStubResolvesFilters: with reevaluateSearchFilters a filter-only
+// reference gets the oid of the object its name filter selects (on create
+// and on modify); without it, or when nothing matches, it keeps no oid.
+func TestStubResolvesFilters(t *testing.T) {
+	s, c := newStub(t)
+	ctx := context.Background()
+	s.Put("roles", map[string]any{"oid": otherRoleOID, "name": "target"})
+	filterRef := func(name string) map[string]any {
+		return map[string]any{"type": "RoleType", "filter": map[string]any{"text": `name = "` + name + `"`}}
+	}
+	targetOID := func(oid string, i int) any {
+		ind := toList(s.Get("roles", oid)["inducement"])[i].(map[string]any)
+		return ind["targetRef"].(map[string]any)["oid"]
+	}
+
+	oid, err := c.Create(ctx, client.Object{Type: "roles", Body: map[string]any{
+		"name": "business", "inducement": []any{map[string]any{"targetRef": filterRef("target")}},
+	}}, []string{"reevaluateSearchFilters"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := targetOID(oid, 0); got != otherRoleOID {
+		t.Errorf("created reference oid = %v, want %s", got, otherRoleOID)
+	}
+
+	if err := c.Modify(ctx, "roles", oid, []client.ItemDelta{{ModificationType: "add", Path: "inducement",
+		Value: []any{map[string]any{"targetRef": filterRef("target")}, map[string]any{"targetRef": filterRef("missing")}}}},
+		[]string{"reevaluateSearchFilters"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := targetOID(oid, 1); got != otherRoleOID {
+		t.Errorf("added reference oid = %v, want %s", got, otherRoleOID)
+	}
+	if got := targetOID(oid, 2); got != nil {
+		t.Errorf("unmatched reference oid = %v, want none", got)
+	}
+
+	if err := c.Modify(ctx, "roles", oid, []client.ItemDelta{{ModificationType: "add", Path: "inducement",
+		Value: []any{map[string]any{"targetRef": filterRef("target"), "order": 2}}}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := targetOID(oid, 3); got != nil {
+		t.Errorf("reference added without reevaluateSearchFilters has oid %v", got)
+	}
+}

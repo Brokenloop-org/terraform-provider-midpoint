@@ -344,3 +344,21 @@ func TestAlignForType_resourcePartialContainersNarrowDeltas(t *testing.T) {
 		})
 	}
 }
+
+func TestPair(t *testing.T) {
+	body := mustJSON(t, `{
+		"d": [
+			{"targetRef":{"filter":{"text":"name = \"b\""},"type":"RoleType","relation":"org:default"}},
+			{"targetRef":{"oid":"a1","type":"RoleType","relation":"org:default"}},
+			{"targetRef":{"oid":"z9","type":"RoleType","relation":"org:default"}}
+		],
+		"a": [
+			{"@id":1,"targetRef":{"oid":"a1","type":"RoleType","relation":"org:default"}},
+			{"@id":2,"targetRef":{"oid":"b1","filter":{"text":"name = \"b\""},"type":"RoleType","relation":"org:default"}}
+		]
+	}`)
+	got := Pair("inducement", body["d"].([]any), body["a"].([]any))
+	if want := []int{1, 0, -1}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Pair = %v, want %v", got, want)
+	}
+}

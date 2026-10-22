@@ -739,3 +739,56 @@ func TestJSONTextValidator(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveTargetOIDs(t *testing.T) {
+	model := func() focusModel {
+		m := baseModel()
+		m.Name = str("business")
+		unknown := filterTarget(`name = "b"`, "RoleType")
+		unknown.OID = types.StringUnknown()
+		known := filterTarget(`name = "c"`, "RoleType")
+		known.OID = str("configured")
+		m.Inducements = []assignmentModel{block(filterTarget(`name = "a"`, "RoleType")), block(unknown), block(known), block(target(fServiceOID, "ServiceType"))}
+		return m
+	}
+	ref := func(oid, filter string) map[string]any {
+		r := map[string]any{"oid": oid, "type": "c:RoleType"}
+		if filter != "" {
+			r["filter"] = map[string]any{"text": filter}
+		}
+		return map[string]any{"targetRef": r}
+	}
+	actual := normalize.Canonical("roles", map[string]any{"name": "business", "inducement": []any{
+		map[string]any{"@id": json.Number("1"), "targetRef": map[string]any{"oid": fServiceOID, "type": "c:ServiceType"}},
+		ref("resolved-c", `name = "c"`),
+		ref("resolved-b", `name = "b"`),
+		ref("resolved-a", `name = "a"`),
+	}})
+
+	m := model()
+	in := m.Inducements
+	resolveTargetOIDs("roles", &m, actual)
+	want := []string{"resolved-a", "resolved-b", "configured", fServiceOID}
+	for i, w := range want {
+		if got := m.Inducements[i].Target.OID; got.ValueString() != w || got.IsUnknown() {
+			t.Errorf("inducement %d oid = %v, want %s", i, got, w)
+		}
+	}
+	if !reflect.DeepEqual(in, model().Inducements) {
+		t.Errorf("the input blocks were modified")
+	}
+
+	// No server body (a failed read-back): computed oids become null.
+	m = model()
+	resolveTargetOIDs("roles", &m, nil)
+	if !m.Inducements[0].Target.OID.IsNull() || !m.Inducements[1].Target.OID.IsNull() || m.Inducements[2].Target.OID.ValueString() != "configured" {
+		t.Errorf("without actual: %+v %+v %+v", m.Inducements[0].Target, m.Inducements[1].Target, m.Inducements[2].Target)
+	}
+
+	// A filter the server does not hold resolves to null.
+	m = model()
+	resolveTargetOIDs("roles", &m, normalize.Canonical("roles", map[string]any{"name": "business"}))
+	if !m.Inducements[1].Target.OID.IsNull() {
+		t.Errorf("unpaired: %+v", m.Inducements[1].Target)
+	}
+}

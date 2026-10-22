@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -642,6 +644,159 @@ resource "midpoint_role" "builtin" {
 		CheckDestroy: func(*terraform.State) error {
 			if s.Get("roles", stubOtherOID) != nil {
 				return fmt.Errorf("role still exists after a forced destroy")
+			}
+			return nil
+		},
+	})
+}
+
+// TestRole_filterTargetOIDIsComputed imports a business role whose
+// inducement midPoint resolved from a filter (the stored reference has the
+// filter and the oid). Filter-only HCL then plans nothing, through an
+// import block and after a plain import; the resolved oid is in state and
+// kept while filter, type and relation are unchanged, and it is never sent
+// back. A filter change plans the oid unknown and records the new
+// resolution.
+func TestRole_filterTargetOIDIsComputed(t *testing.T) {
+	const (
+		addr        = "midpoint_role.business"
+		businessOID = "5e000000-0000-4000-8000-0000000000b1"
+		targetOID   = "5e000000-0000-4000-8000-0000000000b2"
+		otherOID    = "5e000000-0000-4000-8000-0000000000b3"
+	)
+	s := newTestStub(t)
+	s.Put("roles", map[string]any{"oid": targetOID, "name": "target"})
+	s.Put("roles", map[string]any{"oid": otherOID, "name": "other"})
+	s.Put("roles", map[string]any{"oid": businessOID, "name": "business", "inducement": []any{
+		map[string]any{"targetRef": map[string]any{
+			"oid": targetOID, "type": "RoleType", "filter": map[string]any{"text": `name = "target"`},
+		}},
+	}})
+	cfg := func(filterName, extra string) string {
+		return fmt.Sprintf(`
+resource "midpoint_role" "business" {
+  name = "business"
+%s
+  inducement {
+    target {
+      type   = "RoleType"
+      filter = "name = \"%s\""
+    }
+  }
+}
+`, extra, filterName)
+	}
+	oidPath := tfjsonpath.New("inducement").AtSliceIndex(0).AtMapKey("target").AtMapKey("oid")
+	inducementDeltas := func(want []any) resource.TestCheckFunc {
+		return checkStub(func() error {
+			patches := requests(s, "PATCH")
+			if len(patches) == 0 {
+				return fmt.Errorf("no PATCH")
+			}
+			last := patches[len(patches)-1]
+			got := asJSON(t, last.Body).(map[string]any)["objectModification"].(map[string]any)["itemDelta"]
+			if !reflect.DeepEqual(got, asJSON(t, want)) {
+				return fmt.Errorf("PATCH deltas = %v, want %v", got, asJSON(t, want))
+			}
+			if opts := last.Query["options"]; !slices.Contains(opts, "reevaluateSearchFilters") {
+				return fmt.Errorf("PATCH options = %v, want reevaluateSearchFilters", opts)
+			}
+			return nil
+		})
+	}
+	filterOnly := func(name string, order int) map[string]any {
+		v := map[string]any{"targetRef": map[string]any{
+			"type": "RoleType", "relation": "org:default", "filter": map[string]any{"text": fmt.Sprintf("name = %q", name)},
+		}}
+		if order > 0 {
+			v["order"] = order
+		}
+		return v
+	}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{
+				// The migration path: an import block plans a no-op import.
+				Config: cfg("target", ""), ResourceName: addr, ImportState: true,
+				ImportStateKind: resource.ImportBlockWithID, ImportStateId: businessOID,
+			},
+			{
+				Config: cfg("target", ""), ResourceName: addr, ImportState: true,
+				ImportStateId: businessOID, ImportStatePersist: true,
+				ImportStateCheck: func(st []*terraform.InstanceState) error {
+					if len(st) != 1 || st[0].Attributes["inducement.0.target.oid"] != targetOID {
+						return fmt.Errorf("imported state = %+v, want the resolved oid %s", st, targetOID)
+					}
+					return nil
+				},
+			},
+			{
+				Config: cfg("target", ""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+			{
+				// Another change keeps the resolved oid planned.
+				Config: cfg("target", `  description = "business role"`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate),
+						plancheck.ExpectKnownValue(addr, oidPath, knownvalue.StringExact(targetOID)),
+					},
+				},
+				Check: checkStub(func() error {
+					patches := requests(s, "PATCH")
+					want := asJSON(t, []any{map[string]any{"modificationType": "add", "path": "description", "value": "business role"}})
+					if len(patches) != 1 {
+						return fmt.Errorf("want one PATCH, got %+v", patches)
+					}
+					if got := asJSON(t, patches[0].Body).(map[string]any)["objectModification"].(map[string]any)["itemDelta"]; !reflect.DeepEqual(got, want) {
+						return fmt.Errorf("PATCH deltas = %v, want %v", got, want)
+					}
+					return nil
+				}),
+			},
+			{
+				// A filter change: the oid is unknown until midPoint resolves
+				// the new filter; the new value is sent filter-only.
+				Config: cfg("other", `  description = "business role"`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate),
+						plancheck.ExpectUnknownValue(addr, oidPath),
+					},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(addr, oidPath, knownvalue.StringExact(otherOID)),
+				},
+				Check: inducementDeltas([]any{
+					map[string]any{"modificationType": "delete", "path": "inducement", "value": []any{map[string]any{"@id": 1}}},
+					map[string]any{"modificationType": "add", "path": "inducement", "value": []any{filterOnly("other", 0)}},
+				}),
+			},
+			refreshIsClean(),
+			{Config: cfg("other", `  description = "business role"`), PlanOnly: true},
+			{
+				// An identity change with the same filter (delete and add of
+				// the value): the planned oid is kept and not sent.
+				Config: strings.Replace(cfg("other", `  description = "business role"`), "  inducement {\n", "  inducement {\n    order = 2\n", 1),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectKnownValue(addr, oidPath, knownvalue.StringExact(otherOID)),
+					},
+				},
+				Check: inducementDeltas([]any{
+					map[string]any{"modificationType": "delete", "path": "inducement", "value": []any{map[string]any{"@id": 1}}}, // the stub reuses the id
+					map[string]any{"modificationType": "add", "path": "inducement", "value": []any{filterOnly("other", 2)}},
+				}),
+			},
+			refreshIsClean(),
+		},
+		CheckDestroy: func(*terraform.State) error {
+			if s.Get("roles", businessOID) != nil {
+				return fmt.Errorf("business role still exists")
 			}
 			return nil
 		},

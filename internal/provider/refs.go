@@ -5,7 +5,10 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -30,8 +33,13 @@ func targetBlock() schema.SingleNestedBlock {
 		Validators:  []validator.Object{targetValidator{}},
 		Attributes: map[string]schema.Attribute{
 			"oid": schema.StringAttribute{
-				Description: "Target object OID.",
-				Optional:    true,
+				Description: "Target object OID. With a filter and no oid configured, this is computed: the OID " +
+					"midPoint resolved the filter to, recorded on create, update, refresh and import. It is kept while " +
+					"filter, type and relation stay the same, and it is never sent to midPoint (midPoint keeps both " +
+					"the filter and the resolved OID on the reference).",
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{targetOIDPlanModifier{}},
 			},
 			"filter": schema.StringAttribute{
 				Description: "midPoint text query selecting the target, e.g. name = \"vault / operator\". " +
@@ -130,6 +138,71 @@ func refFromJSON(m map[string]any) (t targetRef, ok bool) {
 // isArchetypeType reports whether a reference type names ArchetypeType.
 func isArchetypeType(typ string) bool {
 	return strings.TrimPrefix(typ, "c:") == "ArchetypeType"
+}
+
+// targetOIDPlanModifier plans the computed oid of a target configured by
+// filter only: the oid recorded in state for a prior target with the same
+// filter, type and relation (the same index first, then any other, so that
+// reordered blocks keep their oids), else unknown until midPoint resolves
+// the filter.
+type targetOIDPlanModifier struct{}
+
+func (targetOIDPlanModifier) Description(context.Context) string {
+	return "Keeps the OID midPoint resolved for a filter while filter, type and relation are unchanged."
+}
+
+func (m targetOIDPlanModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (targetOIDPlanModifier) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if !req.ConfigValue.IsNull() || !req.PlanValue.IsUnknown() || req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+	targetPath := req.Path.ParentPath()  // <item>[i].target
+	blockPath := targetPath.ParentPath() // <item>[i]
+	var planned types.Object
+	var prior types.List
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, targetPath, &planned)...)
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, blockPath.ParentPath(), &prior)...)
+	if resp.Diagnostics.HasError() || planned.IsNull() || planned.IsUnknown() || prior.IsNull() || prior.IsUnknown() {
+		return
+	}
+	want := planned.Attributes()
+	if f := want["filter"]; f == nil || f.IsNull() || f.IsUnknown() {
+		return
+	}
+	candidates := prior.Elements()
+	if step, _ := blockPath.Steps().LastStep(); step != nil {
+		if i, isIndex := step.(path.PathStepElementKeyInt); isIndex && i >= 0 && int(i) < len(candidates) {
+			candidates = append([]attr.Value{candidates[i]}, candidates...)
+		}
+	}
+	for _, c := range candidates {
+		block, ok := c.(types.Object)
+		if !ok || block.IsNull() || block.IsUnknown() {
+			continue
+		}
+		t, ok := block.Attributes()["target"].(types.Object)
+		if !ok || t.IsNull() || t.IsUnknown() {
+			continue
+		}
+		have := t.Attributes()
+		oid, ok := have["oid"].(types.String)
+		if !ok || oid.IsNull() || oid.IsUnknown() {
+			continue
+		}
+		same := true
+		for _, name := range []string{"filter", "type", "relation"} {
+			if want[name] == nil || have[name] == nil || !want[name].Equal(have[name]) {
+				same = false
+			}
+		}
+		if same {
+			resp.PlanValue = oid
+			return
+		}
+	}
 }
 
 // knownValue returns the value of a known, non-null string.

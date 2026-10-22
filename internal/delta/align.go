@@ -247,6 +247,14 @@ func alignList(name string, d, a []any) []any {
 	return out
 }
 
+// Pair matches the values of the multi-valued item name between a desired
+// and an actual list the way Align and Compute do: pairs[i] is the index in
+// a of the value paired with d[i], or -1.
+func Pair(name string, d, a []any) []int {
+	pairs, _ := pair(name, d, a)
+	return pairs
+}
+
 // pair matches the values of item name: pairs[i] is the index in a of the
 // value paired with d[i], or -1; unpaired lists the indexes in a left over,
 // in order. A desired value pairs with the first free actual value whose Key,
