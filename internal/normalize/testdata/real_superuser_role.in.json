@@ -1,0 +1,153 @@
+{
+  "restType": "roles",
+  "body": {
+    "@metadata": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 4,
+      "storage": {
+        "createTimestamp": "2026-10-22T12:29:34.587Z",
+        "createChannel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#init"
+      },
+      "process": {
+        "requestTimestamp": "2026-10-22T12:29:34.576Z"
+      }
+    },
+    "oid": "00000000-0000-0000-0000-000000000004",
+    "version": "1",
+    "name": "Superuser",
+    "description": "Role that gives user full authorization in MidPoint.",
+    "operationExecution": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 11,
+      "recordType": "simple",
+      "timestamp": "2026-10-22T12:29:34.602Z",
+      "operation": {
+        "objectDelta": {
+          "changeType": "add",
+          "objectType": "c:RoleType"
+        },
+        "executionResult": {
+          "operation": "com.evolveum.midpoint.model.impl.lens.ChangeExecutor.executeDelta",
+          "status": "success",
+          "importance": "normal",
+          "token": 1000000000000000070
+        },
+        "objectName": "Superuser"
+      },
+      "status": "success",
+      "channel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#init"
+    },
+    "indestructible": true,
+    "assignment": [
+      {
+        "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+        "@metadata": {
+          "@id": 5,
+          "storage": {
+            "createTimestamp": "2026-10-22T12:29:34.587Z",
+            "createChannel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#init"
+          },
+          "process": {
+            "requestTimestamp": "2026-10-22T12:29:34.576Z"
+          },
+          "provenance": {
+            "acquisition": {
+              "@id": 6,
+              "channel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#init",
+              "timestamp": "2026-10-22T12:29:34.576Z"
+            }
+          }
+        },
+        "@id": 1,
+        "identifier": "archetype",
+        "targetRef": {
+          "oid": "00000000-0000-0000-0000-000000000320",
+          "relation": "org:default",
+          "type": "c:ArchetypeType"
+        },
+        "activation": {
+          "effectiveStatus": "enabled"
+        }
+      },
+      {
+        "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+        "@metadata": {
+          "@id": 7,
+          "storage": {
+            "createTimestamp": "2026-10-22T12:29:34.587Z",
+            "createChannel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#init"
+          },
+          "process": {
+            "requestTimestamp": "2026-10-22T12:29:34.576Z"
+          },
+          "provenance": {
+            "acquisition": {
+              "@id": 8,
+              "channel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#init",
+              "timestamp": "2026-10-22T12:29:34.576Z"
+            }
+          }
+        },
+        "@id": 3,
+        "identifier": "privileged-access",
+        "documentation": "Superuser role provides privileged access - by definition.",
+        "targetRef": {
+          "oid": "00000000-0000-0000-0000-000000000332",
+          "relation": "org:default",
+          "type": "c:PolicyType"
+        },
+        "activation": {
+          "effectiveStatus": "enabled"
+        }
+      }
+    ],
+    "iteration": 0,
+    "iterationToken": "",
+    "archetypeRef": {
+      "oid": "00000000-0000-0000-0000-000000000320",
+      "relation": "org:default",
+      "type": "c:ArchetypeType"
+    },
+    "roleMembershipRef": {
+      "@metadata": {
+        "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+        "@id": 9,
+        "storage": {
+          "createTimestamp": "2026-10-22T12:29:34.585Z"
+        },
+        "provenance": {
+          "assignmentPath": {
+            "sourceRef": {
+              "oid": "00000000-0000-0000-0000-000000000004",
+              "relation": "org:default",
+              "type": "c:RoleType"
+            },
+            "segment": {
+              "@id": 10,
+              "segmentOrder": 1,
+              "assignmentId": 1,
+              "targetRef": {
+                "oid": "00000000-0000-0000-0000-000000000320",
+                "relation": "org:default",
+                "type": "c:ArchetypeType"
+              },
+              "matchingOrder": true
+            }
+          }
+        }
+      },
+      "oid": "00000000-0000-0000-0000-000000000320",
+      "relation": "org:default",
+      "type": "c:ArchetypeType"
+    },
+    "activation": {
+      "effectiveStatus": "enabled",
+      "enableTimestamp": "2026-10-22T12:29:34.578Z"
+    },
+    "authorization": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 2,
+      "action": "http://midpoint.evolveum.com/xml/ns/public/security/authorization-3#all"
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "assignment": [
+    {
+      "@id": 1,
+      "identifier": "archetype",
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000320",
+        "relation": "org:default",
+        "type": "ArchetypeType"
+      }
+    },
+    {
+      "@id": 3,
+      "documentation": "Superuser role provides privileged access - by definition.",
+      "identifier": "privileged-access",
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000332",
+        "relation": "org:default",
+        "type": "PolicyType"
+      }
+    }
+  ],
+  "authorization": [
+    {
+      "@id": 2,
+      "action": [
+        "http://midpoint.evolveum.com/xml/ns/public/security/authorization-3#all"
+      ]
+    }
+  ],
+  "description": "Role that gives user full authorization in MidPoint.",
+  "indestructible": true,
+  "name": "Superuser",
+  "oid": "00000000-0000-0000-0000-000000000004"
+}

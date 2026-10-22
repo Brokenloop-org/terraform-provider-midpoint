@@ -1,0 +1,36 @@
+{
+  "restType": "tasks",
+  "body": {
+    "oid": "1ffad957-1421-42e3-9687-c901453cd32d",
+    "version": "27",
+    "name": "recompute",
+    "taskIdentifier": "1792672229603-28266-1",
+    "ownerRef": {"oid": "00000000-0000-0000-0000-000000000002", "relation": "org:default", "type": "c:UserType"},
+    "executionState": "suspended",
+    "schedulingState": "suspended",
+    "stateBeforeSuspend": "running",
+    "schedulingStateBeforeSuspend": "ready",
+    "node": "DefaultNode",
+    "nodeAsObserved": "DefaultNode",
+    "result": {"operation": "run", "status": "success"},
+    "resultStatus": "success",
+    "lastRunStartTimestamp": "2026-10-22T12:30:29.636Z",
+    "lastRunFinishTimestamp": "2026-10-22T12:30:29.713Z",
+    "completionTimestamp": "2026-10-22T12:30:29.717Z",
+    "nextRunStartTimestamp": "2026-10-23T12:30:29.717Z",
+    "progress": 0,
+    "expectedTotal": 10,
+    "operationStats": {"timestamp": "2026-10-22T12:30:29.711Z"},
+    "activityState": {"activity": {"realizationState": "complete"}},
+    "affectedObjects": {"activity": {"activityType": "c:recomputation"}},
+    "unpauseAction": "executeImmediately",
+    "schedule": {"recurrence": "recurring", "interval": 3600},
+    "activity": {
+      "work": {
+        "recomputation": {
+          "objects": {"type": "#UserType", "query": {"filter": {"text": "name = \"x\""}}}
+        }
+      }
+    }
+  }
+}

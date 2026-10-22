@@ -1,0 +1,52 @@
+{
+  "restType": "roles",
+  "body": {
+    "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+    "@type": "c:RoleType",
+    "@metadata": {"@id": 4, "storage": {"createTimestamp": "2026-10-22T12:29:34.587Z"}},
+    "metadata": {"createTimestamp": "2026-10-22T12:29:34.587Z", "modifyTimestamp": "2026-10-22T12:30:00.000Z"},
+    "oid": "11111111-0000-0000-0000-000000000001",
+    "version": "7",
+    "name": "app-role",
+    "description": "keep me",
+    "riskLevel": "high",
+    "iteration": 0,
+    "iterationToken": "",
+    "operationExecution": {"@id": 11, "status": "success", "timestamp": "2026-10-22T12:29:34.602Z"},
+    "roleMembershipRef": {"oid": "00000000-0000-0000-0000-000000000320", "relation": "org:default", "type": "c:ArchetypeType"},
+    "archetypeRef": {"oid": "00000000-0000-0000-0000-000000000320", "relation": "org:default", "type": "c:ArchetypeType"},
+    "linkRef": [{"oid": "aaaaaaaa-0000-0000-0000-000000000001", "type": "c:ShadowType"}],
+    "parentOrgRef": {"oid": "bbbbbbbb-0000-0000-0000-000000000001", "type": "c:OrgType"},
+    "tenantRef": {"oid": "bbbbbbbb-0000-0000-0000-000000000002", "type": "c:OrgType"},
+    "delegatedRef": {"oid": "bbbbbbbb-0000-0000-0000-000000000003", "type": "c:UserType"},
+    "policySituation": "http://midpoint.evolveum.com/xml/ns/public/model/policy/situation#exclusionViolation",
+    "triggeredPolicyRule": {"ruleName": "r1"},
+    "effectiveMarkRef": {"oid": "00000000-0000-0000-0000-000000000800", "type": "c:MarkType"},
+    "trigger": {"@id": 20, "timestamp": "2026-10-23T00:00:00Z", "handlerUri": "x"},
+    "fetchResult": {"status": "success"},
+    "diagnosticInformation": {"timestamp": "2026-10-22T12:29:34.602Z"},
+    "behavior": {"authentication": {"failedLogins": 0}},
+    "lensContext": {"state": "final"},
+    "@incomplete": true,
+    "activation": {
+      "administrativeStatus": "enabled",
+      "effectiveStatus": "enabled",
+      "validityStatus": "inValidityPeriod",
+      "validityChangeTimestamp": "2026-10-22T12:29:34.578Z",
+      "enableTimestamp": "2026-10-22T12:29:34.578Z",
+      "disableTimestamp": "2026-10-22T12:29:34.578Z",
+      "archiveTimestamp": "2026-10-22T12:29:34.578Z",
+      "disableReason": "http://midpoint.evolveum.com/xml/ns/public/model/disableReason#explicit"
+    },
+    "assignment": [
+      {
+        "@id": 1,
+        "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+        "@metadata": {"@id": 5, "storage": {"createTimestamp": "2026-10-22T12:29:34.587Z"}},
+        "metadata": {"createTimestamp": "2026-10-22T12:29:34.587Z"},
+        "targetRef": {"oid": "00000000-0000-0000-0000-000000000320", "relation": "org:default", "type": "ArchetypeType"},
+        "activation": {"effectiveStatus": "enabled"}
+      }
+    ]
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "assignment": [
+    {
+      "@id": 1,
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000320",
+        "relation": "org:default",
+        "type": "ArchetypeType"
+      }
+    },
+    {
+      "@id": 7,
+      "activation": {
+        "@id": 8,
+        "administrativeStatus": "disabled"
+      },
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000004",
+        "relation": "org:default",
+        "type": "RoleType"
+      }
+    }
+  ],
+  "authorization": [
+    {
+      "@id": 2,
+      "action": [
+        "http://midpoint.evolveum.com/xml/ns/public/security/authorization-3#all"
+      ]
+    }
+  ],
+  "inducement": [
+    {
+      "@id": 3,
+      "construction": {
+        "resourceRef": {
+          "oid": "cccccccc-0000-0000-0000-000000000001",
+          "relation": "org:default",
+          "type": "ResourceType"
+        }
+      }
+    }
+  ],
+  "name": "ids"
+}

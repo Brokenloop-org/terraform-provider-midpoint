@@ -1,0 +1,18 @@
+{
+  "restType": "roles",
+  "body": {
+    "name": {"orig": "Folded", "norm": "folded"},
+    "displayName": {"orig": "Folded Role", "norm": "folded role", "translation": {"key": "Role.folded"}, "lang": {"en": "Folded Role"}},
+    "identifier": {"orig": "only-orig"},
+    "archetypePolicy": {
+      "display": {
+        "label": {"orig": "Application", "norm": "application", "translation": {"key": "Application.label"}},
+        "icon": {"cssClass": "fa fa-cloud", "color": "blue"}
+      }
+    },
+    "extension": {
+      "notAPolyString": {"orig": "kept", "other": "because of other keys"},
+      "multi": [{"orig": "A", "norm": "a"}, {"orig": "B", "norm": "b"}]
+    }
+  }
+}

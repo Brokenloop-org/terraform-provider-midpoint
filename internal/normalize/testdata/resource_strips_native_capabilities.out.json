@@ -1,0 +1,68 @@
+{
+  "capabilities": {
+    "configured": {
+      "activation": {
+        "status": {
+          "attribute": [
+            "ri:enabled"
+          ]
+        }
+      }
+    }
+  },
+  "connectorConfiguration": {
+    "configurationProperties": {
+      "host": "ldap.example.com",
+      "port": 389
+    }
+  },
+  "connectorRef": {
+    "oid": "dddddddd-0000-0000-0000-000000000001",
+    "relation": "org:default",
+    "type": "ConnectorType"
+  },
+  "name": "LDAP",
+  "oid": "cccccccc-0000-0000-0000-000000000001",
+  "schema": {
+    "generationConstraints": {
+      "generateObjectClass": [
+        "ri:inetOrgPerson"
+      ]
+    }
+  },
+  "schemaHandling": {
+    "objectType": [
+      {
+        "@id": 1,
+        "activation": {
+          "administrativeStatus": {
+            "outbound": [
+              {
+                "strength": "weak"
+              }
+            ]
+          }
+        },
+        "attribute": [
+          {
+            "@id": 2,
+            "inbound": [
+              {
+                "@id": 3,
+                "target": {
+                  "path": "name"
+                }
+              }
+            ],
+            "ref": "ri:uid"
+          }
+        ],
+        "intent": "default",
+        "kind": "account",
+        "objectClass": [
+          "ri:inetOrgPerson"
+        ]
+      }
+    ]
+  }
+}

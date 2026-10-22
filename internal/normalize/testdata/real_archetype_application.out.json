@@ -1,0 +1,167 @@
+{
+  "archetypePolicy": {
+    "adminGuiConfiguration": {
+      "objectDetails": {
+        "panel": [
+          {
+            "@id": 3,
+            "display": {
+              "label": "Inventory records"
+            },
+            "identifier": "projections",
+            "panelType": "projections"
+          },
+          {
+            "@id": 4,
+            "identifier": "assignments",
+            "visibility": "hidden"
+          },
+          {
+            "@id": 5,
+            "identifier": "password",
+            "visibility": "hidden"
+          },
+          {
+            "@id": 6,
+            "identifier": "applicablePolicies",
+            "visibility": "hidden"
+          },
+          {
+            "@id": 7,
+            "identifier": "serviceMembers",
+            "listView": {
+              "searchBoxConfiguration": {
+                "indirectConfiguration": {
+                  "indirect": true
+                },
+                "objectTypeConfiguration": {
+                  "defaultValue": "#UserType",
+                  "supportedTypes": [
+                    "#UserType"
+                  ],
+                  "visibility": "hidden"
+                }
+              }
+            }
+          },
+          {
+            "@id": 8,
+            "identifier": "serviceGovernance",
+            "visibility": "hidden"
+          },
+          {
+            "@id": 9,
+            "display": {
+              "icon": {
+                "cssClass": "fa fa-users"
+              },
+              "label": "Governance"
+            },
+            "displayOrder": 91,
+            "identifier": "governance",
+            "panelType": "governanceCards"
+          },
+          {
+            "@id": 15,
+            "display": {
+              "icon": {
+                "cssClass": "fa fa-tags"
+              },
+              "label": "Classifications",
+              "tooltip": "Information classifications (labels)"
+            },
+            "displayOrder": 92,
+            "identifier": "classifications",
+            "listView": {
+              "collection": {
+                "filter": {
+                  "text": "targetRef/@/archetypeRef matches ( oid = \"00000000-0000-0000-0000-000000000330\" )"
+                }
+              },
+              "dataProvider": {
+                "@type": "http://midpoint.evolveum.com/xml/ns/public/common/common-3#RepositoryAssignmentDataProviderType"
+              },
+              "identifier": "classifications-view",
+              "type": "c:AssignmentType"
+            },
+            "panelType": "roleAssignments"
+          },
+          {
+            "@id": 10,
+            "identifier": "inducements",
+            "visibility": "hidden"
+          },
+          {
+            "@id": 11,
+            "display": {
+              "label": "Construction inducements"
+            },
+            "displayOrder": 115,
+            "identifier": "resourceEntitlementsTopLevel",
+            "panelType": "constructionInducements"
+          },
+          {
+            "@id": 13,
+            "display": {
+              "label": "Application roles"
+            },
+            "displayOrder": 117,
+            "identifier": "applicationRoles",
+            "listView": {
+              "collection": {
+                "collectionRef": {
+                  "oid": "00000000-0000-0000-0001-000000000016",
+                  "relation": "org:default",
+                  "type": "ObjectCollectionType"
+                }
+              },
+              "identifier": "applicationRoles",
+              "searchBoxConfiguration": {
+                "objectTypeConfiguration": {
+                  "defaultValue": "#RoleType",
+                  "supportedTypes": [
+                    "#RoleType"
+                  ],
+                  "visibility": "hidden"
+                }
+              },
+              "type": "c:RoleType"
+            },
+            "panelType": "inducedBy"
+          },
+          {
+            "@id": 14,
+            "displayOrder": 118,
+            "identifier": "inducedBy",
+            "panelType": "inducedBy"
+          }
+        ]
+      }
+    },
+    "display": {
+      "icon": {
+        "color": "blue",
+        "cssClass": "fa fa-cloud"
+      },
+      "label": "Application",
+      "pluralLabel": "Applications"
+    }
+  },
+  "assignment": [
+    {
+      "@id": 1,
+      "assignmentRelation": [
+        {
+          "@id": 2,
+          "holderType": [
+            "#ServiceType"
+          ]
+        }
+      ],
+      "identifier": "holderType"
+    }
+  ],
+  "description": "\n        Applications are basic building blocks for defining access.\n        These objects contain business information.\n        Application is an administrative object describing application\n        as a business target that the access relates to.\n    ",
+  "name": "Application",
+  "oid": "00000000-0000-0000-0000-000000000329"
+}

@@ -1,0 +1,20 @@
+{
+  "restType": "roles",
+  "body": {
+    "c:name": "prefixed",
+    "c:description": "c:values-other-than-type-are-untouched",
+    "assignment": [
+      {
+        "c:targetRef": {"t:oid": "00000000-0000-0000-0000-000000000320", "t:type": "c:ArchetypeType", "t:relation": "org:default"}
+      }
+    ],
+    "inducement": [
+      {
+        "c:condition": {
+          "q:filter": {"q:text": "name = \"x\""},
+          "c:expression": {"c:script": {"c:code": "c:not-a-prefix"}}
+        }
+      }
+    ]
+  }
+}
