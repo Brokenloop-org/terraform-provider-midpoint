@@ -1,0 +1,12 @@
+{
+  "name": "u",
+  "credentials": {
+    "password": {
+      "value": [
+        {
+          "clearValue": "new"
+        }
+      ]
+    }
+  }
+}

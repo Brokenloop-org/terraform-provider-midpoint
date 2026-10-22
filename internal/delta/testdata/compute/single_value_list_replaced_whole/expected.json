@@ -1,0 +1,11 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "credentials/password/value",
+    "value": [
+      {
+        "clearValue": "new"
+      }
+    ]
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "ownerRef",
+    "value": {
+      "oid": "u2",
+      "type": "UserType",
+      "relation": "org:default"
+    }
+  }
+]

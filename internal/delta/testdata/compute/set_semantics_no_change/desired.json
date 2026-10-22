@@ -1,0 +1,36 @@
+{
+  "name": "r",
+  "subtype": [
+    "a",
+    "b"
+  ],
+  "assignment": [
+    {
+      "targetRef": {
+        "filter": {
+          "filter": {
+            "text": "name = \"x\""
+          }
+        },
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    },
+    {
+      "targetRef": {
+        "oid": "y1",
+        "relation": "org:default"
+      }
+    }
+  ],
+  "authorization": [
+    {
+      "decision": "allow",
+      "action": [
+        "read",
+        "add"
+      ],
+      "order": 1
+    }
+  ]
+}

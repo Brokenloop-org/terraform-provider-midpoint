@@ -1,0 +1,15 @@
+[
+  {
+    "modificationType": "add",
+    "path": "inducement",
+    "value": [
+      {
+        "targetRef": {
+          "oid": "b1",
+          "type": "RoleType",
+          "relation": "org:default"
+        }
+      }
+    ]
+  }
+]

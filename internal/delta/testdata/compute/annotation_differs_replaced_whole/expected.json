@@ -1,0 +1,10 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "extension/provider",
+    "value": {
+      "@type": "T2",
+      "limit": 1
+    }
+  }
+]

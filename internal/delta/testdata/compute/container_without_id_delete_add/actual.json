@@ -1,0 +1,20 @@
+{
+  "name": "r",
+  "inducement": [
+    {
+      "description": "old",
+      "targetRef": {
+        "oid": "a1",
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    },
+    {
+      "targetRef": {
+        "oid": "b1",
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    }
+  ]
+}

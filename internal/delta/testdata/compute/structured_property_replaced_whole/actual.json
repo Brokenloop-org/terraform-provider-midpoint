@@ -1,0 +1,17 @@
+{
+  "name": "t",
+  "activity": {
+    "work": {
+      "recomputation": {
+        "objects": {
+          "type": "UserType",
+          "query": {
+            "filter": {
+              "text": "name = \"a\""
+            }
+          }
+        }
+      }
+    }
+  }
+}

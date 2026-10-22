@@ -1,0 +1,11 @@
+[
+  {
+    "modificationType": "add",
+    "path": "schemaHandling/objectType[2]/attribute",
+    "value": [
+      {
+        "ref": "ri:mail"
+      }
+    ]
+  }
+]

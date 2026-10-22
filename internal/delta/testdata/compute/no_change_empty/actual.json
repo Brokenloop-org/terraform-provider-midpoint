@@ -1,0 +1,24 @@
+{
+  "name": "r",
+  "description": "d",
+  "inducement": [
+    {
+      "@id": 1,
+      "order": 2,
+      "targetRef": {
+        "oid": "a1",
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    },
+    {
+      "@id": 2,
+      "targetRef": {
+        "oid": "b1",
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    }
+  ],
+  "riskLevel": "low"
+}

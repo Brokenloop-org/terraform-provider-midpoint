@@ -1,0 +1,27 @@
+{
+  "name": "r",
+  "inducement": [
+    {
+      "targetRef": {
+        "filter": {
+          "filter": {
+            "text": "name = \"existing\""
+          }
+        },
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    },
+    {
+      "targetRef": {
+        "filter": {
+          "filter": {
+            "text": "name = \"new\""
+          }
+        },
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    }
+  ]
+}

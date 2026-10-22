@@ -1,0 +1,13 @@
+{
+  "name": "r",
+  "inducement": [
+    {
+      "@id": 1,
+      "targetRef": {
+        "oid": "a1",
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    }
+  ]
+}

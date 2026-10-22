@@ -1,0 +1,20 @@
+{
+  "name": "u",
+  "assignment": [
+    {
+      "description": "new",
+      "targetRef": {
+        "oid": "a1",
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    },
+    {
+      "targetRef": {
+        "oid": "o1",
+        "type": "OrgType",
+        "relation": "org:default"
+      }
+    }
+  ]
+}

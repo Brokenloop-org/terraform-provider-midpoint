@@ -1,0 +1,19 @@
+[
+  {
+    "modificationType": "add",
+    "path": "inducement",
+    "value": [
+      {
+        "targetRef": {
+          "filter": {
+            "filter": {
+              "text": "name = \"new\""
+            }
+          },
+          "type": "RoleType",
+          "relation": "org:default"
+        }
+      }
+    ]
+  }
+]
