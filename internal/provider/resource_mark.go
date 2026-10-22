@@ -34,7 +34,7 @@ func (s *markState) fields() simpleFields {
 
 // NewMarkResource returns the midpoint_mark resource.
 func NewMarkResource() resource.Resource {
-	return simpleResource(markSpec.ShortName, markSpec, typedSchema(
+	return simpleResource(markSpec.ShortName, markSpec, typedSchema(markSpec,
 		"A midPoint mark (MarkType): an event or object mark.",
 		map[string]schema.Attribute{
 			"name":        nameAttribute(),

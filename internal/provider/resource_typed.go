@@ -94,9 +94,10 @@ func identityAttributes() map[string]schema.Attribute {
 			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 		},
 		"oid": schema.StringAttribute{
-			Description: "Object OID. When unset midPoint generates one. Changing it replaces the object.",
-			Optional:    true,
-			Computed:    true,
+			Description: "Object OID. When unset midPoint generates one. Changing it replaces the object. Creating an object " +
+				"whose oid already exists fails unless adopt_existing is set.",
+			Optional: true,
+			Computed: true,
 			PlanModifiers: []planmodifier.String{
 				stringplanmodifier.UseStateForUnknown(),
 				stringplanmodifier.RequiresReplaceIfConfigured(),
@@ -107,9 +108,9 @@ func identityAttributes() map[string]schema.Attribute {
 
 // typedSchema is a schema with attrs plus identityAttributes and
 // commonAttributes.
-func typedSchema(description string, attrs map[string]schema.Attribute, blocks map[string]schema.Block) schema.Schema {
+func typedSchema(spec engineSpec, description string, attrs map[string]schema.Attribute, blocks map[string]schema.Block) schema.Schema {
 	all := identityAttributes()
-	for k, v := range commonAttributes() {
+	for k, v := range commonAttributes(spec) {
 		all[k] = v
 	}
 	for k, v := range attrs {

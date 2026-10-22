@@ -290,7 +290,7 @@ func NewResourceResource() resource.Resource {
 	return &typedResource[resourceState]{
 		name: resourceSpec.ShortName,
 		spec: resourceSpec,
-		schema: typedSchema(
+		schema: typedSchema(resourceSpec,
 			"A midPoint resource (ResourceType): a connector, its configuration, schema handling and "+
 				"synchronization. The connector is found by type (and version) with a search filter, so the "+
 				"configuration holds no environment-specific connector OID. midPoint manages the native "+

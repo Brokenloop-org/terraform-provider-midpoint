@@ -88,7 +88,7 @@ func focusSchema(kind focusKind, attributes map[string]schema.Attribute) schema.
 	for k, v := range attributes {
 		attrs[k] = v
 	}
-	return typedSchema(kind.Description, attrs, map[string]schema.Block{
+	return typedSchema(kind.Spec, kind.Description, attrs, map[string]schema.Block{
 		"assignment": assignmentBlock("An assignment (membership, archetype, org)."),
 		"inducement": assignmentBlock("An inducement: what holders of this object get."),
 		"activation": schema.SingleNestedBlock{

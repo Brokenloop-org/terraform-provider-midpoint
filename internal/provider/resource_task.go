@@ -130,7 +130,7 @@ func NewTaskResource() resource.Resource {
 	return &typedResource[taskState]{
 		name: taskSpec.ShortName,
 		spec: taskSpec,
-		schema: typedSchema(
+		schema: typedSchema(taskSpec,
 			"A midPoint task (TaskType). The provider sets the execution state only when it creates the task; "+
 				"suspending or resuming it in midPoint is an operation, not a change of configuration, and is never drift. "+
 				"Assignments (in extra) are compared only when the task configures some: midPoint assigns a task the "+

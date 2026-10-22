@@ -79,7 +79,7 @@ func (r *objectResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 		},
 		"oid": schema.StringAttribute{
 			Description: "Object OID. When unset, an oid in body is used, else midPoint generates one. " +
-				"Changing it replaces the object.",
+				"Changing it replaces the object. Creating an object whose oid already exists fails unless adopt_existing is set.",
 			Optional: true,
 			Computed: true,
 			PlanModifiers: []planmodifier.String{
@@ -97,7 +97,7 @@ func (r *objectResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			Computed:    true,
 		},
 	}
-	for k, v := range commonAttributes() {
+	for k, v := range commonAttributes(objectSpec("")) {
 		attrs[k] = v
 	}
 	resp.Schema = schema.Schema{

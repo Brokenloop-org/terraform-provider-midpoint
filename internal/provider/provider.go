@@ -76,8 +76,9 @@ func (p *midpointProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 		Description: "Manages Evolveum midPoint objects through the midPoint REST API.",
 		Attributes: map[string]schema.Attribute{
 			"url": schema.StringAttribute{
-				Description: "Base URL of the midPoint server, e.g. https://midpoint.example.com. May also be set with MIDPOINT_URL.",
-				Optional:    true,
+				Description: "Base URL of the midPoint server, e.g. https://midpoint.example.com; the provider appends " +
+					"/midpoint/ws/rest. May also be set with MIDPOINT_URL.",
+				Optional: true,
 			},
 			"username": schema.StringAttribute{
 				Description: "Username for HTTP basic authentication. May also be set with MIDPOINT_USERNAME.",
@@ -93,8 +94,9 @@ func (p *midpointProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Optional:    true,
 			},
 			"ca_bundle": schema.StringAttribute{
-				Description: "PEM-encoded CA certificates used to verify the midPoint server certificate.",
-				Optional:    true,
+				Description: "PEM-encoded CA certificates used to verify the midPoint server certificate, e.g. " +
+					"file(\"ca.pem\"). When set they replace the system trust store.",
+				Optional: true,
 			},
 			"default_options": schema.MapAttribute{
 				Description: "Default midPoint execution options per resource type, keyed by resource short name " +

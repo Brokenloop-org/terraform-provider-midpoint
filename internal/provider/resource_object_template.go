@@ -271,7 +271,7 @@ func (s *objectTemplateState) fields() simpleFields {
 
 // NewObjectTemplateResource returns the midpoint_object_template resource.
 func NewObjectTemplateResource() resource.Resource {
-	return simpleResource(objectTemplateSpec.ShortName, objectTemplateSpec, typedSchema(
+	return simpleResource(objectTemplateSpec.ShortName, objectTemplateSpec, typedSchema(objectTemplateSpec,
 		"A midPoint object template (ObjectTemplateType): mappings and item definitions applied to focus objects.",
 		map[string]schema.Attribute{
 			"name":            nameAttribute(),

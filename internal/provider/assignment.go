@@ -50,7 +50,7 @@ var assignmentItems = []string{"targetRef", "construction", "order", "condition"
 func assignmentBlock(description string) schema.ListNestedBlock {
 	jsonText := func(what string) schema.StringAttribute {
 		return schema.StringAttribute{
-			Description: what + " JSON text in midPoint naming (camelCase, as in the REST API), e.g. " +
+			Description: what + " as JSON text in midPoint naming (camelCase, as in the REST API), e.g. " +
 				"jsonencode({...}) or jsonencode(yamldecode(file(\"x.yaml\"))).",
 			Optional:   true,
 			CustomType: jsontypes.NormalizedType{},
@@ -65,9 +65,9 @@ func assignmentBlock(description string) schema.ListNestedBlock {
 					Description: "Assignment order; 2 makes an inducement apply to the members of the members.",
 					Optional:    true,
 				},
-				"condition":   jsonText("Condition (MappingType) as"),
-				"policy_rule": jsonText("Policy rule (policyRule) as"),
-				"extra":       jsonText("Other items of this assignment (e.g. description, activation, focusType) as a JSON object"),
+				"condition":   jsonText("Condition (MappingType)"),
+				"policy_rule": jsonText("Policy rule (policyRule)"),
+				"extra":       jsonText("Other items of this assignment (e.g. description, activation, focusType), an object,"),
 			},
 			Blocks: map[string]schema.Block{
 				"target": targetBlock(),
@@ -77,7 +77,7 @@ func assignmentBlock(description string) schema.ListNestedBlock {
 						"resource": schema.StringAttribute{Description: "Resource OID.", Optional: true},
 						"kind":     schema.StringAttribute{Description: "Object kind, e.g. account or entitlement.", Optional: true},
 						"intent":   schema.StringAttribute{Description: "Object intent, e.g. default.", Optional: true},
-						"body":     jsonText("Other construction items (attribute, association, ...) as a JSON object"),
+						"body":     jsonText("Other construction items (attribute, association, ...), an object,"),
 					},
 				},
 			},
