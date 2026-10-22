@@ -317,11 +317,26 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+// searchBody renders a midPoint 4.9 search response (see
+// internal/normalize/testdata/real/search-roles-superuser.json) holding items
+// as the inner result list; no items means the inner key is absent, as midPoint
+// sends it for zero matches.
+func searchBody(items ...string) string {
+	inner := ""
+	if len(items) > 0 {
+		inner = `,"object":[` + strings.Join(items, ",") + `]`
+	}
+	return `{"@ns":"http://prism.evolveum.com/xml/ns/public/types-3","object":{` +
+		`"@ns":"http://midpoint.evolveum.com/xml/ns/public/common/api-types-3",` +
+		`"@type":"http://midpoint.evolveum.com/xml/ns/public/common/api-types-3#ObjectListType"` +
+		inner + `}}`
+}
+
 func TestSearch_textFilterAndTotalCount(t *testing.T) {
 	c, seen := stub(t, reply{
 		Status: 200,
 		Header: map[string]string{"X-Total-Count": "12"},
-		Body:   `{"object":[{"oid":"u1","name":"a","@type":"c:UserType"}]}`,
+		Body:   searchBody(`{"@ns":"http://midpoint.evolveum.com/xml/ns/public/common/common-3","@type":"c:UserType","oid":"u1","name":"a"}`),
 	})
 
 	objs, total, err := c.Search(context.Background(), "users", `roleMembershipRef matches (oid = "1")`, 5, nil)
@@ -341,7 +356,9 @@ func TestSearch_textFilterAndTotalCount(t *testing.T) {
 	if total != 12 {
 		t.Errorf("total = %d, want 12", total)
 	}
-	want := []Object{{OID: "u1", Body: map[string]any{"oid": "u1", "name": "a", "@type": "c:UserType"}}}
+	want := []Object{{OID: "u1", Body: map[string]any{
+		"@ns": "http://midpoint.evolveum.com/xml/ns/public/common/common-3", "@type": "c:UserType", "oid": "u1", "name": "a",
+	}}}
 	if !reflect.DeepEqual(objs, want) {
 		t.Errorf("objs = %#v, want %#v", objs, want)
 	}
@@ -357,35 +374,49 @@ func TestSearch_resultShapes(t *testing.T) {
 		wantErr   string
 	}{
 		{
-			name:      "single result as object",
-			header:    map[string]string{"X-Total-Count": "1"},
-			body:      `{"object":{"oid":"u1","name":"a"}}`,
+			name:      "one match without total header",
+			body:      searchBody(`{"oid":"u1"}`),
 			wantOIDs:  []string{"u1"},
-			wantTotal: 1,
+			wantTotal: -1,
 		},
 		{
-			name:      "ObjectListType wrapper",
-			header:    map[string]string{"X-Total-Count": "2"},
-			body:      `{"@ns":"x","object":{"@type":"ObjectListType","object":[{"oid":"u1"},{"oid":"u2"}]}}`,
+			name:      "several matches with total header",
+			header:    map[string]string{"X-Total-Count": "7"},
+			body:      searchBody(`{"oid":"u1"}`, `{"oid":"u2"}`),
 			wantOIDs:  []string{"u1", "u2"},
-			wantTotal: 2,
+			wantTotal: 7,
 		},
 		{
-			name:      "no results",
-			header:    map[string]string{"X-Total-Count": "0"},
-			body:      `{}`,
-			wantTotal: 0,
-		},
-		{
-			name:    "missing total header",
-			body:    `{"object":[{"oid":"u1"},{"oid":"u2"}]}`,
-			wantErr: "X-Total-Count",
+			name:      "zero matches",
+			body:      searchBody(),
+			wantOIDs:  []string{},
+			wantTotal: -1,
 		},
 		{
 			name:    "invalid total header",
 			header:  map[string]string{"X-Total-Count": "many"},
-			body:    `{"object":[{"oid":"u1"}]}`,
+			body:    searchBody(`{"oid":"u1"}`),
 			wantErr: "X-Total-Count",
+		},
+		{
+			name:    "no ObjectListType",
+			body:    `{}`,
+			wantErr: `under "object", got nothing`,
+		},
+		{
+			name:    "bare list instead of ObjectListType",
+			body:    `{"object":[{"oid":"u1"}]}`,
+			wantErr: `under "object", got a list`,
+		},
+		{
+			name:    "single object instead of inner list",
+			body:    `{"object":{"@type":"ObjectListType","object":{"oid":"u1"}}}`,
+			wantErr: `under "object"."object", got an object`,
+		},
+		{
+			name:    "non-object result",
+			body:    `{"object":{"@type":"ObjectListType","object":["u1"]}}`,
+			wantErr: "got a string",
 		},
 	}
 	for _, tc := range tests {
@@ -394,14 +425,17 @@ func TestSearch_resultShapes(t *testing.T) {
 			objs, total, err := c.Search(context.Background(), "users", "", 0, nil)
 			if tc.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
-					t.Fatalf("err = %v, want error mentioning %s", err, tc.wantErr)
+					t.Fatalf("err = %v, want error containing %q", err, tc.wantErr)
 				}
 				return
 			}
 			if err != nil {
 				t.Fatalf("Search: %v", err)
 			}
-			var oids []string
+			if objs == nil {
+				t.Fatal("objs is nil, want a non-nil slice")
+			}
+			oids := []string{}
 			for _, o := range objs {
 				oids = append(oids, o.OID)
 			}
@@ -416,7 +450,7 @@ func TestSearch_resultShapes(t *testing.T) {
 }
 
 func TestSearch_omitsEmptyFilterAndPaging(t *testing.T) {
-	c, seen := stub(t, reply{Status: 200, Header: map[string]string{"X-Total-Count": "0"}, Body: `{}`})
+	c, seen := stub(t, reply{Status: 200, Body: searchBody()})
 	if _, _, err := c.Search(context.Background(), "roles", "", 0, []string{"raw"}); err != nil {
 		t.Fatalf("Search: %v", err)
 	}

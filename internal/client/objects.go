@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -95,9 +96,17 @@ func (c *Client) Delete(ctx context.Context, typ, oid string, options []string) 
 }
 
 // Search runs an Axiom query filter against typ. An empty filter matches all
-// objects and maxSize <= 0 means no paging limit. total is midPoint's total
-// match count from the X-Total-Count header.
-func (c *Client) Search(ctx context.Context, typ, axiomFilter string, maxSize int, options []string) ([]Object, int, error) {
+// objects and maxSize <= 0 means no paging limit.
+//
+// total is midPoint's total match count from the X-Total-Count header. -1
+// means the server did not report a total; callers treat len(objs) as a lower
+// bound. midPoint 4.9 never sends the header, although Search still asks for
+// it with returnTotalCount=true.
+//
+// midPoint returns the matches as an ObjectListType under "object":
+// {"@ns": ..., "object": {"@type": "...#ObjectListType", "object": [...]}}.
+// The inner "object" key is absent when nothing matches.
+func (c *Client) Search(ctx context.Context, typ, axiomFilter string, maxSize int, options []string) (objs []Object, total int, err error) {
 	query := map[string]any{}
 	if axiomFilter != "" {
 		query["filter"] = map[string]any{"text": axiomFilter}
@@ -117,30 +126,22 @@ func (c *Client) Search(ctx context.Context, typ, axiomFilter string, maxSize in
 		return nil, 0, fmt.Errorf("decoding %s search result: %w", typ, err)
 	}
 
-	items := doc["object"]
-	// The result may be an ObjectListType wrapping the list once more.
-	if m, ok := items.(map[string]any); ok {
-		if inner, ok := m["object"]; ok {
-			items = inner
-		}
+	listType, ok := doc["object"].(map[string]any)
+	if !ok {
+		return nil, 0, fmt.Errorf("decoding %s search result: want an ObjectListType object under \"object\", got %s", typ, describe(doc["object"]))
 	}
 	var list []any
-	switch v := items.(type) {
-	case nil:
-	case []any:
-		list = v
-	case map[string]any:
-		// midPoint renders a single-valued occurrence as an object.
-		list = []any{v}
-	default:
-		return nil, 0, fmt.Errorf("decoding %s search result: unexpected %T under \"object\"", typ, items)
+	if inner, present := listType["object"]; present {
+		if list, ok = inner.([]any); !ok {
+			return nil, 0, fmt.Errorf("decoding %s search result: want a list under \"object\".\"object\", got %s", typ, describe(inner))
+		}
 	}
 
-	objs := make([]Object, 0, len(list))
+	objs = make([]Object, 0, len(list))
 	for _, item := range list {
 		m, ok := item.(map[string]any)
 		if !ok {
-			return nil, 0, fmt.Errorf("decoding %s search result: unexpected %T in result list", typ, item)
+			return nil, 0, fmt.Errorf("decoding %s search result: want objects in the result list, got %s", typ, describe(item))
 		}
 		oid, _ := m["oid"].(string)
 		objs = append(objs, Object{OID: oid, Body: m})
@@ -148,13 +149,33 @@ func (c *Client) Search(ctx context.Context, typ, axiomFilter string, maxSize in
 
 	h := resp.Header.Get("X-Total-Count")
 	if h == "" {
-		return nil, 0, fmt.Errorf("decoding %s search result: missing X-Total-Count header", typ)
+		return objs, -1, nil
 	}
-	total, err := strconv.Atoi(h)
+	total, err = strconv.Atoi(h)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decoding %s search result: invalid X-Total-Count %q", typ, h)
 	}
 	return objs, total, nil
+}
+
+// describe names the JSON type of v for error messages.
+func describe(v any) string {
+	switch v.(type) {
+	case nil:
+		return "nothing"
+	case map[string]any:
+		return "an object"
+	case []any:
+		return "a list"
+	case string:
+		return "a string"
+	case json.Number:
+		return "a number"
+	case bool:
+		return "a boolean"
+	default:
+		return fmt.Sprintf("%T", v)
+	}
 }
 
 // ServerVersion returns the build version of the node serving the request.

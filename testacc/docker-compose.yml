@@ -1,6 +1,10 @@
 # midPoint acceptance-test environment, adapted from the official Evolveum
 # native-PostgreSQL docker-compose layout. Start with `make env-up`, remove
 # containers and volumes with `make env-down`.
+#
+# This is a throwaway local test server, not a deployment template. The
+# credentials below (database db.secret.pw.007, administrator Test5ecr3t) are
+# the upstream Evolveum demo defaults and are not secrets.
 name: midpoint-testacc
 
 services:

@@ -40,10 +40,10 @@ func testAccPreCheck(t *testing.T) {
 	}
 }
 
-// TestAccProvider_configure checks that the provider serves a plan for a
+// TestAccProvider_serves checks that the provider serves a plan for a
 // config with no resources. Terraform prunes a provider nothing uses, so
 // Configure is not invoked here; resource acceptance tests cover it.
-func TestAccProvider_configure(t *testing.T) {
+func TestAccProvider_serves(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
