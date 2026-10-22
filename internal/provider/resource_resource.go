@@ -204,6 +204,45 @@ func resourceFromBody(ctx context.Context, s *resourceState, actual map[string]a
 	return diags
 }
 
+// validateResource runs the simple-resource checks and warns when the
+// connector configuration holds a clear-text secret.
+func validateResource(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	simpleValidator(resourceSpec.ShortName, (*resourceState).fields)(ctx, req, resp)
+	var cc types.Dynamic
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("connector_configuration"), &cc)...)
+	if cc.IsNull() || cc.IsUnknown() {
+		return
+	}
+	// Unknown parts convert with an error; only known content is checked.
+	if v, d := dynToGo(ctx, cc); !d.HasError() && hasKey(v, "clearValue") {
+		resp.Diagnostics.AddAttributeWarning(path.Root("connector_configuration"), "Clear-text secret in configuration",
+			"connector_configuration contains a clearValue; it will be stored in Terraform state in plain text. "+
+				"Prefer expression.const references or midPoint secret providers.")
+	}
+}
+
+// hasKey reports whether a map anywhere in v has key.
+func hasKey(v any, key string) bool {
+	switch t := v.(type) {
+	case map[string]any:
+		if _, ok := t[key]; ok {
+			return true
+		}
+		for _, e := range t {
+			if hasKey(e, key) {
+				return true
+			}
+		}
+	case []any:
+		for _, e := range t {
+			if hasKey(e, key) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // observeConnectorOID sets connector_oid from the connectorRef oid midPoint
 // resolved (null before a read).
 func observeConnectorOID(s *resourceState, actual map[string]any) {
@@ -286,7 +325,15 @@ func NewResourceResource() resource.Resource {
 					"midPoint naming, e.g. yamldecode(file(\"connector.yaml\")). The configurationProperties must " +
 					"carry the connector's namespace as \"@ns\" (e.g. \"@ns\" = \"http://midpoint.evolveum.com/xml/ns/" +
 					"public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon." +
-					"connector.csv.CsvConnector\"), or midPoint stores them unqualified and the connector finds none."),
+					"connector.csv.CsvConnector\"), or midPoint stores them unqualified and the connector finds none. " +
+					"\"@ns\" is an annotation, never compared: a change to \"@ns\" alone is not detected, and the " +
+					"changes the provider sends are built from the compared form, without \"@ns\". Changes to single " +
+					"properties are not affected, but an update that adds connectorConfiguration or " +
+					"configurationProperties whole (adopting or importing a resource that has none, or restoring them " +
+					"after they were removed in midPoint) writes the properties without their namespace, and the " +
+					"connector then finds no configuration; set them in midPoint first in that case. The value is " +
+					"stored in Terraform state in plain text: a password given as a clearValue is there too (a warning " +
+					"says so); prefer expression const references or midPoint secret providers."),
 				"schema_handling": optionalDynamic("Schema handling (schemaHandling) in midPoint naming: object " +
 					"types with their attributes and mappings, e.g. yamldecode(file(\"schema-handling.yaml\")). A " +
 					"change is applied as narrow item deltas (an added mapping is one add)."),
@@ -297,7 +344,9 @@ func NewResourceResource() resource.Resource {
 				"schema": schema.SingleNestedAttribute{
 					Description: "Resource schema settings (schema). midPoint caches the schema it fetches from the " +
 						"connector in schema/definition; that cached definition is compared only when definition is " +
-						"configured.",
+						"configured. So removing definition from the configuration leaves the schema in midPoint as it " +
+						"is (it is no longer compared); it is not deleted. Configuring or removing generation_constraints " +
+						"changes only schema/generationConstraints.",
 					Optional: true,
 					Attributes: map[string]schema.Attribute{
 						"generation_constraints": optionalDynamic("Schema generation constraints " +
@@ -315,7 +364,7 @@ func NewResourceResource() resource.Resource {
 			return resourceToBody(ctx, s)
 		},
 		fromBody: resourceFromBody,
-		validate: simpleValidator(resourceSpec.ShortName, (*resourceState).fields),
+		validate: validateResource,
 		observe:  observeConnectorOID,
 	}
 }

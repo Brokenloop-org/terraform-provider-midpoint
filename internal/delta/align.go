@@ -33,6 +33,21 @@ var compareOnlyWhenConfiguredByType = map[string][]string{
 	"resources": {"schema/definition"},
 }
 
+// partialContainersByType are root single-valued containers, per REST type,
+// that hold server-managed parts next to configuration: the parts
+// Canonical strips or compareOnlyWhenConfiguredByType drops. The aligned
+// bodies hold such a container on both sides whenever either side has it
+// (an empty one on the other side), so that configuring or removing the
+// configured part is a delta inside the container, never an add or replace
+// of the whole container, which would replace or delete what midPoint
+// manages there.
+var partialContainersByType = map[string][]string{
+	// ResourceType.capabilities: native (connector-reported) next to
+	// configured; ResourceType.schema: the cached definition next to
+	// generationConstraints.
+	"resources": {"capabilities", "schema"},
+}
+
 // Align returns copies of desired and actual in which the actual body is
 // normalized against the desired one, pairwise, so that normalize.Equal and
 // Compute see only real differences:
@@ -64,9 +79,13 @@ func Align(desired, actual map[string]any) (d, a map[string]any) {
 }
 
 // AlignForType is Align for an object of REST type restType: it also drops
-// the root items of compareOnlyWhenConfiguredByType[restType] from the
-// actual body when the desired body does not set them. Like Align it is
-// idempotent and modifies neither input.
+// the items of compareOnlyWhenConfiguredByType[restType] from the actual
+// body when the desired body does not set them, and gives each side an
+// empty container of partialContainersByType[restType] that only the other
+// side has. Like Align it is idempotent and modifies neither input; the
+// aligned desired body equals desired up to such empty containers (which
+// never make two different bodies compare equal: the other side has
+// content there).
 func AlignForType(restType string, desired, actual map[string]any) (d, a map[string]any) {
 	d, a = Align(desired, actual)
 	if a == nil {
@@ -75,12 +94,23 @@ func AlignForType(restType string, desired, actual map[string]any) (d, a map[str
 	for _, item := range compareOnlyWhenConfiguredByType[restType] {
 		dropUnconfigured(desired, a, strings.Split(item, "/"))
 	}
+	for _, name := range partialContainersByType[restType] {
+		_, dm := d[name].(map[string]any)
+		_, am := a[name].(map[string]any)
+		switch {
+		case dm && a[name] == nil:
+			a[name] = map[string]any{}
+		case am && d[name] == nil:
+			d[name] = map[string]any{}
+		}
+	}
 	return d, a
 }
 
 // dropUnconfigured deletes the item at path from a, an aligned copy that
 // AlignForType owns, when desired does not set it. A container that the
-// deletion leaves empty (nothing but "@id") is deleted too.
+// deletion leaves empty (nothing but "@id") is deleted too, unless desired
+// has it.
 func dropUnconfigured(desired, a map[string]any, path []string) {
 	name := path[0]
 	if len(path) == 1 {
@@ -93,8 +123,11 @@ func dropUnconfigured(desired, a map[string]any, path []string) {
 	if !ok {
 		return
 	}
-	dm, _ := desired[name].(map[string]any)
+	dm, desiredHas := desired[name].(map[string]any)
 	dropUnconfigured(dm, am, path[1:])
+	if desiredHas {
+		return
+	}
 	for k := range am {
 		if k != "@id" {
 			return

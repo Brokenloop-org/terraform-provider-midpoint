@@ -1,12 +1,17 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
@@ -431,5 +436,152 @@ func TestResource_extraConflicts(t *testing.T) {
 				}},
 			})
 		})
+	}
+}
+
+// Configuring and removing capabilities and generation constraints on a
+// resource midPoint has already tested (native capabilities and a cached
+// schema present) changes only the configured parts.
+func TestResource_capabilitiesAndGenerationConstraintsAreNarrow(t *testing.T) {
+	s := newTestStub(t)
+	plain := resourceConfig(loginOnly, "")
+	configured := resourceConfig(loginOnly, `
+  capabilities = { create = { enabled = false } }
+  schema       = { generation_constraints = { generateObjectClass = ["ri:AccountObjectClass"] } }
+`)
+	native := map[string]any{"create": map[string]any{}, "read": map[string]any{"returnDefaultAttributesOption": false}}
+	cached := map[string]any{"@ns": xsdNamespace, "schema": "<xsd:schema/>"}
+	// onePatch checks that the last apply sent exactly one PATCH with
+	// want, and that the server-managed parts survived it.
+	onePatch := func(want []any) resource.TestCheckFunc {
+		return checkStub(func() error {
+			patches := requests(s, "PATCH")
+			if len(patches) != 1 {
+				return fmt.Errorf("want one PATCH, got %d", len(patches))
+			}
+			if got, w := asJSON(t, patches[0].Body), asJSON(t, map[string]any{"objectModification": map[string]any{"itemDelta": want}}); !reflect.DeepEqual(got, w) {
+				return fmt.Errorf("PATCH body = %v, want %v", got, w)
+			}
+			b := stubBody(s, "resources", stubResourceOID)
+			caps, _ := b["capabilities"].(map[string]any)
+			sch, _ := b["schema"].(map[string]any)
+			if !reflect.DeepEqual(asJSON(t, caps["native"]), asJSON(t, native)) || !reflect.DeepEqual(asJSON(t, sch["definition"]), asJSON(t, cached)) {
+				return fmt.Errorf("server-managed parts changed: capabilities %v, schema %v", caps, sch)
+			}
+			return nil
+		})
+	}
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{Config: plain},
+			{
+				PreConfig: func() {
+					b := stubBody(s, "resources", stubResourceOID)
+					b["capabilities"] = map[string]any{"native": native, "cachingMetadata": map[string]any{"serialNumber": "1"}}
+					b["schema"] = map[string]any{"definition": cached, "cachingMetadata": map[string]any{"serialNumber": "2"}}
+					s.Put("resources", b)
+				},
+				Config: configured,
+				Check: onePatch([]any{
+					map[string]any{"modificationType": "add", "path": "capabilities/configured",
+						"value": map[string]any{"create": map[string]any{"enabled": false}}},
+					map[string]any{"modificationType": "add", "path": "schema/generationConstraints",
+						"value": map[string]any{"generateObjectClass": []any{"ri:AccountObjectClass"}}},
+				}),
+			},
+			refreshIsClean(),
+			{
+				Config: plain,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					checkStub(func() error {
+						// Only the PATCHes of this step count.
+						patches := requests(s, "PATCH")
+						if len(patches) != 2 {
+							return fmt.Errorf("want two PATCHes in total, got %d", len(patches))
+						}
+						want := asJSON(t, map[string]any{"objectModification": map[string]any{"itemDelta": []any{
+							map[string]any{"modificationType": "replace", "path": "capabilities/configured"},
+							map[string]any{"modificationType": "replace", "path": "schema/generationConstraints"},
+						}}})
+						if got := asJSON(t, patches[1].Body); !reflect.DeepEqual(got, want) {
+							return fmt.Errorf("PATCH body = %v, want %v", got, want)
+						}
+						b := stubBody(s, "resources", stubResourceOID)
+						caps, _ := b["capabilities"].(map[string]any)
+						sch, _ := b["schema"].(map[string]any)
+						if caps["configured"] != nil || sch["generationConstraints"] != nil ||
+							!reflect.DeepEqual(asJSON(t, caps["native"]), asJSON(t, native)) ||
+							!reflect.DeepEqual(asJSON(t, sch["definition"]), asJSON(t, cached)) {
+							return fmt.Errorf("after removal: capabilities %v, schema %v", caps, sch)
+						}
+						return nil
+					}),
+				),
+			},
+			refreshIsClean(),
+		},
+	})
+}
+
+// validateConfig runs the midpoint_resource config validation on a config
+// with connector_configuration cc and returns its diagnostics.
+func validateResourceConfig(t *testing.T, cc any) diag.Diagnostics {
+	t.Helper()
+	ctx := context.Background()
+	r := NewResourceResource()
+	var sr fwresource.SchemaResponse
+	r.Schema(ctx, fwresource.SchemaRequest{}, &sr)
+	dyn, d := goToDyn(ctx, cc)
+	if d.HasError() {
+		t.Fatal(d)
+	}
+	connector, d := types.ObjectValueFrom(ctx, connectorAttrTypes, connectorModel{
+		Type: types.StringValue(csvConnectorType), Version: types.StringNull(),
+	})
+	if d.HasError() {
+		t.Fatal(d)
+	}
+	st := resourceState{
+		commonModel: commonModel{
+			ID: types.StringNull(), OID: types.StringNull(), AdoptExisting: types.BoolNull(),
+			ForceDestroy: types.BoolNull(), Options: types.ListNull(types.StringType),
+		},
+		Name: types.StringValue("csv"), Description: types.StringNull(), LifecycleState: types.StringNull(),
+		Connector: connector, ConnectorOID: types.StringNull(), ConnectorConfiguration: dyn,
+		SchemaHandling: types.DynamicNull(), Synchronization: types.DynamicNull(), Capabilities: types.DynamicNull(),
+		Schema: types.ObjectNull(resourceSchemaAttrTypes), Extra: types.DynamicNull(),
+	}
+	state := tfsdk.State{Schema: sr.Schema}
+	if d := state.Set(ctx, &st); d.HasError() {
+		t.Fatal(d)
+	}
+	var resp fwresource.ValidateConfigResponse
+	r.(fwresource.ResourceWithValidateConfig).ValidateConfig(ctx,
+		fwresource.ValidateConfigRequest{Config: tfsdk.Config{Schema: sr.Schema, Raw: state.Raw}}, &resp)
+	return resp.Diagnostics
+}
+
+func TestResource_clearValueInConnectorConfigurationWarns(t *testing.T) {
+	props := func(password any) map[string]any {
+		return map[string]any{"configurationProperties": map[string]any{
+			"@ns": "urn:ldap", "host": "ldap.example.com", "bindPassword": password,
+		}}
+	}
+	warned := func(diags diag.Diagnostics) bool {
+		for _, d := range diags.Warnings() {
+			if strings.Contains(d.Detail(), "contains a clearValue") {
+				return true
+			}
+		}
+		return false
+	}
+	diags := validateResourceConfig(t, props(map[string]any{"clearValue": "secret"}))
+	if diags.HasError() || !warned(diags) {
+		t.Errorf("clearValue: diagnostics %v, want the clear-text warning only", diags)
+	}
+	diags = validateResourceConfig(t, props(map[string]any{"expression": map[string]any{"const": "ldapBindPassword"}}))
+	if diags.HasError() || warned(diags) {
+		t.Errorf("expression.const: diagnostics %v, want none", diags)
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
 )
 
 // mustJSON decodes s with json.Number numbers, like canonical bodies.
@@ -251,6 +253,73 @@ func TestAlignForType(t *testing.T) {
 			}
 			if d2, a2 := AlignForType(tt.restType, d, a); !reflect.DeepEqual(d2, d) || !reflect.DeepEqual(a2, a) {
 				t.Errorf("AlignForType is not idempotent: second pass gave %s", dump(t, a2))
+			}
+		})
+	}
+}
+
+// capabilities and schema of a resource hold server-managed parts (native
+// capabilities, the cached schema) that Canonical strips or that are
+// compared only when configured: configuring or removing the configured
+// part is a delta inside the container, never one of the whole container.
+func TestAlignForType_resourcePartialContainersNarrowDeltas(t *testing.T) {
+	const cached = `{"@ns":"http://www.w3.org/2001/XMLSchema","schema":"<xsd:schema/>"}`
+	const caps = `{"create":{"enabled":false}}`
+	const gc = `{"generateObjectClass":["ri:A"]}`
+	tests := []struct {
+		name, desired, actual, want string
+	}{
+		{
+			// Canonical pruned capabilities: only native was there.
+			name:    "capabilities_configured_added",
+			desired: `{"name":"r","capabilities":{"configured":` + caps + `}}`,
+			actual:  `{"name":"r"}`,
+			want:    `[{"modificationType":"add","path":"capabilities/configured","value":` + caps + `}]`,
+		},
+		{
+			name:    "capabilities_configured_removed",
+			desired: `{"name":"r"}`,
+			actual:  `{"name":"r","capabilities":{"configured":` + caps + `}}`,
+			want:    `[{"modificationType":"replace","path":"capabilities/configured"}]`,
+		},
+		{
+			name:    "generation_constraints_added_next_to_cached_schema",
+			desired: `{"name":"r","schema":{"generationConstraints":` + gc + `}}`,
+			actual:  `{"name":"r","schema":{"definition":` + cached + `}}`,
+			want:    `[{"modificationType":"add","path":"schema/generationConstraints","value":` + gc + `}]`,
+		},
+		{
+			name:    "generation_constraints_removed_next_to_cached_schema",
+			desired: `{"name":"r"}`,
+			actual:  `{"name":"r","schema":{"generationConstraints":` + gc + `,"definition":` + cached + `}}`,
+			want:    `[{"modificationType":"replace","path":"schema/generationConstraints"}]`,
+		},
+		{
+			name:    "generation_constraints_added_without_schema",
+			desired: `{"name":"r","schema":{"generationConstraints":` + gc + `}}`,
+			actual:  `{"name":"r"}`,
+			want:    `[{"modificationType":"add","path":"schema/generationConstraints","value":` + gc + `}]`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d, a := AlignForType("resources", mustJSON(t, tt.desired), mustJSON(t, tt.actual))
+			if d2, a2 := AlignForType("resources", d, a); !reflect.DeepEqual(d2, d) || !reflect.DeepEqual(a2, a) {
+				t.Errorf("AlignForType is not idempotent: second pass gave %s / %s", dump(t, d2), dump(t, a2))
+			}
+			if normalize.Equal(d, a) {
+				t.Fatalf("aligned bodies compare equal: %s", dump(t, a))
+			}
+			got, err := Compute(d, a)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var want any
+			if err := json.Unmarshal([]byte(tt.want), &want); err != nil {
+				t.Fatal(err)
+			}
+			if g := asJSON(t, got); !reflect.DeepEqual(g, want) {
+				t.Errorf("deltas =\n%s\nwant\n%s", dump(t, g), dump(t, want))
 			}
 		})
 	}

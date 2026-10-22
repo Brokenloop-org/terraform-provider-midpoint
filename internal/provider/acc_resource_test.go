@@ -151,6 +151,49 @@ func fullNameAttribute(body map[string]any) (map[string]any, error) {
 	return nil, fmt.Errorf("no ri:fullName attribute in %v", ot)
 }
 
+// accCSVConfiguredParts configures capabilities and generation
+// constraints on the CSV resource.
+const accCSVConfiguredParts = `
+  capabilities = { create = { enabled = false } }
+  schema       = { generation_constraints = { generateObjectClass = ["ri:AccountObjectClass"] } }
+`
+
+// accServerManagedKept checks, on a raw read of the resource at addr, that
+// midPoint still holds the native capabilities and the cached schema
+// definition, and that the configured capabilities and generation
+// constraints are present exactly when configured is set.
+func accServerManagedKept(c *client.Client, addr string, configured bool) resource.TestCheckFunc {
+	return func(st *terraform.State) error {
+		oid, err := accResourceOID(st, addr)
+		if err != nil {
+			return err
+		}
+		raw, err := c.Get(context.Background(), "resources", oid, client.GetOptions{Options: []string{"noFetch"}})
+		if err != nil {
+			return err
+		}
+		caps, _ := raw.Body["capabilities"].(map[string]any)
+		sch, _ := raw.Body["schema"].(map[string]any)
+		def, _ := sch["definition"].(map[string]any)
+		if caps["native"] == nil || def["schema"] == nil {
+			return fmt.Errorf("server-managed parts lost: capabilities %v, schema keys %v", caps, keysOf(sch))
+		}
+		if (caps["configured"] != nil) != configured || (sch["generationConstraints"] != nil) != configured {
+			return fmt.Errorf("configured parts: capabilities/configured %v, schema/generationConstraints %v, want present = %v",
+				caps["configured"], sch["generationConstraints"], configured)
+		}
+		return nil
+	}
+}
+
+func keysOf(m map[string]any) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
 func TestAccResource_csv(t *testing.T) {
 	testAccPreCheck(t)
 	c := accClient(t)
@@ -241,6 +284,19 @@ func TestAccResource_csv(t *testing.T) {
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("extra"), knownvalue.Null()),
 				},
 			},
+			// Configuring capabilities and generation constraints next to
+			// the native capabilities and cached schema, and removing them
+			// again, touches only the configured parts.
+			{
+				Config: accCSVResourceConfig(fixtures, name, "schema-handling.yaml", accCSVConfiguredParts),
+				Check:  accServerManagedKept(c, addr, true),
+			},
+			emptyPlanAfterRefresh(),
+			{
+				Config: accCSVResourceConfig(fixtures, name, "schema-handling.yaml", ""),
+				Check:  accServerManagedKept(c, addr, false),
+			},
+			emptyPlanAfterRefresh(),
 			// One more inbound mapping on ri:fullName is one narrow add:
 			// one modification (the version moves by one) that keeps every
 			// container id and adds one inbound value.
@@ -454,8 +510,8 @@ func TestAccResource_forceDestroyWithShadows(t *testing.T) {
 	name := acctest.RandomWithPrefix("tf-acc-csv-shadows")
 	var oid, importTask string
 	// The resource delete leaves the shadows in the repository (midPoint
-	// 4.9 does not delete them with the resource); remove them and the
-	// import task.
+	// 4.9 does not delete them with the resource); remove them, the import
+	// task and, when a step failed before the destroy, the resource.
 	t.Cleanup(func() {
 		ctx := context.Background()
 		if oid != "" {
@@ -467,6 +523,9 @@ func TestAccResource_forceDestroyWithShadows(t *testing.T) {
 				if err := c.Delete(ctx, "shadows", s.OID, []string{"raw"}); err != nil && !errors.Is(err, client.ErrNotFound) {
 					t.Errorf("deleting shadow %s: %v", s.OID, err)
 				}
+			}
+			if err := c.Delete(ctx, "resources", oid, []string{"raw"}); err != nil && !errors.Is(err, client.ErrNotFound) {
+				t.Errorf("deleting resource %s: %v", oid, err)
 			}
 		}
 		if importTask != "" {
@@ -542,8 +601,14 @@ func TestAccResource_example(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The test runs the configuration from a temporary directory.
+	// The test runs the configuration from a temporary directory, and
+	// under a test name.
+	const exampleName = `name        = "HR"`
+	if !strings.Contains(string(raw), exampleName) {
+		t.Fatalf("the example no longer sets %s", exampleName)
+	}
 	cfg := strings.ReplaceAll(string(raw), "${path.module}", dir)
+	cfg = strings.Replace(cfg, exampleName, fmt.Sprintf("name        = %q", acctest.RandomWithPrefix("tf-acc-example")), 1)
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
