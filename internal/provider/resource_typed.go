@@ -182,7 +182,7 @@ func setOID(ctx context.Context, state interface {
 }
 
 // ModifyPlan warns, when creating with adopt_existing, that an existing
-// object will be adopted.
+// object will be adopted, listing the changes the adoption will send.
 func (r *typedResource[S]) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() || !req.State.Raw.IsNull() || r.data == nil {
 		return // destroy, update, or not configured
@@ -195,12 +195,22 @@ func (r *typedResource[S]) ModifyPlan(ctx context.Context, req resource.ModifyPl
 		return
 	}
 	eng := r.engine()
-	_, err := eng.c.Get(ctx, r.spec.RestType, oid.ValueString(), eng.getOptions())
+	existing, err := eng.c.Get(ctx, r.spec.RestType, oid.ValueString(), eng.getOptions())
 	switch {
 	case err == nil:
+		// The changes the adoption's update will send, computed from the
+		// plan exactly as Create computes its desired body.
+		var desired map[string]any
+		if req.Config.Raw.IsFullyKnown() {
+			var s S
+			if d := req.Plan.Get(ctx, &s); !d.HasError() {
+				if body, d := r.toBody(ctx, &s, false, false); !d.HasError() {
+					desired = body
+				}
+			}
+		}
 		resp.Diagnostics.AddWarning("Existing object will be adopted",
-			fmt.Sprintf("midpoint_%s %s/%s exists and will be adopted; the configured content is applied as an update",
-				r.name, r.spec.RestType, oid.ValueString()))
+			eng.adoptionWarning(ctx, "midpoint_"+r.name, oid.ValueString(), desired, existing.Body))
 	case !errors.Is(err, client.ErrNotFound):
 		tflog.Debug(ctx, "cannot check for an object to adopt", map[string]any{"type": r.spec.RestType, "oid": oid.ValueString(), "error": err.Error()})
 	}

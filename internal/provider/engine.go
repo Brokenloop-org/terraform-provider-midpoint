@@ -401,3 +401,41 @@ func pruneValue(v any) (any, bool) {
 		return v, true
 	}
 }
+
+// adoptionMaxChanges caps the changes the adoption warning lists.
+const adoptionMaxChanges = 20
+
+// adoptionWarning is the detail of the plan-time warning for adopting the
+// existing object oid, read as actual, with the configured body desired
+// (nil when it is not known at plan time). It lists the item deltas the
+// adoption's update will send, one "<modificationType> <path>" line each,
+// without values: they can hold secrets. A replace without a value removes
+// the item and says so. When the changes cannot be computed it falls back to
+// a generic sentence.
+func (e *engine) adoptionWarning(ctx context.Context, address, oid string, desired, actual map[string]any) string {
+	lead := fmt.Sprintf("%s %s exists and will be adopted", address, e.ref(oid))
+	if desired == nil {
+		return lead + "; the configured content is applied as an update. Some configured values are known " +
+			"only during apply, so the changes cannot be listed; items the configuration leaves out are removed."
+	}
+	equal, deltas, err := e.reconcile(ctx, desired, actual)
+	if err != nil {
+		return lead + "; the configured content is applied as an update"
+	}
+	if equal || len(deltas) == 0 {
+		return lead + "; applying the configuration will send no changes."
+	}
+	lines := make([]string, 0, min(len(deltas), adoptionMaxChanges)+1)
+	for i, d := range deltas {
+		if i == adoptionMaxChanges {
+			lines = append(lines, fmt.Sprintf("and %d more", len(deltas)-adoptionMaxChanges))
+			break
+		}
+		line := d.ModificationType + " " + d.Path
+		if d.ModificationType == "replace" && d.Value == nil {
+			line += " (removes it)"
+		}
+		lines = append(lines, "  "+line)
+	}
+	return lead + "; applying the configuration will send these changes:\n" + strings.Join(lines, "\n")
+}

@@ -21,8 +21,11 @@ func commonAttributes(spec engineSpec) map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"adopt_existing": schema.BoolAttribute{
 			Description: "When an object with the configured oid already exists, adopt it into state and apply " +
-				"the configured content as an update (the plan warns that it will be adopted) instead of failing. " +
-				"Without it, creating an object whose oid already exists fails and nothing is written. Defaults to false.",
+				"the configuration to it as an update instead of failing. The configuration must describe the whole " +
+				"object: items midPoint holds that are not configured (other than server-managed ones) are removed " +
+				"on the first apply. The plan warns that the object will be adopted and lists the changes the " +
+				"update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an " +
+				"object whose oid already exists fails and nothing is written. Defaults to false.",
 			Optional: true,
 			Computed: true,
 			Default:  booldefault.StaticBool(false),

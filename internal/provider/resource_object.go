@@ -233,12 +233,20 @@ func (r *objectResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 	if creating && plan.AdoptExisting.ValueBool() && !plan.OID.IsUnknown() && plan.OID.ValueString() != "" &&
 		!plan.Type.IsUnknown() && r.data != nil {
 		spec := objectSpec(plan.Type.ValueString())
-		_, err := r.data.Client.Get(ctx, spec.RestType, plan.OID.ValueString(), client.GetOptions{Options: spec.ReadOptions, Exclude: readExcludes})
+		eng := newEngine(r.data, spec)
+		existing, err := eng.c.Get(ctx, spec.RestType, plan.OID.ValueString(), eng.getOptions())
 		switch {
 		case err == nil:
+			// The changes the adoption's update will send, computed from
+			// the plan exactly as Create computes its desired body.
+			var desired map[string]any
+			if req.Config.Raw.IsFullyKnown() {
+				if body, d := desiredBody(ctx, plan); !d.HasError() {
+					desired = body
+				}
+			}
 			resp.Diagnostics.AddWarning("Existing object will be adopted",
-				fmt.Sprintf("midpoint_object %s/%s exists and will be adopted; the configured content is applied as an update",
-					spec.RestType, plan.OID.ValueString()))
+				eng.adoptionWarning(ctx, "midpoint_object", plan.OID.ValueString(), desired, existing.Body))
 		case !errors.Is(err, client.ErrNotFound):
 			tflog.Debug(ctx, "cannot check for an object to adopt", map[string]any{"type": spec.RestType, "oid": plan.OID.ValueString(), "error": err.Error()})
 		}
