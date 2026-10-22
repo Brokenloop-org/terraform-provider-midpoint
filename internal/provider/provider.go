@@ -242,5 +242,8 @@ func (p *midpointProvider) Resources(_ context.Context) []func() resource.Resour
 }
 
 func (p *midpointProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		NewObjectDataSource,
+		NewConnectorDataSource,
+	}
 }

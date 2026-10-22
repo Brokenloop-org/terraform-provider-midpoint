@@ -107,11 +107,17 @@ func (s *resourceState) schemaModel(ctx context.Context) (m resourceSchemaModel,
 // typ (and version, when set) by a search filter, so the configuration
 // holds no environment-specific connector OID.
 func connectorRefValue(typ, version string) map[string]any {
+	return map[string]any{"type": "ConnectorType", "filter": map[string]any{"text": connectorFilter(typ, version)}}
+}
+
+// connectorFilter is the Axiom filter for the connectors of type typ and,
+// when it is set, version.
+func connectorFilter(typ, version string) string {
 	text := "connectorType = " + axiomString(typ)
 	if version != "" {
 		text += " and connectorVersion = " + axiomString(version)
 	}
-	return map[string]any{"type": "ConnectorType", "filter": map[string]any{"text": text}}
+	return text
 }
 
 // resourceToBody is the body of s: the simple fields, connectorRef from

@@ -403,6 +403,10 @@ func TestStubSearch(t *testing.T) {
 		s.Put("services", map[string]any{"name": "svc", "assignment": map[string]any{"targetRef": map[string]any{"oid": archetypeOID, "type": "ArchetypeType"}}})
 		s.Put("shadows", map[string]any{"name": "uid=a", "resourceRef": map[string]any{"oid": resourceOID, "type": "ResourceType"}})
 		s.Put("shadows", map[string]any{"name": "uid=b", "resourceRef": map[string]any{"oid": otherRoleOID, "type": "ResourceType"}})
+		s.Put("roles", map[string]any{"name": `say "hi"`})
+		s.Put("connectors", map[string]any{"name": "csv 2.7", "connectorType": "com.example.Csv", "connectorVersion": "2.7"})
+		s.Put("connectors", map[string]any{"name": "csv 2.8", "connectorType": "com.example.Csv", "connectorVersion": "2.8"})
+		s.Put("connectors", map[string]any{"name": "ldap", "connectorType": "com.example.Ldap", "connectorVersion": "1.0"})
 	}
 	tests := []struct {
 		name      string
@@ -421,6 +425,15 @@ func TestStubSearch(t *testing.T) {
 		{name: "totals reported when enabled", restType: "assignmentHolders", filter: membersFilter, maxSize: 1, totals: true, wantNames: []string{"alice"}, wantTotal: 2},
 		{name: "shadows of a resource", restType: "shadows", filter: `resourceRef matches (oid = "` + resourceOID + `")`, wantNames: []string{"uid=a"}, wantTotal: -1},
 		{name: "no matches", restType: "shadows", filter: `resourceRef matches (oid = "` + roleOID + `")`, wantTotal: -1},
+		{name: "name in the searched type", restType: "roles", filter: `name = "target"`, wantNames: []string{"target"}, wantTotal: -1},
+		{name: "name matches a polystring orig", restType: "orgs", filter: `name = "org1"`, wantNames: []string{"org1"}, wantTotal: -1},
+		{name: "name of another type does not match", restType: "users", filter: `name = "target"`, wantTotal: -1},
+		{name: "name with escaped quotes", restType: "roles", filter: `name = "say \"hi\""`, wantNames: []string{`say "hi"`}, wantTotal: -1},
+		{name: "connectors by type", restType: "connectors", filter: `connectorType = "com.example.Csv"`, wantNames: []string{"csv 2.7", "csv 2.8"}, wantTotal: -1},
+		{name: "connectors by type and version", restType: "connectors",
+			filter: `connectorType = "com.example.Csv" and connectorVersion = "2.8"`, wantNames: []string{"csv 2.8"}, wantTotal: -1},
+		{name: "connectors of an unknown version", restType: "connectors",
+			filter: `connectorType = "com.example.Ldap" and connectorVersion = "2.8"`, wantTotal: -1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -455,7 +468,7 @@ func TestStubSearch(t *testing.T) {
 
 func TestStubSearch_unsupportedFilter(t *testing.T) {
 	_, c := newStub(t)
-	_, _, err := c.Search(context.Background(), "roles", `name = "x"`, 0, nil)
+	_, _, err := c.Search(context.Background(), "roles", `description = "x"`, 0, nil)
 	var apiErr *client.APIError
 	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusBadRequest {
 		t.Fatalf("err = %v, want HTTP 400", err)

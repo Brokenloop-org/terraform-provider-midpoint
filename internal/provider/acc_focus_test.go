@@ -117,18 +117,23 @@ func TestAccService_withRoles(t *testing.T) {
 	name := acctest.RandomWithPrefix("tf-acc-svc")
 	cfg := func(adminDesc string) string {
 		return fmt.Sprintf(`
+data "midpoint_object" "application" {
+  type = "archetypes"
+  name = "Application"
+}
+
 resource "midpoint_service" "app" {
   name         = %[1]q
   display_name = "Acceptance service"
-  archetype    = %[2]q
+  archetype    = data.midpoint_object.application.oid
 }
 
 resource "midpoint_role" "admin" {
   name         = "%[1]s / admin"
   display_name = "Admin"
   identifier   = "admin"
-  description  = %[3]q
-  archetype    = %[4]q
+  description  = %[2]q
+  archetype    = %[3]q
 
   inducement {
     target {
@@ -141,7 +146,7 @@ resource "midpoint_role" "admin" {
 resource "midpoint_role" "user" {
   name       = "%[1]s / user"
   identifier = "user"
-  archetype  = %[4]q
+  archetype  = %[3]q
 
   inducement {
     target {
@@ -150,7 +155,7 @@ resource "midpoint_role" "user" {
     }
   }
 }
-`, name, accApplicationArchetype, adminDesc, accApplicationRoleArchetype)
+`, name, adminDesc, accApplicationRoleArchetype)
 	}
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },

@@ -2,8 +2,8 @@
 // tests without Docker. It stores objects as JSON bodies, answers reads with
 // the server-managed noise a real midPoint adds (so normalization is
 // exercised), applies item deltas, and understands exactly the search
-// filters the provider's CRUD engine emits. It is a test helper: no
-// persistence, no authentication, no schema.
+// filters the provider's CRUD engine and data sources emit. It is a test
+// helper: no persistence, no authentication, no schema.
 package mpstub
 
 import (
@@ -38,11 +38,20 @@ const (
 var focusTypes = []string{"users", "roles", "orgs", "services", "archetypes"}
 
 // The only search filters the stub understands: the members checks the
-// engine runs before a delete.
+// engine runs before a delete, and the lookups of the data sources.
 var (
-	membersFilter = regexp.MustCompile(`^roleMembershipRef matches \(oid = "([^"]*)"\) or assignment/targetRef matches \(oid = "([^"]*)"\)$`)
-	shadowsFilter = regexp.MustCompile(`^resourceRef matches \(oid = "([^"]*)"\)$`)
+	membersFilter   = regexp.MustCompile(`^roleMembershipRef matches \(oid = "([^"]*)"\) or assignment/targetRef matches \(oid = "([^"]*)"\)$`)
+	shadowsFilter   = regexp.MustCompile(`^resourceRef matches \(oid = "([^"]*)"\)$`)
+	nameFilter      = regexp.MustCompile(`^name = ` + axiomLiteral + `$`)
+	connectorFilter = regexp.MustCompile(`^connectorType = ` + axiomLiteral +
+		`(?: and connectorVersion = ` + axiomLiteral + `)?$`)
 )
+
+// axiomLiteral matches a quoted Axiom string, capturing its escaped content.
+const axiomLiteral = `"((?:[^"\\]|\\.)*)"`
+
+// unquoteAxiom undoes the escaping of an axiomLiteral capture.
+var unquoteAxiom = strings.NewReplacer(`\\`, `\`, `\"`, `"`).Replace
 
 // Recorded is one request the stub received.
 type Recorded struct {
@@ -198,7 +207,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && len(seg) == 1:
 		s.create(w, r, seg[0], body)
 	case r.Method == http.MethodPost && len(seg) == 2 && seg[1] == "search":
-		s.search(w, body)
+		s.search(w, seg[0], body)
 	case r.Method == http.MethodPatch && len(seg) == 2:
 		s.modify(w, seg[0], seg[1], body)
 	case r.Method == http.MethodDelete && len(seg) == 2:
@@ -285,7 +294,7 @@ func (s *Server) delete(w http.ResponseWriter, typ, oid string) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) search(w http.ResponseWriter, body map[string]any) {
+func (s *Server) search(w http.ResponseWriter, typ string, body map[string]any) {
 	query, _ := body["query"].(map[string]any)
 	filter, _ := query["filter"].(map[string]any)
 	text, _ := filter["text"].(string)
@@ -306,6 +315,22 @@ func (s *Server) search(w http.ResponseWriter, body map[string]any) {
 		target := m[1]
 		match = func(k key, v map[string]any) bool {
 			return k.typ == "shadows" && hasRef(v["resourceRef"], target)
+		}
+	} else if m := nameFilter.FindStringSubmatch(text); m != nil {
+		name := unquoteAxiom(m[1])
+		match = func(k key, v map[string]any) bool {
+			return k.typ == typ && nameString(v["name"]) == name
+		}
+	} else if ix := connectorFilter.FindStringSubmatchIndex(text); ix != nil {
+		connType := unquoteAxiom(text[ix[2]:ix[3]])
+		withVersion := ix[4] >= 0
+		version := ""
+		if withVersion {
+			version = unquoteAxiom(text[ix[4]:ix[5]])
+		}
+		match = func(k key, v map[string]any) bool {
+			return k.typ == "connectors" && v["connectorType"] == connType &&
+				(!withVersion || v["connectorVersion"] == version)
 		}
 	} else {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("stub does not understand the filter %q", text))

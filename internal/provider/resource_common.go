@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -54,13 +55,22 @@ func optionsFromList(ctx context.Context, l types.List) ([]string, diag.Diagnost
 // configuredData returns the provider data handed to a resource's
 // Configure; nil (without a diagnostic) before the provider is configured.
 func configuredData(req resource.ConfigureRequest, resp *resource.ConfigureResponse) *providerData {
-	if req.ProviderData == nil {
+	return asProviderData(req.ProviderData, &resp.Diagnostics)
+}
+
+// configuredDataSourceData is configuredData for a data source's Configure.
+func configuredDataSourceData(req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) *providerData {
+	return asProviderData(req.ProviderData, &resp.Diagnostics)
+}
+
+func asProviderData(pd any, diags *diag.Diagnostics) *providerData {
+	if pd == nil {
 		return nil
 	}
-	data, ok := req.ProviderData.(*providerData)
+	data, ok := pd.(*providerData)
 	if !ok {
-		resp.Diagnostics.AddError("Unexpected provider data",
-			fmt.Sprintf("expected *providerData, got %T; this is a provider bug", req.ProviderData))
+		diags.AddError("Unexpected provider data",
+			fmt.Sprintf("expected *providerData, got %T; this is a provider bug", pd))
 		return nil
 	}
 	return data
