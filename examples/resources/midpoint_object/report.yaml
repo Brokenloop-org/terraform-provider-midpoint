@@ -1,0 +1,12 @@
+# A report in midPoint naming, without the type wrapper.
+name: Roles
+description: Every role, with its name and description.
+objectCollection:
+  view:
+    type: RoleType
+    column:
+      - name: name
+        path: name
+      - name: description
+        path: description
+        previousColumn: name

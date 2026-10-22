@@ -9,7 +9,7 @@ resource "midpoint_task" "recompute_contractors" {
       recomputation = {
         objects = {
           type  = "UserType"
-          query = { filter = { text = "employeeType = \"contractor\"" } }
+          query = { filter = { text = "subtype = \"contractor\"" } }
         }
       }
     }

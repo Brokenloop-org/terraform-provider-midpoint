@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *" # nightly acceptance run
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+
+      - name: Lint
+        run: make lint
+
+      - name: Unit tests
+        run: go test ./...
+
+      - name: Docs are up to date
+        run: |
+          make docs
+          git add -N docs/ examples/
+          git diff --exit-code docs/ examples/
+
+      - name: Validate examples
+        run: make validate-examples
+
+  acceptance:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        MIDPOINT_VERSION: ["4.9", "4.10"]
+    env:
+      MIDPOINT_VERSION: ${{ matrix.MIDPOINT_VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+
+      - name: Start midPoint ${{ matrix.MIDPOINT_VERSION }}
+        run: make env-up
+
+      - name: Acceptance tests
+        run: make testacc
+
+      - name: Collect midPoint logs
+        if: failure()
+        run: docker compose -f testacc/docker-compose.yml logs --no-color > midpoint-logs.txt 2>&1
+
+      - name: Upload midPoint logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: midpoint-logs-${{ matrix.MIDPOINT_VERSION }}
+          path: midpoint-logs.txt
+
+      - name: Stop midPoint
+        if: always()
+        run: make env-down

@@ -1,0 +1,7 @@
+# Inducement condition (a midPoint mapping): true for users whose subtype
+# includes "employee".
+source:
+  - path: $focus/subtype
+expression:
+  script:
+    code: "subtype?.contains('employee')"

@@ -1,0 +1,209 @@
+# Role "End user" (00000000-0000-0000-0000-000000000008) as midPoint 4.9
+# ships it: the body of data.midpoint_object for that oid, written with
+# yamlencode (no type wrapper, oid, container ids or server-managed items).
+# Edit it to customize the role. The body is authoritative: items left out of
+# this file are removed from the role, so start from your own server's export.
+adminGuiConfiguration:
+  feedbackMessagesHook:
+    stackTraceVisibility: hidden
+  homePage:
+    type: UserType
+    widget:
+    - identifier: myWorkItems
+      visibility: hidden
+    - identifier: myHistory
+      visibility: hidden
+    - identifier: listUsersWidget
+      visibility: hidden
+    - identifier: listResourcesWidget
+      visibility: hidden
+    - action:
+      - identifier: viewAll
+        visibility: hidden
+      identifier: myRequests
+  selfProfilePage:
+    panel:
+    - identifier: history
+      visibility: hidden
+    - identifier: personas
+      visibility: hidden
+    - identifier: focusTriggers
+      visibility: hidden
+    - identifier: password
+      visibility: hidden
+    - identifier: assignments
+      panel:
+      - identifier: constructionAssignments
+        visibility: hidden
+      - identifier: indirectAssignments
+        visibility: hidden
+      - identifier: dataProtectionAssignments
+        visibility: hidden
+      - identifier: orgAssignments
+        visibility: hidden
+      - identifier: roleAssignments
+        visibility: hidden
+      - identifier: serviceAssignments
+        visibility: hidden
+    type: UserType
+authorization:
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-ui-3#selfAll
+  description: "\n            Allow access to all self-service operations in GUI.\n
+    \       "
+  name: gui-self-service-access
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read
+  description: "\n            Allow to read all the properties of \"self\" object.
+    I.e. every logged-in user can read\n            object that represent his own
+    identity.\n        "
+  name: self-read
+  object:
+  - special: self
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read
+  description: "\n            Allow to read all the properties of all the shadows
+    that belong to \"self\" object.\n            I.e. every logged-in user can read
+    all his accounts.\n        "
+  name: self-shadow-read
+  object:
+  - owner:
+      special: self
+    type: ShadowType
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read
+  description: "\n            Allow to read all the personas of currently logged-in
+    user.\n        "
+  name: self-persona-read
+  object:
+  - owner:
+      special: self
+    type: UserType
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#changeCredentials
+  description: "\n            Allow to modify user's own credentials.\n            Note
+    that this is a request phase authorization. It also requires corresponding execution-phase
+    authorization.\n        "
+  item:
+  - credentials
+  name: self-credentials-request
+  object:
+  - special: self
+  phase: request
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#changeCredentials
+  description: "\n            Allow to modify credentials of all users accounts.\n
+    \           Note that this is a request phase authorization. It also requires
+    corresponding execution-phase authorization.\n        "
+  item:
+  - credentials
+  name: self-shadow-credentials-request
+  object:
+  - owner:
+      special: self
+    type: ShadowType
+  phase: request
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read
+  description: "\n            Allow to read requestable roles. This allows to search
+    for requestable roles in user interface.\n        "
+  name: read-requestable-roles
+  object:
+  - filter:
+      text: "requestable = true"
+    type: RoleType
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-ui-3#roleDetails
+  description: "\n            Allow to show details of requestable roles in the
+    user interface.\n        "
+  name: requestable-role-details
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#assign
+  description: "\n            Allow to assign requestable roles. This allows to
+    request roles in a request-and-approve process.\n            The requestable roles
+    will be displayed in the role request dialog by default.\n            Please note
+    that the roles also need an approval definition to go through the approval process.\n
+    \           Otherwise they will be assigned automatically without any approval.\n
+    \       "
+  name: assign-requestable-roles
+  object:
+  - special: self
+  phase: request
+  relation: org:default
+  target:
+    filter:
+      text: "requestable = true"
+    type: RoleType
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#modify
+  description: "\n            Authorization that allows to self-modification of
+    some properties, but only in execution phase.\n            The limitation real
+    limitation of these operations is done in the request phase.\n            E.g.
+    the modification of assignments is controlled in the request phase by using the
+    #assign\n            authorization.\n        "
+  item:
+  - credentials
+  - assignment
+  name: self-execution-modify
+  object:
+  - special: self
+  phase: execution
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#add
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#modify
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#delete
+  description: "\n            Authorization that allows to self-modification of
+    user's accounts, but only in execution phase.\n            The real limitation
+    of these operations is done in the request phase.\n        "
+  name: self-shadow-execution-add-modify-delete
+  object:
+  - owner:
+      special: self
+    type: ShadowType
+  phase: execution
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#get
+  description: "\n            Authorization that allows to read all the object that
+    are possible assignment targets. We want that\n            to display the targets
+    in the selection windows.\n            Note that this authorization may be too
+    broad for production use. Normally it should be limited to just\n            selected
+    properties such as name and description.\n        "
+  name: assignment-target-get
+  object:
+  - type: OrgType
+  - type: ResourceType
+  - type: RoleType
+  - type: ServiceType
+  - type: UserType
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#get
+  description: "\n            Authorization that allows to read all the object that
+    are possible to use for (not only) GUI\n            customizations. E.g there
+    might be lookup tables used for attributes, custom form types defined, etc.\n
+    \       "
+  name: operational-objects-get
+  object:
+  - type: LookupTableType
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read
+  description: "\n            Authorization that allows to read approval status
+    of cases. This is used to display requests\n            to the end users, especially
+    in the \"My Requests\" box in user dashboard.\n        "
+  name: assignment-target-read-case
+  object:
+  - requester:
+      special: self
+    type: CaseType
+- action:
+  - http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read
+  description: "\n            Authorization that allows to see all tasks owned by
+    a currently logged-in user.\n        "
+  name: self-owned-task-read
+  object:
+  - owner:
+      special: self
+    type: TaskType
+description: "Role authorizing end users to log in, change their passwords and review
+  assigned accounts. Note: This role definition is just an example. It should be tailored
+  for each specific deployment."
+name: "End user"

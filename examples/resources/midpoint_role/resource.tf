@@ -1,4 +1,10 @@
-# An application role granting access to a service.
+# The service the roles below grant access to.
+resource "midpoint_service" "dev_k8s" {
+  name      = "dev-k8s"
+  archetype = "00000000-0000-0000-0000-000000000329" # Application
+}
+
+# An application role granting access to the service.
 resource "midpoint_role" "dev_k8s_admin" {
   name         = "dev-k8s / admin"
   display_name = "Dev cluster / admin"
