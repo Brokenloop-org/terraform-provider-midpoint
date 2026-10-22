@@ -5,7 +5,7 @@
         {
           "identifier": "p",
           "listView": {
-            "type": "c:RoleType"
+            "type": "RoleType"
           }
         }
       ]

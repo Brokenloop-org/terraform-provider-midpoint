@@ -115,6 +115,11 @@ var configurationOverrides = []Rule{
 	{Path: "**/identityProvider/metadata", Reason: "Saml2ProviderAuthenticationModuleType.metadata (IdP metadata in a security policy SAML2 module) is configuration; **/metadata targets MetadataType"},
 }
 
+// Type QName values ("#UserType", "c:UserType", "UserType") are not a rule
+// here: Canonical folds them in every value (see qnameValue in canonical.go),
+// because midPoint returns "#UserType" for any QName item written as
+// "UserType" and the set of QName-valued items is open-ended.
+
 // MultiValued holds the local names of multi-valued items. Canonical wraps a
 // single value of these items into a one-element list so that the JSON
 // shape of one value and of several values compare alike.

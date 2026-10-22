@@ -1,0 +1,60 @@
+{
+  "#KeyType": "keys are never rewritten",
+  "adminGuiConfiguration": {
+    "objectDetails": {
+      "panel": [
+        {
+          "identifier": "p",
+          "listView": {
+            "searchBoxConfiguration": {
+              "objectTypeConfiguration": {
+                "defaultValue": "UserType",
+                "supportedTypes": [
+                  "UserType",
+                  "OrgType",
+                  "q:NotAType",
+                  "xsd:string"
+                ]
+              }
+            },
+            "type": "RoleType"
+          }
+        }
+      ]
+    }
+  },
+  "description": "SomeType",
+  "extension": {
+    "label": "#Header",
+    "lowercaseType": "#lowercaseType",
+    "plain": "RoleTypes"
+  },
+  "inducement": [
+    {
+      "focusType": "UserType",
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000008",
+        "relation": "org:default",
+        "type": "RoleType"
+      }
+    },
+    {
+      "construction": {
+        "attribute": [
+          {
+            "ref": "ri:cn"
+          }
+        ],
+        "kind": "account",
+        "resourceRef": {
+          "oid": "cccccccc-0000-0000-0000-000000000001",
+          "relation": "org:default",
+          "type": "ResourceType"
+        }
+      },
+      "focusType": "UserType",
+      "order": 2
+    }
+  ],
+  "name": "qnames"
+}

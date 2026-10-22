@@ -35,9 +35,9 @@
                   "indirect": true
                 },
                 "objectTypeConfiguration": {
-                  "defaultValue": "#UserType",
+                  "defaultValue": "UserType",
                   "supportedTypes": [
-                    "#UserType"
+                    "UserType"
                   ],
                   "visibility": "hidden"
                 }
@@ -82,7 +82,7 @@
                 "@type": "http://midpoint.evolveum.com/xml/ns/public/common/common-3#RepositoryAssignmentDataProviderType"
               },
               "identifier": "classifications-view",
-              "type": "c:AssignmentType"
+              "type": "AssignmentType"
             },
             "panelType": "roleAssignments"
           },
@@ -118,14 +118,14 @@
               "identifier": "applicationRoles",
               "searchBoxConfiguration": {
                 "objectTypeConfiguration": {
-                  "defaultValue": "#RoleType",
+                  "defaultValue": "RoleType",
                   "supportedTypes": [
-                    "#RoleType"
+                    "RoleType"
                   ],
                   "visibility": "hidden"
                 }
               },
-              "type": "c:RoleType"
+              "type": "RoleType"
             },
             "panelType": "inducedBy"
           },
@@ -154,7 +154,7 @@
         {
           "@id": 2,
           "holderType": [
-            "#ServiceType"
+            "ServiceType"
           ]
         }
       ],

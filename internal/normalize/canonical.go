@@ -1,6 +1,7 @@
 package normalize
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -11,6 +12,23 @@ var keyPrefixes = []string{"c:", "t:", "q:"}
 
 // polyStringKeys are the keys of a serialized PolyStringType.
 var polyStringKeys = map[string]bool{"orig": true, "norm": true, "translation": true, "lang": true}
+
+// qnameValue matches a string value that is a midPoint type QName, written
+// "RoleType", "#RoleType" or "c:RoleType". midPoint accepts all three and
+// returns "#RoleType" for a QName item (focusType, holderType, supportedTypes,
+// selector types, ...) even when "RoleType" was written, so a configured value
+// would otherwise differ from the stored one forever. Canonical drops the
+// prefix. Only values change, never keys; other prefixes (ri:, q:, xsd:) and
+// strings not ending in "Type" are kept.
+var qnameValue = regexp.MustCompile(`^(#|c:)?[A-Z][A-Za-z0-9]*Type$`)
+
+// canonicalString is the canonical form of a string value.
+func canonicalString(s string) string {
+	if qnameValue.MatchString(s) {
+		return strings.TrimPrefix(strings.TrimPrefix(s, "#"), "c:")
+	}
+	return s
+}
 
 // defaultRelation is the relation midPoint stores on a reference that has
 // none.
@@ -23,7 +41,9 @@ const defaultRelation = "org:default"
 // from reference type values and @type values), drops items matching
 // ServerManaged (root @ns/@type, metadata, computed state), folds polystrings
 // to their orig string, wraps single values of MultiValued items into
-// one-element lists, gives references without a relation "org:default",
+// one-element lists, drops the "#" or "c:" prefix of type QName string
+// values ("#UserType" is "UserType"), gives references without a relation
+// "org:default",
 // prunes maps and lists that only became empty through stripping, and keeps
 // container "@id"s.
 func Canonical(restType string, body map[string]any) map[string]any {
@@ -102,9 +122,9 @@ func canonicalValue(restType string, path []string, name string, v any) (any, bo
 		return out, false
 	case string:
 		if name == "@type" {
-			return strings.TrimPrefix(t, "c:"), false
+			t = strings.TrimPrefix(t, "c:")
 		}
-		return t, false
+		return canonicalString(t), false
 	default:
 		return v, false
 	}

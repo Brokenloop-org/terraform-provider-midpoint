@@ -44,6 +44,7 @@ var requiredCases = []string{
 	"keeps_container_ids",
 	"real_superuser_role",
 	"real_task",
+	"qname_values_normalized",
 }
 
 func TestCanonical(t *testing.T) {

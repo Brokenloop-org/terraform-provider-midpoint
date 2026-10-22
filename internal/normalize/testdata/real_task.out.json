@@ -8,7 +8,7 @@
               "text": "name = \"fixture-nobody\""
             }
           },
-          "type": "#UserType"
+          "type": "UserType"
         }
       }
     }
