@@ -113,3 +113,47 @@ func stripIDs(v any) any {
 		return v
 	}
 }
+
+// protectedKeys mark a protected string value: a map holding any of them
+// carries a secret (or its hash) and never belongs in state.
+var protectedKeys = []string{"clearValue", "encryptedData", "hashedData", "externalData"}
+
+// stripProtected returns v without protected strings: every map holding a
+// protected key is removed, and so is every map or list that becomes empty
+// by it. Containers that were empty already are kept. A root that is
+// removed entirely becomes an empty map. It never mutates v.
+func stripProtected(v any) any {
+	out, keep := stripProtectedValue(v)
+	if !keep {
+		return map[string]any{}
+	}
+	return out
+}
+
+func stripProtectedValue(v any) (out any, keep bool) {
+	switch t := v.(type) {
+	case map[string]any:
+		for _, k := range protectedKeys {
+			if _, ok := t[k]; ok {
+				return nil, false
+			}
+		}
+		m := make(map[string]any, len(t))
+		for k, e := range t {
+			if c, keep := stripProtectedValue(e); keep {
+				m[k] = c
+			}
+		}
+		return m, len(m) > 0 || len(t) == 0
+	case []any:
+		l := make([]any, 0, len(t))
+		for _, e := range t {
+			if c, keep := stripProtectedValue(e); keep {
+				l = append(l, c)
+			}
+		}
+		return l, len(l) > 0 || len(t) == 0
+	default:
+		return v, true
+	}
+}

@@ -77,7 +77,8 @@ func (d *objectDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 			},
 			"body": schema.DynamicAttribute{
 				Description: "The object content in canonical form, without its type wrapper, its oid, " +
-					"container ids and server-managed items.",
+					"container ids and server-managed items. Protected strings (passwords and other secrets, " +
+					"clear, encrypted or hashed) are removed, with the containers left empty by that.",
 				Computed: true,
 			},
 		},
@@ -142,7 +143,7 @@ func (d *objectDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	body, diags := goToDyn(ctx, stateBody(actual))
+	body, diags := goToDyn(ctx, stripProtected(stateBody(actual)))
 	resp.Diagnostics.Append(diags...)
 	m.ID = types.StringValue(oid)
 	m.OID = types.StringValue(oid)

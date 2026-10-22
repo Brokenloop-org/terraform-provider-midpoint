@@ -1,7 +1,10 @@
 package provider
 
 import (
+	"fmt"
+	"net/http"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -112,5 +115,49 @@ func TestDataConnector_notFound(t *testing.T) {
 					`\s+with\s+version\s+9\.9.*available\s+versions.*2\.7.*2\.8`),
 			},
 		},
+	})
+}
+
+func TestDataConnector_ambiguousWithVersion(t *testing.T) {
+	s := newTestStub(t)
+	putConnectors(s)
+	twin := s.Put("connectors", map[string]any{
+		"name":          "ConnId " + dsLDAPType + " v3.9 (copy)",
+		"connectorType": dsLDAPType, "connectorVersion": "3.9",
+	})
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{{
+			Config: connectorConfig(`
+  connector_type    = "` + dsLDAPType + `"
+  connector_version = "3.9"
+`),
+			ExpectError: regexp.MustCompile(`(?s)more\s+than\s+one\s+connector.*` + twin + `.*use\s+the\s+oid\s+directly`),
+		}},
+	})
+}
+
+func TestDataConnector_notFoundWhenListingVersionsFails(t *testing.T) {
+	s := newTestStub(t)
+	putConnectors(s)
+	// Fail only the follow-up search by type alone.
+	s.SetFault(func(r mpstub.Recorded) int {
+		query, _ := r.Body["query"].(map[string]any)
+		filter, _ := query["filter"].(map[string]any)
+		if text := fmt.Sprint(filter["text"]); strings.HasPrefix(text, "connectorType") && !strings.Contains(text, "connectorVersion") {
+			return http.StatusInternalServerError
+		}
+		return 0
+	})
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{{
+			Config: connectorConfig(`
+  connector_type    = "` + dsCSVType + `"
+  connector_version = "9.9"
+`),
+			ExpectError: regexp.MustCompile(`(?s)Connector\s+not\s+found.*no\s+connector\s+of\s+type.*with\s+version\s+9\.9.*` +
+				`cannot\s+list\s+the\s+available\s+versions.*500`),
+		}},
 	})
 }

@@ -87,8 +87,9 @@ func (d *connectorDataSource) Read(ctx context.Context, req datasource.ReadReque
 	}
 	typ, version := m.ConnectorType.ValueString(), m.ConnectorVersion.ValueString()
 
-	objs, ok := d.search(ctx, typ, version, resp)
-	if !ok {
+	objs, err := d.search(ctx, typ, version)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("connector_type"), "Cannot look up connector", err.Error())
 		return
 	}
 	switch len(objs) {
@@ -97,11 +98,11 @@ func (d *connectorDataSource) Read(ctx context.Context, req datasource.ReadReque
 		if version != "" {
 			detail += " with version " + version
 			// List the versions there are, to make the error actionable.
-			others, ok := d.search(ctx, typ, "", resp)
-			if !ok {
-				return
-			}
-			if len(others) > 0 {
+			others, err := d.search(ctx, typ, "")
+			switch {
+			case err != nil:
+				detail += "\n(cannot list the available versions: " + err.Error() + ")"
+			case len(others) > 0:
 				detail += "; available versions: " + describeConnectors(others)
 			}
 		}
@@ -109,9 +110,13 @@ func (d *connectorDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	case 1:
 	default:
+		hint := "set connector_version to choose one"
+		if version != "" {
+			hint = "use the oid directly"
+		}
 		resp.Diagnostics.AddError("Ambiguous connector",
-			fmt.Sprintf("more than one connector matches type %s%s: %s; set connector_version to choose one",
-				typ, versionSuffix(version), describeConnectors(objs)))
+			fmt.Sprintf("more than one connector matches type %s%s: %s; %s",
+				typ, versionSuffix(version), describeConnectors(objs), hint))
 		return
 	}
 
@@ -126,15 +131,13 @@ func (d *connectorDataSource) Read(ctx context.Context, req datasource.ReadReque
 }
 
 // search finds up to lookupLimit connectors of type typ (and version, when
-// set); ok is false when it failed (with an error in resp).
-func (d *connectorDataSource) search(ctx context.Context, typ, version string, resp *datasource.ReadResponse) ([]client.Object, bool) {
+// set).
+func (d *connectorDataSource) search(ctx context.Context, typ, version string) ([]client.Object, error) {
 	objs, _, err := d.data.Client.Search(ctx, "connectors", connectorFilter(typ, version), lookupLimit, nil)
 	if err != nil {
-		resp.Diagnostics.AddAttributeError(path.Root("connector_type"), "Cannot look up connector",
-			fmt.Sprintf("searching connectors of type %s%s: %s", typ, versionSuffix(version), err))
-		return nil, false
+		return nil, fmt.Errorf("searching connectors of type %s%s: %w", typ, versionSuffix(version), err)
 	}
-	return objs, true
+	return objs, nil
 }
 
 func versionSuffix(version string) string {

@@ -57,3 +57,42 @@ func TestStateBody_dropsOIDAndContainerIDs(t *testing.T) {
 		t.Error("stateBody modified its input")
 	}
 }
+
+func TestStripProtected_removesProtectedStringsAndEmptiedContainers(t *testing.T) {
+	in := map[string]any{
+		"name": "n",
+		"credentials": map[string]any{
+			"password": map[string]any{
+				"value": map[string]any{"encryptedData": map[string]any{"cipherValue": "x"}},
+			},
+			"nonce": map[string]any{"value": map[string]any{"hashedData": map[string]any{"digestValue": "y"}}},
+		},
+		"connectorConfiguration": map[string]any{
+			"configurationProperties": map[string]any{
+				"host":     "ldap.example.com",
+				"password": map[string]any{"clearValue": "secret"},
+				"token":    []any{map[string]any{"externalData": map[string]any{"key": "k"}}, "kept"},
+			},
+		},
+		"extension": map[string]any{},
+		"empty":     []any{},
+	}
+	want := map[string]any{
+		"name": "n",
+		"connectorConfiguration": map[string]any{
+			"configurationProperties": map[string]any{
+				"host":  "ldap.example.com",
+				"token": []any{"kept"},
+			},
+		},
+		// Containers that were empty already are not stripping's business.
+		"extension": map[string]any{},
+		"empty":     []any{},
+	}
+	if got := stripProtected(in); !reflect.DeepEqual(got, want) {
+		t.Errorf("stripProtected = %v, want %v", got, want)
+	}
+	if _, ok := in["credentials"]; !ok {
+		t.Error("stripProtected modified its input")
+	}
+}

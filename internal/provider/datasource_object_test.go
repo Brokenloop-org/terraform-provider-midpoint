@@ -194,3 +194,31 @@ data "midpoint_object" "test" {
 		},
 	})
 }
+
+func TestDataObject_bodyWithoutProtectedStrings(t *testing.T) {
+	s := newTestStub(t)
+	s.Put("users", map[string]any{
+		"oid":  objRoleOID,
+		"name": "alice",
+		"credentials": map[string]any{"password": map[string]any{
+			"value": map[string]any{"encryptedData": map[string]any{"cipherData": map[string]any{"cipherValue": "c2VjcmV0"}}},
+		}},
+	})
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{{
+			Config: `
+data "midpoint_object" "test" {
+  type = "users"
+  name = "alice"
+}
+`,
+			ConfigStateChecks: []statecheck.StateCheck{
+				// credentials held nothing but the protected string, so it is gone.
+				statecheck.ExpectKnownValue(dsObjectAddr, tfjsonpath.New("body"), knownvalue.ObjectExact(map[string]knownvalue.Check{
+					"name": knownvalue.StringExact("alice"),
+				})),
+			},
+		}},
+	})
+}
