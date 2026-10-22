@@ -103,6 +103,9 @@ var ServerManaged = []Rule{
 	{Path: "activityState", Types: []string{"tasks"}, Reason: "TaskActivityStateType: runtime activity state, buckets and statistics"},
 	{Path: "affectedObjects", Types: []string{"tasks"}, Reason: "TaskAffectedObjectsType: derived from the activity definition"},
 	{Path: "unpauseAction", Types: []string{"tasks"}, Reason: "set by the task manager when a task waits"},
+
+	// Function libraries.
+	{Path: "function/parameter/@type", Types: []string{"functionLibraries"}, Reason: "midPoint 4.9 annotates every function parameter value with its type c:ExpressionParameterType, which is the only type a parameter has; a serialization annotation, never configuration (recorded in testdata/real/function-library.json)"},
 }
 
 // configurationOverrides are configuration items whose path a broader
@@ -145,6 +148,7 @@ var MultiValued = map[string]bool{
 	"property":                   true, // PropertyReferenceListType.property (ItemPathType)
 	"panel":                      true, // GuiObjectDetailsPageType.panel (ContainerPanelConfigurationType); archetype-application fixture
 	"supportedTypes":             true, // ObjectTypeSearchItemConfigurationType.supportedTypes (QName); archetype-application fixture
+	"function":                   true, // FunctionLibraryType.function (ExpressionType), unbounded; 4.9 returns a single function as an object
 }
 
 // IsServerManaged reports whether the item at path (local names only, no
