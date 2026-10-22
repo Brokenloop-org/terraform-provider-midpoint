@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -190,6 +191,11 @@ func TestProviderConfigure(t *testing.T) {
 			wantErrs: 1,
 		},
 		{
+			name:     "URL with credentials",
+			env:      withEnv(map[string]string{"MIDPOINT_URL": "http://admin:s3cret@midpoint.example.com"}),
+			wantErrs: 1,
+		},
+		{
 			name:     "invalid ca_bundle",
 			env:      withEnv(nil),
 			vals:     map[string]tftypes.Value{"ca_bundle": str("not a PEM certificate")},
@@ -213,6 +219,11 @@ func TestProviderConfigure(t *testing.T) {
 			}
 			if got := resp.Diagnostics.WarningsCount(); got != tc.wantWarnings {
 				t.Errorf("got %d warnings, want %d: %v", got, tc.wantWarnings, resp.Diagnostics)
+			}
+			for _, d := range resp.Diagnostics {
+				if strings.Contains(d.Summary()+d.Detail(), "s3cret") {
+					t.Errorf("diagnostic %q leaks the URL password: %s", d.Summary(), d.Detail())
+				}
 			}
 			if tc.wantErrs > 0 {
 				if resp.ResourceData != nil {

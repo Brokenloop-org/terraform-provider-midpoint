@@ -3,6 +3,7 @@ package provider
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -128,7 +129,7 @@ func (p *midpointProvider) Configure(ctx context.Context, req provider.Configure
 	}
 
 	tflog.Debug(ctx, "configured midPoint provider", map[string]any{
-		"url":      cfg.URL,
+		"url":      redactURL(cfg.URL),
 		"username": cfg.Username,
 		"insecure": cfg.Insecure,
 	})
@@ -152,9 +153,9 @@ func (p *midpointProvider) Configure(ctx context.Context, req provider.Configure
 
 	if version, err := c.ServerVersion(ctx); err != nil {
 		resp.Diagnostics.AddWarning("Unable to read midPoint server version",
-			"Reading the server version from "+cfg.URL+" failed; later requests may fail too: "+err.Error())
+			"Reading the server version from "+redactURL(cfg.URL)+" failed; later requests may fail too: "+err.Error())
 	} else {
-		tflog.Info(ctx, "connected to midPoint", map[string]any{"url": cfg.URL, "version": version})
+		tflog.Info(ctx, "connected to midPoint", map[string]any{"url": redactURL(cfg.URL), "version": version})
 	}
 
 	data := &providerData{Client: c, Config: cfg, DefaultOptions: defaults}
@@ -195,6 +196,15 @@ func resolveConfig(model providerModel) (providerConfig, diag.Diagnostics) {
 	cfg.CABundle = model.CABundle.ValueString()
 
 	return cfg, diags
+}
+
+// redactURL returns s with any password masked, for logs and diagnostics.
+func redactURL(s string) string {
+	u, err := url.Parse(s)
+	if err != nil {
+		return "(invalid URL)"
+	}
+	return u.Redacted()
 }
 
 // stringOrEnv returns the attribute value, falling back to the environment

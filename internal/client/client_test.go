@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -353,6 +354,7 @@ func TestSearch_resultShapes(t *testing.T) {
 		body      string
 		wantOIDs  []string
 		wantTotal int
+		wantErr   string
 	}{
 		{
 			name:      "single result as object",
@@ -370,20 +372,32 @@ func TestSearch_resultShapes(t *testing.T) {
 		},
 		{
 			name:      "no results",
+			header:    map[string]string{"X-Total-Count": "0"},
 			body:      `{}`,
 			wantTotal: 0,
 		},
 		{
-			name:      "no total header counts results",
-			body:      `{"object":[{"oid":"u1"},{"oid":"u2"}]}`,
-			wantOIDs:  []string{"u1", "u2"},
-			wantTotal: 2,
+			name:    "missing total header",
+			body:    `{"object":[{"oid":"u1"},{"oid":"u2"}]}`,
+			wantErr: "X-Total-Count",
+		},
+		{
+			name:    "invalid total header",
+			header:  map[string]string{"X-Total-Count": "many"},
+			body:    `{"object":[{"oid":"u1"}]}`,
+			wantErr: "X-Total-Count",
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c, _ := stub(t, reply{Status: 200, Header: tc.header, Body: tc.body})
 			objs, total, err := c.Search(context.Background(), "users", "", 0, nil)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("err = %v, want error mentioning %s", err, tc.wantErr)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("Search: %v", err)
 			}
@@ -402,7 +416,7 @@ func TestSearch_resultShapes(t *testing.T) {
 }
 
 func TestSearch_omitsEmptyFilterAndPaging(t *testing.T) {
-	c, seen := stub(t, reply{Status: 200, Body: `{}`})
+	c, seen := stub(t, reply{Status: 200, Header: map[string]string{"X-Total-Count": "0"}, Body: `{}`})
 	if _, _, err := c.Search(context.Background(), "roles", "", 0, []string{"raw"}); err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -472,11 +486,17 @@ func TestNew_invalidConfig(t *testing.T) {
 		{"URL without scheme", Config{URL: "midpoint.example.com"}},
 		{"unsupported scheme", Config{URL: "ftp://midpoint.example.com"}},
 		{"CA bundle without certificates", Config{URL: "https://midpoint.example.com", CABundle: []byte("not a pem")}},
+		{"URL with credentials", Config{URL: "https://admin:s3cret@midpoint.example.com"}},
+		{"unparsable URL with credentials", Config{URL: "https://admin:s3cret@midpoint.example.com:port"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := New(tc.cfg); err == nil {
-				t.Error("New must fail")
+			_, err := New(tc.cfg)
+			if err == nil {
+				t.Fatal("New must fail")
+			}
+			if strings.Contains(err.Error(), "s3cret") {
+				t.Errorf("error %q leaks the URL password", err.Error())
 			}
 		})
 	}
@@ -506,9 +526,12 @@ func TestNew_userAgentAndTrailingSlash(t *testing.T) {
 }
 
 func TestNew_TLS(t *testing.T) {
-	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{"node":{"build":{"version":"4.9.9"}}}`)
 	}))
+	// The untrusted case fails the handshake on purpose; keep test output clean.
+	srv.Config.ErrorLog = log.New(io.Discard, "", 0)
+	srv.StartTLS()
 	t.Cleanup(srv.Close)
 	caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw})
 

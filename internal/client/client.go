@@ -80,13 +80,25 @@ func (e *APIError) Is(target error) bool {
 
 // New validates cfg and returns a Client.
 func New(cfg Config) (*Client, error) {
+	// Errors below never quote cfg.URL: it might carry credentials.
 	u, err := url.Parse(cfg.URL)
 	if err != nil {
-		return nil, fmt.Errorf("invalid midPoint URL %q: %w", cfg.URL, err)
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
+		return nil, fmt.Errorf("invalid midPoint URL: %w", err)
+	}
+	if u.User != nil {
+		return nil, errors.New("midPoint URL must not contain credentials; use username/password")
 	}
 	if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return nil, fmt.Errorf("invalid midPoint URL %q: must be an absolute http or https URL", cfg.URL)
+		return nil, errors.New("invalid midPoint URL: must be an absolute http or https URL")
 	}
+	u.Path = strings.TrimRight(u.Path, "/") + restPath
+	u.RawPath = ""
+	u.RawQuery = ""
+	u.Fragment = ""
 
 	tlsConfig := &tls.Config{InsecureSkipVerify: cfg.Insecure}
 	if len(cfg.CABundle) > 0 {
@@ -109,7 +121,7 @@ func New(cfg Config) (*Client, error) {
 	}
 
 	return &Client{
-		base:      strings.TrimRight(cfg.URL, "/") + restPath,
+		base:      u.String(),
 		username:  cfg.Username,
 		password:  cfg.Password,
 		userAgent: userAgent,
@@ -148,7 +160,8 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%s %s: %w", method, target, err)
+		// *url.Error already names the method and URL.
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 	respBody, err := io.ReadAll(resp.Body)

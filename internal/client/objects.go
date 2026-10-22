@@ -96,7 +96,7 @@ func (c *Client) Delete(ctx context.Context, typ, oid string, options []string) 
 
 // Search runs an Axiom query filter against typ. An empty filter matches all
 // objects and maxSize <= 0 means no paging limit. total is midPoint's total
-// match count, or len(objs) when the server does not report it.
+// match count from the X-Total-Count header.
 func (c *Client) Search(ctx context.Context, typ, axiomFilter string, maxSize int, options []string) ([]Object, int, error) {
 	query := map[string]any{}
 	if axiomFilter != "" {
@@ -146,13 +146,13 @@ func (c *Client) Search(ctx context.Context, typ, axiomFilter string, maxSize in
 		objs = append(objs, Object{OID: oid, Body: m})
 	}
 
-	total := len(objs)
-	if h := resp.Header.Get("X-Total-Count"); h != "" {
-		n, err := strconv.Atoi(h)
-		if err != nil {
-			return nil, 0, fmt.Errorf("decoding %s search result: invalid X-Total-Count %q", typ, h)
-		}
-		total = n
+	h := resp.Header.Get("X-Total-Count")
+	if h == "" {
+		return nil, 0, fmt.Errorf("decoding %s search result: missing X-Total-Count header", typ)
+	}
+	total, err := strconv.Atoi(h)
+	if err != nil {
+		return nil, 0, fmt.Errorf("decoding %s search result: invalid X-Total-Count %q", typ, h)
 	}
 	return objs, total, nil
 }
