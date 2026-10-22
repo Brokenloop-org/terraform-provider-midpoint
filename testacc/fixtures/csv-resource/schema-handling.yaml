@@ -1,0 +1,18 @@
+# schema_handling of the acceptance-test CSV resource: one account type with
+# two attributes, each with one inbound mapping.
+objectType:
+  - kind: account
+    intent: default
+    default: true
+    objectClass: ri:AccountObjectClass
+    attribute:
+      - ref: ri:login
+        inbound:
+          - name: login-to-name
+            target:
+              path: name
+      - ref: ri:fullName
+        inbound:
+          - name: fullname-to-fullname
+            target:
+              path: fullName

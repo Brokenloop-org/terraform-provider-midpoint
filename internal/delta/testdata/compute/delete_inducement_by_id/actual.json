@@ -1,0 +1,21 @@
+{
+  "name": "r",
+  "inducement": [
+    {
+      "@id": 1,
+      "targetRef": {
+        "oid": "a1",
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    },
+    {
+      "@id": 7,
+      "targetRef": {
+        "oid": "b1",
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    }
+  ]
+}

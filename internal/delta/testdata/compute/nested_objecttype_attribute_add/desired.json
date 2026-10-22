@@ -1,0 +1,33 @@
+{
+  "name": "ldap",
+  "schemaHandling": {
+    "objectType": [
+      {
+        "kind": "account",
+        "intent": "default",
+        "attribute": [
+          {
+            "ref": "ri:cn",
+            "outbound": [
+              {
+                "strength": "strong",
+                "source": [
+                  {
+                    "path": "name"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "ref": "ri:mail"
+          }
+        ]
+      },
+      {
+        "kind": "entitlement",
+        "intent": "group"
+      }
+    ]
+  }
+}

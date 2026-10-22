@@ -1,0 +1,27 @@
+{
+  "activity": {
+    "work": {
+      "recomputation": {
+        "objects": {
+          "query": {
+            "filter": {
+              "text": "name = \"x\""
+            }
+          },
+          "type": "UserType"
+        }
+      }
+    }
+  },
+  "name": "recompute",
+  "oid": "1ffad957-1421-42e3-9687-c901453cd32d",
+  "ownerRef": {
+    "oid": "00000000-0000-0000-0000-000000000002",
+    "relation": "org:default",
+    "type": "UserType"
+  },
+  "schedule": {
+    "interval": 3600,
+    "recurrence": "recurring"
+  }
+}

@@ -1,0 +1,9 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "extension/costCenter",
+    "value": [
+      "CC-2"
+    ]
+  }
+]

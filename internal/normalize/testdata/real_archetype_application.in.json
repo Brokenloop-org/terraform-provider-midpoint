@@ -1,0 +1,274 @@
+{
+  "restType": "archetypes",
+  "body": {
+    "@metadata": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 16,
+      "storage": {
+        "createTimestamp": "2026-10-22T12:29:34.559Z",
+        "createChannel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#init"
+      },
+      "process": {
+        "requestTimestamp": "2026-10-22T12:29:34.553Z"
+      }
+    },
+    "oid": "00000000-0000-0000-0000-000000000329",
+    "version": "1",
+    "name": "Application",
+    "description": "\n        Applications are basic building blocks for defining access.\n        These objects contain business information.\n        Application is an administrative object describing application\n        as a business target that the access relates to.\n    ",
+    "operationExecution": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 19,
+      "recordType": "simple",
+      "timestamp": "2026-10-22T12:29:34.569Z",
+      "operation": {
+        "objectDelta": {
+          "changeType": "add",
+          "objectType": "c:ArchetypeType"
+        },
+        "executionResult": {
+          "operation": "com.evolveum.midpoint.model.impl.lens.ChangeExecutor.executeDelta",
+          "status": "success",
+          "importance": "normal",
+          "token": 1000000000000000065
+        },
+        "objectName": "Application"
+      },
+      "status": "success",
+      "channel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#init"
+    },
+    "assignment": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@metadata": {
+        "@id": 17,
+        "storage": {
+          "createTimestamp": "2026-10-22T12:29:34.559Z",
+          "createChannel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#init"
+        },
+        "process": {
+          "requestTimestamp": "2026-10-22T12:29:34.553Z"
+        },
+        "provenance": {
+          "acquisition": {
+            "@id": 18,
+            "channel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#init",
+            "timestamp": "2026-10-22T12:29:34.553Z"
+          }
+        }
+      },
+      "@id": 1,
+      "identifier": "holderType",
+      "activation": {
+        "effectiveStatus": "enabled"
+      },
+      "assignmentRelation": {
+        "@id": 2,
+        "holderType": "#ServiceType"
+      }
+    },
+    "iteration": 0,
+    "iterationToken": "",
+    "activation": {
+      "effectiveStatus": "enabled",
+      "enableTimestamp": "2026-10-22T12:29:34.555Z"
+    },
+    "archetypePolicy": {
+      "display": {
+        "label": {
+          "orig": "Application",
+          "norm": "application",
+          "translation": {
+            "key": "Application.label"
+          }
+        },
+        "pluralLabel": {
+          "orig": "Applications",
+          "norm": "applications",
+          "translation": {
+            "key": "Applications.title"
+          }
+        },
+        "icon": {
+          "cssClass": "fa fa-cloud",
+          "color": "blue"
+        }
+      },
+      "adminGuiConfiguration": {
+        "objectDetails": {
+          "panel": [
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 3,
+              "identifier": "projections",
+              "display": {
+                "label": {
+                  "orig": "Inventory records",
+                  "norm": "inventory records",
+                  "translation": {
+                    "key": "Application.panel.projections"
+                  }
+                }
+              },
+              "panelType": "projections"
+            },
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 4,
+              "identifier": "assignments",
+              "visibility": "hidden"
+            },
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 5,
+              "identifier": "password",
+              "visibility": "hidden"
+            },
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 6,
+              "identifier": "applicablePolicies",
+              "visibility": "hidden"
+            },
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 7,
+              "identifier": "serviceMembers",
+              "listView": {
+                "searchBoxConfiguration": {
+                  "objectTypeConfiguration": {
+                    "visibility": "hidden",
+                    "defaultValue": "#UserType",
+                    "supportedTypes": "#UserType"
+                  },
+                  "indirectConfiguration": {
+                    "indirect": true
+                  }
+                }
+              }
+            },
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 8,
+              "identifier": "serviceGovernance",
+              "visibility": "hidden"
+            },
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 9,
+              "identifier": "governance",
+              "display": {
+                "label": {
+                  "orig": "Governance",
+                  "norm": "governance",
+                  "translation": {
+                    "key": "GovernanceCardsPanel.label"
+                  }
+                },
+                "icon": {
+                  "cssClass": "fa fa-users"
+                }
+              },
+              "displayOrder": 91,
+              "panelType": "governanceCards"
+            },
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 15,
+              "identifier": "classifications",
+              "display": {
+                "label": {
+                  "orig": "Classifications",
+                  "norm": "classifications",
+                  "translation": {
+                    "key": "classifications.panel.label"
+                  }
+                },
+                "tooltip": "Information classifications (labels)",
+                "icon": {
+                  "cssClass": "fa fa-tags"
+                }
+              },
+              "displayOrder": 92,
+              "panelType": "roleAssignments",
+              "listView": {
+                "identifier": "classifications-view",
+                "dataProvider": {
+                  "@type": "http://midpoint.evolveum.com/xml/ns/public/common/common-3#RepositoryAssignmentDataProviderType"
+                },
+                "type": "c:AssignmentType",
+                "collection": {
+                  "filter": {
+                    "text": "targetRef/@/archetypeRef matches ( oid = \"00000000-0000-0000-0000-000000000330\" )"
+                  }
+                }
+              }
+            },
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 10,
+              "identifier": "inducements",
+              "visibility": "hidden"
+            },
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 11,
+              "identifier": "resourceEntitlementsTopLevel",
+              "display": {
+                "label": {
+                  "orig": "Construction inducements",
+                  "norm": "construction inducements",
+                  "translation": {
+                    "key": "Application.panel.constructionInducements"
+                  }
+                }
+              },
+              "displayOrder": 115,
+              "panelType": "constructionInducements"
+            },
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 13,
+              "identifier": "applicationRoles",
+              "display": {
+                "label": {
+                  "orig": "Application roles",
+                  "norm": "application roles",
+                  "translation": {
+                    "key": "Application.panel.inducedBy"
+                  }
+                }
+              },
+              "displayOrder": 117,
+              "panelType": "inducedBy",
+              "listView": {
+                "identifier": "applicationRoles",
+                "searchBoxConfiguration": {
+                  "objectTypeConfiguration": {
+                    "visibility": "hidden",
+                    "defaultValue": "#RoleType",
+                    "supportedTypes": "#RoleType"
+                  }
+                },
+                "type": "c:RoleType",
+                "collection": {
+                  "collectionRef": {
+                    "oid": "00000000-0000-0000-0001-000000000016",
+                    "relation": "org:default",
+                    "type": "c:ObjectCollectionType"
+                  }
+                }
+              }
+            },
+            {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 14,
+              "identifier": "inducedBy",
+              "displayOrder": 118,
+              "panelType": "inducedBy"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "assignment": [
+    {
+      "@id": 1,
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000329",
+        "relation": "org:default",
+        "type": "ArchetypeType"
+      }
+    }
+  ],
+  "name": "fixture-org",
+  "oid": "c69036e4-7f37-4e0d-a326-a6429fb95b17"
+}

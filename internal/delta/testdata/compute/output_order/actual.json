@@ -1,0 +1,15 @@
+{
+  "name": "r",
+  "description": "old",
+  "inducement": [
+    {
+      "@id": 5,
+      "targetRef": {
+        "oid": "b1",
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    }
+  ],
+  "riskLevel": "high"
+}

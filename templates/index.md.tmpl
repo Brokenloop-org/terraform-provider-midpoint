@@ -1,0 +1,65 @@
+---
+page_title: "{{.ProviderShortName}} Provider"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.ProviderShortName}} Provider
+
+{{ .Description | trimspace }}
+
+The provider manages midPoint configuration objects (services, roles, orgs,
+archetypes, object templates, marks, tasks, connector resources, and any other
+type through `midpoint_object`) as Terraform resources. It compares what
+midPoint returns strictly with the configuration, so a change made in the
+midPoint GUI shows as drift, and it writes only the changed items as narrow
+item deltas.
+
+Safety rules that apply to every resource:
+
+- Creating an object whose `oid` already exists fails unless `adopt_existing = true`.
+  An adopted object takes the whole configuration: items it does not
+  configure are removed on the first apply, and the plan warning lists the
+  changes.
+- Deleting a role, service, org or archetype that still has members, or a
+  resource that still has shadows, fails unless `force_destroy = true`.
+- Deleting an object adopted with `adopt_existing = true` fails unless
+  `force_destroy = true`; remove it from state with a `removed` block
+  (`lifecycle { destroy = false }`) to stop managing it.
+- `overwrite` is never sent unless it is listed in a resource's `options`.
+
+## Example Usage
+
+{{ tffile "examples/provider/provider.tf" }}
+
+## Environment variables
+
+Every attribute except `ca_bundle` and `default_options` can come from the
+environment. An attribute set in the configuration takes precedence.
+`url`, `username` and `password` are required, from either source.
+
+| Attribute | Environment variable | Notes |
+|---|---|---|
+| `url` | `MIDPOINT_URL` | Base URL without `/midpoint`, e.g. `https://midpoint.example.com`. |
+| `username` | `MIDPOINT_USERNAME` | HTTP basic authentication. |
+| `password` | `MIDPOINT_PASSWORD` | HTTP basic authentication. |
+| `insecure` | `MIDPOINT_INSECURE` | `true` skips TLS verification (development only). |
+
+## Execution options
+
+Each resource sends midPoint execution options on create and update. A
+resource's `options` attribute wins over the provider's `default_options`
+entry for its type, which wins over the built-in defaults below. A list given
+in `options` or `default_options` is sent on both create and update; an empty
+list sends no options.
+
+| `default_options` key | Create | Update |
+|---|---|---|
+| `service`, `role`, `archetype`, `object_template` | `isImport`, `raw` | `raw` |
+| `org`, `mark`, `task`, `object` | `isImport` | none |
+| `resource` | `isImport`, `reevaluateSearchFilters` | `reevaluateSearchFilters` |
+
+`reevaluateSearchFilters` is added to any write that sends a reference with
+a filter and no oid.
+
+{{ .SchemaMarkdown | trimspace }}

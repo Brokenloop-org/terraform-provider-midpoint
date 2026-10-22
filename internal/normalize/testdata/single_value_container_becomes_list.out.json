@@ -1,0 +1,77 @@
+{
+  "activation": {
+    "administrativeStatus": "enabled"
+  },
+  "alreadyList": [
+    1,
+    2
+  ],
+  "assignment": [
+    {
+      "@id": 1,
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000320",
+        "relation": "org:default",
+        "type": "ArchetypeType"
+      }
+    }
+  ],
+  "authorization": [
+    {
+      "@id": 3,
+      "action": [
+        "http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read"
+      ],
+      "object": [
+        {
+          "type": "UserType"
+        }
+      ]
+    }
+  ],
+  "extension": {
+    "note": "x"
+  },
+  "inducement": [
+    {
+      "@id": 2,
+      "condition": {
+        "expression": {
+          "script": [
+            {
+              "code": "true"
+            }
+          ]
+        }
+      },
+      "construction": {
+        "attribute": [
+          {
+            "outbound": [
+              {
+                "source": [
+                  {
+                    "path": "$focus/name"
+                  }
+                ],
+                "strength": "strong"
+              }
+            ],
+            "ref": "ri:cn"
+          }
+        ],
+        "intent": "default",
+        "kind": "account",
+        "resourceRef": {
+          "oid": "cccccccc-0000-0000-0000-000000000001",
+          "relation": "org:default",
+          "type": "ResourceType"
+        }
+      }
+    }
+  ],
+  "name": "single-values",
+  "policyRule": {
+    "name": "single"
+  }
+}

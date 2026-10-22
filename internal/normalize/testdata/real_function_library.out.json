@@ -1,0 +1,22 @@
+{
+  "description": "recorded fixture",
+  "function": [
+    {
+      "name": "greet",
+      "parameter": [
+        {
+          "name": "who",
+          "type": "xsd:string"
+        }
+      ],
+      "returnType": "xsd:string",
+      "script": [
+        {
+          "code": "\"hello \" + who"
+        }
+      ]
+    }
+  ],
+  "name": "fixture-function-library",
+  "oid": "99999999-0000-4000-8000-000000000002"
+}

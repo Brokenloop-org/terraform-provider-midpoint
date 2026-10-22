@@ -1,0 +1,17 @@
+{
+  "name": "r",
+  "description": "new",
+  "inducement": [
+    {
+      "targetRef": {
+        "oid": "a1",
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    }
+  ],
+  "subtype": [
+    "x"
+  ],
+  "requestable": true
+}

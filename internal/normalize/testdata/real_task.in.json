@@ -1,0 +1,377 @@
+{
+  "restType": "tasks",
+  "body": {
+    "@metadata": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 1,
+      "storage": {
+        "createTimestamp": "2026-10-22T12:30:29.603Z",
+        "creatorRef": {
+          "oid": "00000000-0000-0000-0000-000000000002",
+          "relation": "org:default",
+          "type": "c:UserType"
+        },
+        "createChannel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#rest"
+      },
+      "process": {
+        "requestTimestamp": "2026-10-22T12:30:29.600Z",
+        "requestorRef": {
+          "oid": "00000000-0000-0000-0000-000000000002",
+          "relation": "org:default",
+          "type": "c:UserType"
+        }
+      }
+    },
+    "oid": "1ffad957-1421-42e3-9687-c901453cd32d",
+    "version": "27",
+    "name": "fixture-task",
+    "operationExecution": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 3,
+      "recordType": "simple",
+      "timestamp": "2026-10-22T12:30:29.628Z",
+      "operation": {
+        "objectDelta": {
+          "changeType": "add",
+          "objectType": "c:TaskType"
+        },
+        "executionResult": {
+          "operation": "com.evolveum.midpoint.model.impl.lens.ChangeExecutor.executeDelta",
+          "status": "success",
+          "importance": "normal",
+          "token": 1000000000000000975
+        },
+        "objectName": "fixture-task"
+      },
+      "status": "success",
+      "initiatorRef": {
+        "oid": "00000000-0000-0000-0000-000000000002",
+        "relation": "org:default",
+        "type": "c:UserType"
+      },
+      "channel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#rest"
+    },
+    "assignment": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 4,
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000502",
+        "relation": "org:default",
+        "type": "c:ArchetypeType"
+      }
+    },
+    "iteration": 0,
+    "iterationToken": "",
+    "archetypeRef": {
+      "oid": "00000000-0000-0000-0000-000000000502",
+      "relation": "org:default",
+      "type": "c:ArchetypeType"
+    },
+    "roleMembershipRef": {
+      "oid": "00000000-0000-0000-0000-000000000502",
+      "relation": "org:default",
+      "type": "c:ArchetypeType"
+    },
+    "taskIdentifier": "1792672229603-28266-1",
+    "ownerRef": {
+      "oid": "00000000-0000-0000-0000-000000000002",
+      "relation": "org:default",
+      "type": "c:UserType"
+    },
+    "executionState": "suspended",
+    "schedulingState": "suspended",
+    "stateBeforeSuspend": "running",
+    "schedulingStateBeforeSuspend": "ready",
+    "resultStatus": "success",
+    "lastRunStartTimestamp": "2026-10-22T12:30:29.636Z",
+    "lastRunFinishTimestamp": "2026-10-22T12:30:29.713Z",
+    "completionTimestamp": "2026-10-22T12:30:29.717Z",
+    "progress": 0,
+    "operationStats": {
+      "environmentalPerformanceInformation": {
+        "provisioningStatistics": {},
+        "mappingsStatistics": {},
+        "notificationsStatistics": {}
+      },
+      "repositoryPerformanceInformation": {
+        "operation": [
+          {
+            "name": "SqaleRepositoryService.getObject",
+            "invocationCount": 7,
+            "executionCount": 7,
+            "totalTime": 7,
+            "minTime": 1,
+            "maxTime": 1,
+            "totalWastedTime": 0,
+            "minWastedTime": 0,
+            "maxWastedTime": 0
+          },
+          {
+            "name": "SqaleRepositoryService.countObjects",
+            "invocationCount": 1,
+            "executionCount": 1,
+            "totalTime": 0,
+            "minTime": 0,
+            "maxTime": 0,
+            "totalWastedTime": 0,
+            "minWastedTime": 0,
+            "maxWastedTime": 0
+          },
+          {
+            "name": "SqaleRepositoryService.modifyObject",
+            "invocationCount": 12,
+            "executionCount": 12,
+            "totalTime": 42,
+            "minTime": 1,
+            "maxTime": 19,
+            "totalWastedTime": 0,
+            "minWastedTime": 0,
+            "maxWastedTime": 0
+          },
+          {
+            "name": "SqaleRepositoryService.searchObjectsIterative",
+            "invocationCount": 1,
+            "executionCount": 1,
+            "totalTime": 0,
+            "minTime": 0,
+            "maxTime": 0,
+            "totalWastedTime": 0,
+            "minWastedTime": 0,
+            "maxWastedTime": 0
+          },
+          {
+            "name": "SqaleRepositoryService.searchObjectsIterativePage",
+            "invocationCount": 1,
+            "executionCount": 1,
+            "totalTime": 0,
+            "minTime": 0,
+            "maxTime": 0,
+            "totalWastedTime": 0,
+            "minWastedTime": 0,
+            "maxWastedTime": 0
+          },
+          {
+            "name": "SqaleRepositoryService.modifyObjectDynamically",
+            "invocationCount": 4,
+            "executionCount": 4,
+            "totalTime": 8,
+            "minTime": 1,
+            "maxTime": 3,
+            "totalWastedTime": 0,
+            "minWastedTime": 0,
+            "maxWastedTime": 0
+          }
+        ]
+      },
+      "cachesPerformanceInformation": {
+        "cache": [
+          {
+            "name": "com.evolveum.midpoint.repo.cache.global.GlobalObjectCache",
+            "hitCount": 1,
+            "weakHitCount": 0,
+            "missCount": 0,
+            "passCount": 0,
+            "notAvailableCount": 0
+          },
+          {
+            "name": "com.evolveum.midpoint.repo.cache.local.LocalQueryCache",
+            "hitCount": 0,
+            "weakHitCount": 0,
+            "missCount": 0,
+            "passCount": 0,
+            "notAvailableCount": 1
+          },
+          {
+            "name": "com.evolveum.midpoint.repo.cache.local.LocalObjectCache",
+            "hitCount": 0,
+            "weakHitCount": 0,
+            "missCount": 0,
+            "passCount": 0,
+            "notAvailableCount": 1
+          },
+          {
+            "name": "com.evolveum.midpoint.repo.cache.global.GlobalQueryCache",
+            "hitCount": 0,
+            "weakHitCount": 0,
+            "missCount": 0,
+            "passCount": 1,
+            "notAvailableCount": 0
+          }
+        ]
+      },
+      "operationsPerformanceInformation": {
+        "operation": [
+          {
+            "name": "com.evolveum.midpoint.task.api.Task.refresh",
+            "invocationCount": 4,
+            "totalTime": 4458,
+            "minTime": 898,
+            "maxTime": 1438
+          },
+          {
+            "name": "SqaleRepositoryService.searchObjectsIterative",
+            "invocationCount": 1,
+            "totalTime": 436,
+            "minTime": 436,
+            "maxTime": 436
+          },
+          {
+            "name": "SqaleRepositoryService.getObject",
+            "invocationCount": 7,
+            "totalTime": 7901,
+            "minTime": 828,
+            "maxTime": 1508
+          },
+          {
+            "name": "com.evolveum.midpoint.notifications.api.NotificationManager.processEvent",
+            "invocationCount": 1,
+            "totalTime": 270,
+            "minTime": 270,
+            "maxTime": 270
+          },
+          {
+            "name": "SqaleRepositoryService.countObjects",
+            "invocationCount": 1,
+            "totalTime": 504,
+            "minTime": 504,
+            "maxTime": 504
+          },
+          {
+            "name": "com.evolveum.midpoint.repo.cache.RepositoryCache.countObjects",
+            "invocationCount": 1,
+            "totalTime": 531,
+            "minTime": 531,
+            "maxTime": 531
+          },
+          {
+            "name": "com.evolveum.midpoint.repo.cache.RepositoryCache.getObject",
+            "invocationCount": 1,
+            "totalTime": 251,
+            "minTime": 251,
+            "maxTime": 251
+          },
+          {
+            "name": "SqaleRepositoryService.modifyObjectDynamically",
+            "invocationCount": 4,
+            "totalTime": 7623,
+            "minTime": 1424,
+            "maxTime": 2505
+          },
+          {
+            "name": "SqaleRepositoryService.modifyObject",
+            "invocationCount": 12,
+            "totalTime": 39532,
+            "minTime": 895,
+            "maxTime": 18379
+          },
+          {
+            "name": "com.evolveum.midpoint.repo.common.activity.run.LocalActivityRun.runLocally",
+            "invocationCount": 1,
+            "totalTime": 22222,
+            "minTime": 22222,
+            "maxTime": 22222
+          },
+          {
+            "name": "com.evolveum.midpoint.repo.cache.RepositoryCache.searchObjectsIterative",
+            "invocationCount": 1,
+            "totalTime": 492,
+            "minTime": 492,
+            "maxTime": 492
+          }
+        ]
+      },
+      "cachingConfiguration": "Caching configuration for thread midPointScheduler_Worker-4 on 2026-10-22T12:30:29.711Z:\n\nProfiles: []",
+      "timestamp": "2026-10-22T12:30:29.711Z"
+    },
+    "binding": "loose",
+    "activity": {
+      "work": {
+        "recomputation": {
+          "objects": {
+            "type": "#UserType",
+            "query": {
+              "filter": {
+                "text": "name = \"fixture-nobody\""
+              }
+            }
+          }
+        }
+      }
+    },
+    "activityState": {
+      "activity": {
+        "realizationState": "complete",
+        "resultStatus": "success",
+        "realizationStartTimestamp": "2026-10-22T12:30:29.676Z",
+        "realizationEndTimestamp": "2026-10-22T12:30:29.703Z",
+        "runStartTimestamp": "2026-10-22T12:30:29.676Z",
+        "runEndTimestamp": "2026-10-22T12:30:29.703Z",
+        "progress": {
+          "expectedTotal": 0,
+          "expectedInCurrentBucket": 0
+        },
+        "statistics": {
+          "itemProcessing": {
+            "run": {
+              "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+              "@id": 8,
+              "startTimestamp": "2026-10-22T12:30:29.676Z",
+              "endTimestamp": "2026-10-22T12:30:29.703Z"
+            }
+          },
+          "actionsExecuted": {}
+        },
+        "bucketing": {
+          "bucket": {
+            "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+            "@id": 6,
+            "sequentialNumber": 1,
+            "state": "complete",
+            "content": {
+              "@type": "http://midpoint.evolveum.com/xml/ns/public/common/common-3#NullWorkBucketContentType"
+            }
+          },
+          "numberOfBuckets": 1,
+          "workComplete": true
+        },
+        "workState": {},
+        "persistence": "singleRealization"
+      },
+      "tree": {
+        "realizationState": "complete",
+        "activity": {
+          "realizationState": "complete",
+          "resultStatus": "success",
+          "task": [
+            {
+              "taskRef": {
+                "@type": "c:ObjectReferenceType",
+                "oid": "1ffad957-1421-42e3-9687-c901453cd32d",
+                "relation": "org:default",
+                "type": "c:TaskType",
+                "targetName": "fixture-task"
+              },
+              "node": "DefaultNode",
+              "executionState": "notRunning",
+              "resultStatus": "success"
+            }
+          ],
+          "progressInformationVisibility": "hidden",
+          "persistence": "singleRealization"
+        }
+      }
+    },
+    "affectedObjects": {
+      "activity": {
+        "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+        "@id": 2,
+        "activityType": "c:recomputation",
+        "objects": {
+          "type": "c:UserType"
+        },
+        "executionMode": "full",
+        "predefinedConfigurationToUse": "production"
+      }
+    }
+  }
+}

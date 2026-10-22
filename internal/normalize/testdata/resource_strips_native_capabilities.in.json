@@ -1,0 +1,36 @@
+{
+  "restType": "resources",
+  "body": {
+    "oid": "cccccccc-0000-0000-0000-000000000001",
+    "name": "LDAP",
+    "connectorRef": {"oid": "dddddddd-0000-0000-0000-000000000001", "type": "c:ConnectorType"},
+    "connectorConfiguration": {
+      "configurationProperties": {"host": "ldap.example.com", "port": 389}
+    },
+    "operationalState": {"lastAvailabilityStatus": "up"},
+    "operationalStateHistory": [{"@id": 5, "lastAvailabilityStatus": "up"}],
+    "capabilities": {
+      "cachingMetadata": {"retrievalTimestamp": "2026-10-22T12:30:29.711Z", "serialNumber": "1"},
+      "native": {"read": {}, "create": {}},
+      "configured": {"activation": {"status": {"attribute": "ri:enabled"}}}
+    },
+    "schema": {
+      "cachingMetadata": {"retrievalTimestamp": "2026-10-22T12:30:29.711Z"},
+      "generationConstraints": {"generateObjectClass": "ri:inetOrgPerson"}
+    },
+    "schemaHandling": {
+      "objectType": {
+        "@id": 1,
+        "kind": "account",
+        "intent": "default",
+        "objectClass": "ri:inetOrgPerson",
+        "attribute": {
+          "@id": 2,
+          "ref": "ri:uid",
+          "inbound": {"@id": 3, "target": {"path": "name"}}
+        },
+        "activation": {"administrativeStatus": {"outbound": {"strength": "weak"}}}
+      }
+    }
+  }
+}

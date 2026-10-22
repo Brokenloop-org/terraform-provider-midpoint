@@ -1,0 +1,18 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "assignment[3]/condition/expression",
+    "value": {
+      "script": [
+        {
+          "code": "return true"
+        }
+      ]
+    }
+  },
+  {
+    "modificationType": "replace",
+    "path": "assignment[3]/condition/strength",
+    "value": "strong"
+  }
+]

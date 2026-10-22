@@ -1,0 +1,45 @@
+[
+  {
+    "modificationType": "delete",
+    "path": "inducement",
+    "value": [
+      {
+        "@id": 5
+      }
+    ]
+  },
+  {
+    "modificationType": "replace",
+    "path": "description",
+    "value": "new"
+  },
+  {
+    "modificationType": "replace",
+    "path": "riskLevel"
+  },
+  {
+    "modificationType": "add",
+    "path": "inducement",
+    "value": [
+      {
+        "targetRef": {
+          "oid": "a1",
+          "type": "RoleType",
+          "relation": "org:default"
+        }
+      }
+    ]
+  },
+  {
+    "modificationType": "add",
+    "path": "requestable",
+    "value": true
+  },
+  {
+    "modificationType": "add",
+    "path": "subtype",
+    "value": [
+      "x"
+    ]
+  }
+]

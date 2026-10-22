@@ -1,0 +1,14 @@
+{
+  "restType": "roles",
+  "body": {
+    "name": "relations",
+    "assignment": [
+      {"targetRef": {"oid": "00000000-0000-0000-0000-000000000320", "type": "c:ArchetypeType"}},
+      {"targetRef": {"oid": "00000000-0000-0000-0000-000000000321", "type": "c:OrgType", "relation": "org:manager"}},
+      {"targetRef": {"type": "c:OrgType", "filter": {"text": "name = \"x\""}}}
+    ],
+    "inducement": [
+      {"construction": {"resourceRef": {"oid": "cccccccc-0000-0000-0000-000000000001", "type": "c:ResourceType"}}}
+    ]
+  }
+}

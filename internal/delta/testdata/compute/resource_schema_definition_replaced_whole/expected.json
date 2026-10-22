@@ -1,0 +1,10 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "schema/definition",
+    "value": {
+      "@ns": "http://www.w3.org/2001/XMLSchema",
+      "schema": "<xsd:schema xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"><xsd:complexType name=\"AccountObjectClass\"/></xsd:schema>"
+    }
+  }
+]

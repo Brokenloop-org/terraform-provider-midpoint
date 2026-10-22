@@ -1,0 +1,24 @@
+{
+  "archetypePolicy": {
+    "display": {
+      "icon": {
+        "color": "blue",
+        "cssClass": "fa fa-cloud"
+      },
+      "label": "Application"
+    }
+  },
+  "displayName": "Folded Role",
+  "extension": {
+    "multi": [
+      "A",
+      "B"
+    ],
+    "notAPolyString": {
+      "orig": "kept",
+      "other": "because of other keys"
+    }
+  },
+  "identifier": "only-orig",
+  "name": "Folded"
+}

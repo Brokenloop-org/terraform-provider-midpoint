@@ -1,0 +1,39 @@
+{
+  "assignment": [
+    {
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000320",
+        "relation": "org:default",
+        "type": "ArchetypeType"
+      }
+    },
+    {
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000321",
+        "relation": "org:manager",
+        "type": "OrgType"
+      }
+    },
+    {
+      "targetRef": {
+        "filter": {
+          "text": "name = \"x\""
+        },
+        "relation": "org:default",
+        "type": "OrgType"
+      }
+    }
+  ],
+  "inducement": [
+    {
+      "construction": {
+        "resourceRef": {
+          "oid": "cccccccc-0000-0000-0000-000000000001",
+          "relation": "org:default",
+          "type": "ResourceType"
+        }
+      }
+    }
+  ],
+  "name": "relations"
+}

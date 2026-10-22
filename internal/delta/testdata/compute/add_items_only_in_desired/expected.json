@@ -1,0 +1,27 @@
+[
+  {
+    "modificationType": "add",
+    "path": "description",
+    "value": "d"
+  },
+  {
+    "modificationType": "add",
+    "path": "extension",
+    "value": {
+      "costCenter": "CC"
+    }
+  },
+  {
+    "modificationType": "add",
+    "path": "inducement",
+    "value": [
+      {
+        "targetRef": {
+          "oid": "a1",
+          "type": "RoleType",
+          "relation": "org:default"
+        }
+      }
+    ]
+  }
+]

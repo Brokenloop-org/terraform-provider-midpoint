@@ -1,0 +1,17 @@
+{
+  "name": "i",
+  "inducement": [
+    {
+      "@id": 1,
+      "construction": {
+        "resourceRef": {
+          "oid": "res1",
+          "type": "ResourceType",
+          "relation": "org:default",
+          "@type": "ObjectReferenceType"
+        },
+        "kind": "account"
+      }
+    }
+  ]
+}

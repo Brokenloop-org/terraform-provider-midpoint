@@ -1,0 +1,194 @@
+{
+  "restType": "resources",
+  "body": {
+    "@metadata": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 1,
+      "storage": {
+        "createTimestamp": "2026-10-22T16:25:20.569Z",
+        "creatorRef": {
+          "oid": "00000000-0000-0000-0000-000000000002",
+          "relation": "org:default",
+          "type": "c:UserType"
+        },
+        "createChannel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#rest"
+      },
+      "process": {
+        "requestTimestamp": "2026-10-22T16:25:20.564Z",
+        "requestorRef": {
+          "oid": "00000000-0000-0000-0000-000000000002",
+          "relation": "org:default",
+          "type": "c:UserType"
+        }
+      }
+    },
+    "oid": "6d8ebeb3-14af-429f-a388-bc2d88e18e16",
+    "version": "1",
+    "name": "fixture-csv-synchronization",
+    "operationExecution": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 17,
+      "recordType": "simple",
+      "timestamp": "2026-10-22T16:25:20.573Z",
+      "operation": {
+        "objectDelta": {
+          "changeType": "add",
+          "objectType": "c:ResourceType"
+        },
+        "executionResult": {
+          "operation": "com.evolveum.midpoint.model.impl.lens.ChangeExecutor.executeDelta",
+          "status": "success",
+          "importance": "normal",
+          "token": 1000000000000003171
+        },
+        "objectName": "fixture-csv-synchronization"
+      },
+      "status": "success",
+      "initiatorRef": {
+        "oid": "00000000-0000-0000-0000-000000000002",
+        "relation": "org:default",
+        "type": "c:UserType"
+      },
+      "channel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#rest"
+    },
+    "iteration": 0,
+    "iterationToken": "",
+    "connectorRef": {
+      "oid": "a1eb24c5-c8e9-422a-a0a8-ed09893dc402",
+      "relation": "org:default",
+      "type": "c:ConnectorType",
+      "filter": {
+        "text": "connectorType = \"com.evolveum.polygon.connector.csv.CsvConnector\" and connectorVersion = \"2.8\""
+      }
+    },
+    "connectorConfiguration": {
+      "@ns": "http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/connector-schema-3",
+      "configurationProperties": {
+        "@ns": "http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon.connector.csv.CsvConnector",
+        "fieldDelimiter": ",",
+        "filePath": "/opt/midpoint/var/hr/employees.csv",
+        "readOnly": true,
+        "encoding": "utf-8",
+        "tmpFolder": "/tmp",
+        "nameAttribute": "login",
+        "uniqueAttribute": "login"
+      }
+    },
+    "schema": {
+      "generationConstraints": {
+        "generateObjectClass": "ri:AccountObjectClass"
+      }
+    },
+    "schemaHandling": {
+      "objectType": {
+        "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+        "@id": 2,
+        "kind": "account",
+        "intent": "default",
+        "displayName": "Employee",
+        "default": true,
+        "objectClass": "ri:AccountObjectClass",
+        "focus": {
+          "type": "#UserType"
+        },
+        "attribute": [
+          {
+            "@id": 3,
+            "ref": "ri:login",
+            "inbound": {
+              "@id": 4,
+              "name": "login-to-name",
+              "target": {
+                "path": "name"
+              }
+            }
+          },
+          {
+            "@id": 5,
+            "ref": "ri:fullName",
+            "inbound": {
+              "@id": 6,
+              "name": "fullname-to-fullname",
+              "target": {
+                "path": "fullName"
+              }
+            }
+          },
+          {
+            "@id": 7,
+            "ref": "ri:email",
+            "inbound": {
+              "@id": 8,
+              "name": "email-to-emailaddress",
+              "target": {
+                "path": "emailAddress"
+              }
+            }
+          }
+        ],
+        "correlation": {
+          "correlators": {
+            "items": {
+              "@id": 9,
+              "name": "by-login",
+              "item": {
+                "@id": 10,
+                "ref": "name"
+              }
+            }
+          }
+        },
+        "synchronization": {
+          "reaction": [
+            {
+              "@id": 11,
+              "name": "linked",
+              "situation": "linked",
+              "actions": {
+                "synchronize": {
+                  "@id": 12,
+                  "name": "synchronize"
+                }
+              }
+            },
+            {
+              "@id": 13,
+              "name": "unlinked",
+              "situation": "unlinked",
+              "actions": {
+                "link": {
+                  "@id": 14,
+                  "name": "link"
+                }
+              }
+            },
+            {
+              "@id": 15,
+              "name": "unmatched",
+              "situation": "unmatched",
+              "actions": {
+                "addFocus": {
+                  "@id": 16,
+                  "name": "add-user"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "capabilities": {
+      "configured": {
+        "create": {
+          "enabled": false
+        },
+        "update": {
+          "enabled": false
+        },
+        "delete": {
+          "enabled": false
+        }
+      }
+    }
+  }
+}

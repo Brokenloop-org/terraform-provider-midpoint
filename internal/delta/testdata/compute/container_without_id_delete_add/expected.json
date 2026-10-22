@@ -1,0 +1,44 @@
+[
+  {
+    "modificationType": "delete",
+    "path": "inducement",
+    "value": [
+      {
+        "description": "old",
+        "targetRef": {
+          "oid": "a1",
+          "type": "RoleType",
+          "relation": "org:default"
+        }
+      },
+      {
+        "targetRef": {
+          "oid": "b1",
+          "type": "RoleType",
+          "relation": "org:default"
+        }
+      }
+    ]
+  },
+  {
+    "modificationType": "add",
+    "path": "inducement",
+    "value": [
+      {
+        "description": "new",
+        "targetRef": {
+          "oid": "a1",
+          "type": "RoleType",
+          "relation": "org:default"
+        }
+      },
+      {
+        "targetRef": {
+          "oid": "c1",
+          "type": "RoleType",
+          "relation": "org:default"
+        }
+      }
+    ]
+  }
+]

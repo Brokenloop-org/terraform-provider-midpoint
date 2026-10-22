@@ -1,0 +1,26 @@
+{
+  "assignment": [
+    {
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000321",
+        "relation": "org:manager",
+        "type": "OrgType"
+      }
+    },
+    {
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000322",
+        "relation": "org:approver",
+        "type": "OrgType"
+      }
+    },
+    {
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000323",
+        "relation": "org:default",
+        "type": "OrgType"
+      }
+    }
+  ],
+  "name": "unqualified relations"
+}

@@ -1,0 +1,7 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "schemaHandling/objectType[2]/attribute[4]/outbound[5]/strength",
+    "value": "strong"
+  }
+]

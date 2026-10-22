@@ -1,0 +1,15 @@
+{
+  "name": "t",
+  "oid": "o1",
+  "ownerRef": {
+    "oid": "u1",
+    "type": "UserType",
+    "relation": "org:default"
+  },
+  "binding": "loose",
+  "activity": {
+    "work": {
+      "recomputation": {}
+    }
+  }
+}

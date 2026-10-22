@@ -1,0 +1,50 @@
+{
+  "adminGuiConfiguration": {
+    "objectDetails": {
+      "panel": [
+        {
+          "identifier": "p",
+          "listView": {
+            "type": "RoleType"
+          }
+        }
+      ]
+    }
+  },
+  "approverRef": [
+    {
+      "oid": "00000000-0000-0000-0000-000000000002",
+      "relation": "org:approver",
+      "type": "UserType"
+    }
+  ],
+  "assignment": [
+    {
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000320",
+        "relation": "org:default",
+        "type": "ArchetypeType"
+      }
+    },
+    {
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000004",
+        "relation": "org:default",
+        "type": "RoleType"
+      }
+    }
+  ],
+  "inducement": [
+    {
+      "construction": {
+        "resourceRef": {
+          "@type": "ObjectReferenceType",
+          "oid": "cccccccc-0000-0000-0000-000000000001",
+          "relation": "org:default",
+          "type": "ResourceType"
+        }
+      }
+    }
+  ],
+  "name": "refs"
+}

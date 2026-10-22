@@ -1,0 +1,11 @@
+{
+  "restType": "roles",
+  "body": {
+    "name": "unqualified relations",
+    "assignment": [
+      {"targetRef": {"oid": "00000000-0000-0000-0000-000000000321", "type": "c:OrgType", "relation": "manager"}},
+      {"targetRef": {"oid": "00000000-0000-0000-0000-000000000322", "type": "c:OrgType", "relation": "org:approver"}},
+      {"targetRef": {"oid": "00000000-0000-0000-0000-000000000323", "type": "c:OrgType", "relation": "default"}}
+    ]
+  }
+}

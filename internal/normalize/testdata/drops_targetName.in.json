@@ -1,0 +1,13 @@
+{
+  "restType": "roles",
+  "body": {
+    "name": "target-names",
+    "assignment": [
+      {"targetRef": {"oid": "00000000-0000-0000-0000-000000000320", "relation": "org:default", "type": "c:ArchetypeType", "targetName": "Application"}},
+      {"targetRef": {"oid": "00000000-0000-0000-0000-000000000004", "relation": "org:default", "type": "c:RoleType", "targetName": {"orig": "Superuser", "norm": "superuser"}}}
+    ],
+    "inducement": [
+      {"construction": {"resourceRef": {"oid": "cccccccc-0000-0000-0000-000000000001", "type": "c:ResourceType", "targetName": "LDAP"}}}
+    ]
+  }
+}

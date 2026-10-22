@@ -1,0 +1,11 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "activity/work/recomputation/objects/query",
+    "value": {
+      "filter": {
+        "text": "name = \"b\""
+      }
+    }
+  }
+]

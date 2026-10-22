@@ -1,0 +1,71 @@
+{
+  "connectorConfiguration": {
+    "configurationProperties": {
+      "encoding": "utf-8",
+      "fieldDelimiter": ",",
+      "filePath": "/opt/midpoint/var/data/accounts.csv",
+      "nameAttribute": "login",
+      "readOnly": true,
+      "tmpFolder": "/tmp",
+      "uniqueAttribute": "login"
+    }
+  },
+  "connectorRef": {
+    "filter": {
+      "text": "connectorType = \"com.evolveum.polygon.connector.csv.CsvConnector\" and connectorVersion = \"2.8\""
+    },
+    "oid": "a1eb24c5-c8e9-422a-a0a8-ed09893dc402",
+    "relation": "org:default",
+    "type": "ConnectorType"
+  },
+  "description": "CSV fixture",
+  "name": "fixture-csv",
+  "oid": "3d332958-49f7-4304-969f-513a40dfacac",
+  "schema": {
+    "definition": {
+      "@ns": "http://www.w3.org/2001/XMLSchema",
+      "schema": "\u003cxsd:schema xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:a=\"http://prism.evolveum.com/xml/ns/public/annotation-3\" xmlns:ra=\"http://midpoint.evolveum.com/xml/ns/public/resource/annotation-3\" xmlns:tns=\"http://midpoint.evolveum.com/xml/ns/public/resource/instance-3\" elementFormDefault=\"qualified\" targetNamespace=\"http://midpoint.evolveum.com/xml/ns/public/resource/instance-3\"\u003e\u003cxsd:import namespace=\"http://prism.evolveum.com/xml/ns/public/annotation-3\"/\u003e\u003cxsd:import namespace=\"http://midpoint.evolveum.com/xml/ns/public/resource/annotation-3\"/\u003e\u003cxsd:complexType name=\"AccountObjectClass\"\u003e\u003cxsd:annotation\u003e\u003cxsd:appinfo\u003e\u003ca:container\u003etrue\u003c/a:container\u003e\u003cra:resourceObject\u003etrue\u003c/ra:resourceObject\u003e\u003cra:nativeObjectClass\u003e__ACCOUNT__\u003c/ra:nativeObjectClass\u003e\u003cra:default\u003etrue\u003c/ra:default\u003e\u003cra:auxiliary\u003efalse\u003c/ra:auxiliary\u003e\u003cra:embedded\u003efalse\u003c/ra:embedded\u003e\u003cra:namingAttribute xmlns:ri=\"http://midpoint.evolveum.com/xml/ns/public/resource/instance-3\"\u003eri:login\u003c/ra:namingAttribute\u003e\u003cra:displayNameAttribute xmlns:ri=\"http://midpoint.evolveum.com/xml/ns/public/resource/instance-3\"\u003eri:login\u003c/ra:displayNameAttribute\u003e\u003cra:identifier xmlns:ri=\"http://midpoint.evolveum.com/xml/ns/public/resource/instance-3\"\u003eri:login\u003c/ra:identifier\u003e\u003c/xsd:appinfo\u003e\u003c/xsd:annotation\u003e\u003cxsd:sequence\u003e\u003cxsd:element name=\"login\" type=\"xsd:string\"\u003e\u003cxsd:annotation\u003e\u003cxsd:appinfo\u003e\u003ca:displayOrder\u003e100\u003c/a:displayOrder\u003e\u003cra:nativeAttributeName\u003elogin\u003c/ra:nativeAttributeName\u003e\u003cra:frameworkAttributeName\u003e__NAME__\u003c/ra:frameworkAttributeName\u003e\u003cra:returnedByDefault\u003etrue\u003c/ra:returnedByDefault\u003e\u003c/xsd:appinfo\u003e\u003c/xsd:annotation\u003e\u003c/xsd:element\u003e\u003cxsd:element minOccurs=\"0\" name=\"email\" type=\"xsd:string\"\u003e\u003cxsd:annotation\u003e\u003cxsd:appinfo\u003e\u003ca:displayOrder\u003e120\u003c/a:displayOrder\u003e\u003cra:nativeAttributeName\u003eemail\u003c/ra:nativeAttributeName\u003e\u003cra:frameworkAttributeName\u003eemail\u003c/ra:frameworkAttributeName\u003e\u003cra:returnedByDefault\u003etrue\u003c/ra:returnedByDefault\u003e\u003c/xsd:appinfo\u003e\u003c/xsd:annotation\u003e\u003c/xsd:element\u003e\u003cxsd:element minOccurs=\"0\" name=\"fullName\" type=\"xsd:string\"\u003e\u003cxsd:annotation\u003e\u003cxsd:appinfo\u003e\u003ca:displayOrder\u003e130\u003c/a:displayOrder\u003e\u003cra:nativeAttributeName\u003efullName\u003c/ra:nativeAttributeName\u003e\u003cra:frameworkAttributeName\u003efullName\u003c/ra:frameworkAttributeName\u003e\u003cra:returnedByDefault\u003etrue\u003c/ra:returnedByDefault\u003e\u003c/xsd:appinfo\u003e\u003c/xsd:annotation\u003e\u003c/xsd:element\u003e\u003c/xsd:sequence\u003e\u003c/xsd:complexType\u003e\u003c/xsd:schema\u003e"
+    }
+  },
+  "schemaHandling": {
+    "objectType": [
+      {
+        "@id": 2,
+        "attribute": [
+          {
+            "@id": 3,
+            "inbound": [
+              {
+                "@id": 4,
+                "name": "login-to-name",
+                "target": {
+                  "path": "name"
+                }
+              }
+            ],
+            "ref": "ri:login"
+          },
+          {
+            "@id": 5,
+            "inbound": [
+              {
+                "@id": 6,
+                "name": "fullname-to-fullname",
+                "target": {
+                  "path": "fullName"
+                }
+              }
+            ],
+            "ref": "ri:fullName"
+          }
+        ],
+        "default": true,
+        "intent": "default",
+        "kind": "account",
+        "objectClass": [
+          "ri:AccountObjectClass"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "restType": "functionLibraries",
+  "body": {
+    "@metadata": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 1,
+      "storage": {
+        "createTimestamp": "2026-10-22T13:40:31.001Z",
+        "creatorRef": {
+          "oid": "00000000-0000-0000-0000-000000000002",
+          "relation": "org:default",
+          "type": "c:UserType"
+        },
+        "createChannel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#rest"
+      },
+      "process": {
+        "requestTimestamp": "2026-10-22T13:40:30.994Z",
+        "requestorRef": {
+          "oid": "00000000-0000-0000-0000-000000000002",
+          "relation": "org:default",
+          "type": "c:UserType"
+        }
+      }
+    },
+    "oid": "99999999-0000-4000-8000-000000000002",
+    "version": "1",
+    "name": "fixture-function-library",
+    "description": "recorded fixture",
+    "operationExecution": {
+      "@ns": "http://prism.evolveum.com/xml/ns/public/types-3",
+      "@id": 2,
+      "recordType": "simple",
+      "timestamp": "2026-10-22T13:40:31.007Z",
+      "operation": {
+        "objectDelta": {
+          "changeType": "add",
+          "objectType": "c:FunctionLibraryType"
+        },
+        "executionResult": {
+          "operation": "com.evolveum.midpoint.model.impl.lens.ChangeExecutor.executeDelta",
+          "status": "success",
+          "importance": "normal",
+          "token": 1000000000000002173
+        },
+        "objectName": "fixture-function-library"
+      },
+      "status": "success",
+      "initiatorRef": {
+        "oid": "00000000-0000-0000-0000-000000000002",
+        "relation": "org:default",
+        "type": "c:UserType"
+      },
+      "channel": "http://midpoint.evolveum.com/xml/ns/public/common/channels-3#rest"
+    },
+    "iteration": 0,
+    "iterationToken": "",
+    "function": {
+      "name": "greet",
+      "parameter": [
+        {
+          "@type": "c:ExpressionParameterType",
+          "name": "who",
+          "type": "xsd:string"
+        }
+      ],
+      "returnType": "xsd:string",
+      "script": [
+        {
+          "code": "\"hello \" + who"
+        }
+      ]
+    }
+  }
+}

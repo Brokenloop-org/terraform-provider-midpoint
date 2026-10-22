@@ -1,0 +1,11 @@
+[
+  {
+    "modificationType": "delete",
+    "path": "inducement",
+    "value": [
+      {
+        "@id": 7
+      }
+    ]
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "name": "r",
+  "description": "d",
+  "inducement": [
+    {
+      "targetRef": {
+        "oid": "a1",
+        "type": "RoleType",
+        "relation": "org:default"
+      }
+    }
+  ],
+  "extension": {
+    "costCenter": "CC"
+  }
+}
