@@ -56,8 +56,9 @@ type typedResource[S any] struct {
 	// importRead sets, on the read that follows an import (importReadKey),
 	// the attributes fromBody reads back only when the prior state sets
 	// them, from actual, the canonical body; it runs after fromBody. Later
-	// reads keep the comparison rules of fromBody. nil for none.
-	importRead func(s *S, actual map[string]any)
+	// reads keep the comparison rules of fromBody. It returns the private
+	// state keys to set (markers of what it recorded); nil for none.
+	importRead func(s *S, actual map[string]any) (markers []string)
 	// observe sets the computed attributes of s from actual, the canonical
 	// body of every read (refresh, import, the read-back after a write),
 	// and with a nil actual to null before a create records the object, so
@@ -345,10 +346,11 @@ func (r *typedResource[S]) Read(ctx context.Context, req resource.ReadRequest, r
 
 	importing, diags := req.Private.GetKey(ctx, importReadKey)
 	resp.Diagnostics.Append(diags...)
+	var markers []string
 	found, diags := r.observingEngine(&s).readInto(ctx, oid.ValueString(), desired, false, func(actual map[string]any) {
 		resp.Diagnostics.Append(r.fromBody(ctx, &s, actual)...)
 		if len(importing) > 0 && r.importRead != nil {
-			r.importRead(&s, actual)
+			markers = r.importRead(&s, actual)
 		}
 	})
 	resp.Diagnostics.Append(diags...)
@@ -357,6 +359,9 @@ func (r *typedResource[S]) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 	if len(importing) > 0 {
 		resp.Diagnostics.Append(resp.Private.SetKey(ctx, importReadKey, nil)...)
+	}
+	for _, key := range markers {
+		resp.Diagnostics.Append(resp.Private.SetKey(ctx, key, []byte("true"))...)
 	}
 	if !found {
 		resp.State.RemoveResource(ctx)

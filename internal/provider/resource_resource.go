@@ -170,13 +170,14 @@ func connectorFromRef(ref any) (m connectorModel, ok bool) {
 // state, so that a configuration written from the server object imports
 // with no change. A reference by oid alone leaves it null: the
 // configuration then sets it with one no-op update.
-func resourceImportRead(s *resourceState, actual map[string]any) {
+func resourceImportRead(s *resourceState, actual map[string]any) []string {
 	if !s.Connector.IsNull() {
-		return
+		return nil
 	}
 	if m, ok := connectorFromRef(actual["connectorRef"]); ok {
 		s.Connector = types.ObjectValueMust(connectorAttrTypes, map[string]attr.Value{"type": m.Type, "version": m.Version})
 	}
+	return nil
 }
 
 // resourceToBody is the body of s: the simple fields, connectorRef from

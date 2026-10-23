@@ -95,9 +95,19 @@ resource "midpoint_task" "recompute" {
 			},
 			emptyPlanAfterRefresh(),
 			// An import records the owner (the caller) and binding midPoint
-			// set; a config that sets them as midPoint holds them imports
-			// with no change.
-			{ResourceName: addr, ImportState: true, ImportStateVerify: true, ImportStateVerifyIgnore: []string{"owner", "binding"}},
+			// set; with them unset in the config the import is clean.
+			{
+				ResourceName: addr, ImportState: true,
+				ImportStateCheck:        checkImportedOwnerAndBinding,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"owner", "binding"},
+			},
+			{
+				Config:          cfg("second"),
+				ResourceName:    addr,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithID,
+			},
 			{
 				Config:          cfg("second", fmt.Sprintf("  owner = %q", accAdministratorOID), `  binding = "loose"`),
 				ResourceName:    addr,

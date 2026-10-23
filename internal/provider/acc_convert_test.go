@@ -218,6 +218,7 @@ func TestAccConvert_roundTrip(t *testing.T) {
 			}
 		}
 	}
+	sort.Strings(lookups)
 	if want := dataBlocks(t, files); !slices.Equal(lookups, want) {
 		t.Errorf("resolved data lookups %v, want %v", lookups, want)
 	}
