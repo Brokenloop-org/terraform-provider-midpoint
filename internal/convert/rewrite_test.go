@@ -150,12 +150,17 @@ func TestRewrite(t *testing.T) {
 			}
 		}
 		out, _, notes := Rewrite(kept)
+		var filtered int
 		for _, b := range targets(byOID(t, out, obsRoleOID)) {
-			if _, ok := b.Attrs["filter"]; ok {
-				if _, has := b.Attrs["oid"]; has {
-					t.Errorf("oid kept next to filter: %+v", b.Attrs)
+			if f, ok := b.Attrs["filter"]; ok {
+				filtered++
+				if _, has := b.Attrs["oid"]; has || f != `name = "grafana / viewer"` {
+					t.Errorf("want filter only: %+v", b.Attrs)
 				}
 			}
+		}
+		if filtered != 1 {
+			t.Errorf("filtered targets = %d, want 1", filtered)
 		}
 		if len(notes) == 0 {
 			t.Error("no note for the dropped oid")
@@ -256,4 +261,49 @@ func sortLookups(d []DataLookup) []DataLookup {
 		}
 	}
 	return out
+}
+
+func TestRewriteContainers(t *testing.T) {
+	const oid = "aaaaaaaa-0000-4000-8000-000000000001"
+	target := Resource{Kind: "midpoint_resource", Label: "res", OID: oid, Attrs: map[string]any{}}
+	inner := map[string]any{"oid": oid}
+	list := []map[string]any{{"resourceRef": inner}}
+	in := []Resource{target, {Kind: "midpoint_role", Label: "r", OID: "aaaaaaaa-0000-4000-8000-000000000002",
+		Attrs: map[string]any{"x": map[string]any{"l": list}}}}
+	out, _, _ := Rewrite(in)
+	got := out[1].Attrs["x"].(map[string]any)["l"].([]any)[0].(map[string]any)["resourceRef"].(map[string]any)
+	if got["oid"] != (Ref{Address: "midpoint_resource.res.oid"}) {
+		t.Errorf("not rewritten: %#v", got)
+	}
+	if inner["oid"] != oid {
+		t.Errorf("input mutated: %#v", inner)
+	}
+}
+
+func TestRewriteGatesAndHints(t *testing.T) {
+	t.Run("non oid owner and non task owner are not references", func(t *testing.T) {
+		in := []Resource{
+			{Kind: "midpoint_role", Label: "r", OID: "aaaaaaaa-0000-4000-8000-000000000002", Attrs: map[string]any{"owner": "00000000-0000-0000-0000-000000000002", "archetype": "not an oid"}},
+			{Kind: "midpoint_task", Label: "t", OID: "aaaaaaaa-0000-4000-8000-000000000003", Attrs: map[string]any{"owner": "someone"}},
+		}
+		out, data, notes := Rewrite(in)
+		if out[0].Attrs["owner"] != "00000000-0000-0000-0000-000000000002" || out[0].Attrs["archetype"] != "not an oid" || out[1].Attrs["owner"] != "someone" {
+			t.Errorf("attrs changed: %v %v", out[0].Attrs, out[1].Attrs)
+		}
+		if len(data) != 0 || len(notes) != 0 {
+			t.Errorf("data %v notes %v", data, notes)
+		}
+	})
+	t.Run("typeless ref infers type from key", func(t *testing.T) {
+		in := []Resource{{Kind: "midpoint_role", Label: "r", OID: "aaaaaaaa-0000-4000-8000-000000000002", Extra: map[string]any{
+			"a": map[string]any{"resourceRef": map[string]any{"oid": "00000000-0000-0000-0000-000000000010"}},
+			"b": map[string]any{"fooRef": map[string]any{"oid": "00000000-0000-0000-0000-000000000011"}},
+		}}}
+		_, data, _ := Rewrite(in)
+		want := []DataLookup{{Label: "resource_10", RestType: "resources", OID: "00000000-0000-0000-0000-000000000010"},
+			{Label: "object_11", RestType: "objects", OID: "00000000-0000-0000-0000-000000000011"}}
+		if !reflect.DeepEqual(data, want) {
+			t.Errorf("data = %+v", data)
+		}
+	})
 }

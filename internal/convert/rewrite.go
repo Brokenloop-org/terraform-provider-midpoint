@@ -2,6 +2,8 @@ package convert
 
 import (
 	"fmt"
+	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -82,13 +84,17 @@ func (w *rewriter) resource(r Resource) Resource {
 	out.Attrs = make(map[string]any, len(r.Attrs))
 	for _, k := range sortedKeys(r.Attrs) {
 		v := r.Attrs[k]
-		switch implied := map[string]string{"archetype": "ArchetypeType", "owner": "UserType"}[k]; {
-		case implied != "":
-			if oid, ok := v.(string); ok {
-				if ref, _ := w.reference(oid, implied, false); ref != nil {
-					v = ref
-				}
+		implied := map[string]string{"archetype": "ArchetypeType", "owner": "UserType"}[k]
+		if k == "owner" && r.Kind != "midpoint_task" {
+			implied = ""
+		}
+		switch oid, isString := v.(string); {
+		case implied != "" && isString && uuidPattern.MatchString(oid):
+			if ref, _ := w.reference(oid, implied, "", false); ref != nil {
+				v = ref
 			}
+		case implied != "":
+			// not an oid: nothing to rewrite
 		default:
 			v = w.value("", v)
 		}
@@ -116,14 +122,14 @@ func (w *rewriter) blocks(bs []Block) []Block {
 			switch {
 			case b.Type == "target" && k == "oid" && isString:
 				typ, _ := b.Attrs["type"].(string)
-				ref, drop := w.reference(oid, typ, hasFilter)
+				ref, drop := w.reference(oid, typ, "", hasFilter)
 				if ref != nil {
 					v = ref
 				} else if drop {
 					continue
 				}
 			case b.Type == "construction" && k == "resource" && isString:
-				if ref, _ := w.reference(oid, "ResourceType", false); ref != nil {
+				if ref, _ := w.reference(oid, "ResourceType", "", false); ref != nil {
 					v = ref
 				}
 			default:
@@ -143,7 +149,7 @@ func (w *rewriter) value(key string, v any) any {
 	case map[string]any:
 		if strings.HasSuffix(key, "Ref") {
 			if oid, ok := t["oid"].(string); ok {
-				return w.refMap(oid, t)
+				return w.refMap(key, oid, t)
 			}
 		}
 		out := make(map[string]any, len(t))
@@ -158,19 +164,48 @@ func (w *rewriter) value(key string, v any) any {
 		}
 		return out
 	default:
+		return w.reflected(key, v)
+	}
+}
+
+// reflected handles the container types other than map[string]any and []any
+// (e.g. []map[string]any or a typed slice): they are converted to the generic
+// shape, so that they are walked and never share memory with the input.
+func (w *rewriter) reflected(key string, v any) any {
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Slice, reflect.Array:
+		if rv.Kind() == reflect.Slice && rv.IsNil() || rv.Type().Elem().Kind() == reflect.Uint8 {
+			return v
+		}
+		out := make([]any, rv.Len())
+		for i := range out {
+			out[i] = w.value(key, rv.Index(i).Interface())
+		}
+		return out
+	case reflect.Map:
+		if rv.IsNil() || rv.Type().Key().Kind() != reflect.String {
+			return v
+		}
+		m := make(map[string]any, rv.Len())
+		for _, k := range rv.MapKeys() {
+			m[k.String()] = rv.MapIndex(k).Interface()
+		}
+		return w.value(key, m)
+	default:
 		return v
 	}
 }
 
 // refMap rewrites the reference map m, whose oid is oid.
-func (w *rewriter) refMap(oid string, m map[string]any) map[string]any {
+func (w *rewriter) refMap(key, oid string, m map[string]any) map[string]any {
 	out := make(map[string]any, len(m))
 	for _, k := range sortedKeys(m) {
 		out[k] = w.value(k, m[k])
 	}
 	typ, _ := m["type"].(string)
 	_, hasFilter := m["filter"]
-	ref, drop := w.reference(oid, typ, hasFilter)
+	ref, drop := w.reference(oid, typ, refKeyTypes[key], hasFilter)
 	if ref != nil {
 		out["oid"] = ref
 	} else if drop {
@@ -181,9 +216,10 @@ func (w *rewriter) refMap(oid string, m map[string]any) map[string]any {
 
 // reference decides what the reference to oid becomes. typ is the type the
 // reference claims (empty when it names none). ref is the replacement Ref,
-// nil to keep the literal oid; drop asks to remove the oid (a filter
+// nil to keep the literal oid; hintRest is the REST type to look up when typ
+// names none; drop asks to remove the oid (a filter
 // remains).
-func (w *rewriter) reference(oid, typ string, hasFilter bool) (ref any, drop bool) {
+func (w *rewriter) reference(oid, typ, hintRest string, hasFilter bool) (ref any, drop bool) {
 	if oid == "" || oid == w.cur.OID {
 		return nil, false
 	}
@@ -203,7 +239,12 @@ func (w *rewriter) reference(oid, typ string, hasFilter bool) (ref any, drop boo
 		return nil, false
 	}
 	if !known {
-		rest = "objects"
+		// The key of the reference names its type when the reference does
+		// not; otherwise the generic objects collection (midPoint serves
+		// GET /objects/{oid}).
+		if rest = hintRest; rest == "" {
+			rest = "objects"
+		}
 	}
 	label, ok := w.lookups[oid]
 	if !ok {
@@ -252,4 +293,12 @@ func restTypeOf(typ string) (rest string, ok bool) {
 		}
 	}
 	return "", false
+}
+
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// refKeyTypes is the REST type a reference key implies when the reference
+// carries no type.
+var refKeyTypes = map[string]string{
+	"resourceRef": "resources", "archetypeRef": "archetypes", "ownerRef": "users", "connectorRef": "connectors",
 }
