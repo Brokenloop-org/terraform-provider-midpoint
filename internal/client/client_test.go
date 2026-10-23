@@ -155,6 +155,26 @@ func TestGet_notFound(t *testing.T) {
 	}
 }
 
+// midPoint answers a read it cannot complete (a resource whose connector
+// does not resolve, say) with HTTP 250 and its OperationResult in place of
+// the object.
+func TestGet_operationResultInsteadOfObject(t *testing.T) {
+	for _, typ := range []string{"resources", "objects"} {
+		t.Run(typ, func(t *testing.T) {
+			c, _ := stub(t, reply{Status: 250, Body: `{"@ns":"x","object":{"@type":"c:OperationResultType","operation":"getObject","status":"fatal_error","message":"Connector OID missing"}}`})
+
+			_, err := c.Get(context.Background(), typ, "r1", GetOptions{})
+			var apiErr *APIError
+			if !errors.As(err, &apiErr) || apiErr.Status != 250 {
+				t.Fatalf("err = %#v, want *APIError with status 250", err)
+			}
+			if !strings.Contains(err.Error(), "Connector OID missing") {
+				t.Errorf("Error() = %q, want midPoint message", err.Error())
+			}
+		})
+	}
+}
+
 func TestCreate_readsLocationHeader(t *testing.T) {
 	tests := []struct {
 		name     string
