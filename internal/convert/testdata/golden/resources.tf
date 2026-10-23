@@ -64,6 +64,7 @@ resource "midpoint_resource" "users_csv" {
             ]
             ref = "ri:DISPLAY_NAME"
           },
+          { displayName = "Groups", ref = "ri:GROUPS" },
         ]
         default = true
         delineation = {

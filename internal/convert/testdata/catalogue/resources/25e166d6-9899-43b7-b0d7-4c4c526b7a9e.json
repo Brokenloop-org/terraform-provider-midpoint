@@ -75,6 +75,10 @@
                   }
                 }
               }
+            },
+            {
+              "ref": "ri:GROUPS",
+              "displayName": "Groups"
             }
           ]
         }

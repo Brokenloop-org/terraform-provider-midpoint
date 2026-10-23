@@ -75,7 +75,7 @@ resource "midpoint_role" "platform_team" {
 ### Optional
 
 - `activation` (Block, Optional) Activation. Other activation items (validity) go in extra. (see [below for nested schema](#nestedblock--activation))
-- `adopt_existing` (Boolean) When an object with the configured oid already exists, adopt it into state and apply the configuration to it as an update instead of failing. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warns that the object will be adopted and lists the changes the update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an object whose oid already exists fails and nothing is written. While it is true, destroying the object fails unless force_destroy is set: an adopted object is not Terraform's to delete. Remove it from state with a removed block (lifecycle { destroy = false }) to stop managing it. Defaults to false.
+- `adopt_existing` (Boolean) When an object with the configured oid already exists, adopt it into state and apply the configuration to it as an update instead of failing. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warns that the object will be adopted and lists the changes the update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an object whose oid already exists fails and nothing is written. While it is true, destroying the object fails unless force_destroy is set: an adopted object is not Terraform's to delete. Remove it from state with a removed block (lifecycle { destroy = false }) to stop managing it. Importing a midPoint built-in (oid 00000000-0000-0000-0000-*) records it as adopted (true); any other import records false. Defaults to false.
 - `archetype` (String) OID of the archetype, written as an assignment to it. On read that assignment is shown here (after an import, or when archetype was set); do not also write it as an assignment block.
 - `assignment` (Block List) An assignment (membership, archetype, org). Values are matched to midPoint by content (target, construction, order), not by position. (see [below for nested schema](#nestedblock--assignment))
 - `authorization` (Dynamic) Authorizations (authorization), a list in midPoint naming, e.g. [{ action = ["http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read"] }].
@@ -133,7 +133,7 @@ Optional:
 
 Optional:
 
-- `filter` (String) midPoint text query selecting the target, e.g. name = "vault / operator". midPoint resolves it when the object is written; with a filter only, Terraform knows no dependency on the target, so ordering is up to the configuration.
+- `filter` (String) midPoint text query selecting the target, e.g. name = "vault / operator". midPoint resolves it when the object is written; with a filter only, Terraform knows no dependency on the target, so ordering is up to the configuration. A structured filter stored in midPoint (equal, and, or, not) is read as its text rendering; the provider never rewrites a stored filter unless this value changes.
 - `oid` (String) Target object OID. With a filter and no oid configured, this is computed: the OID midPoint resolved the filter to, recorded on create, update, refresh and import. It is kept while filter, type and relation stay the same, and it is never sent to midPoint (midPoint keeps both the filter and the resolved OID on the reference).
 - `relation` (String) Relation of the reference, e.g. org:manager. Defaults to org:default. A name without a prefix is in the org: namespace, as midPoint stores it: manager is written org:manager.
 - `type` (String) Target object type, e.g. RoleType, ServiceType, OrgType, ArchetypeType.
@@ -168,7 +168,7 @@ Optional:
 
 Optional:
 
-- `filter` (String) midPoint text query selecting the target, e.g. name = "vault / operator". midPoint resolves it when the object is written; with a filter only, Terraform knows no dependency on the target, so ordering is up to the configuration.
+- `filter` (String) midPoint text query selecting the target, e.g. name = "vault / operator". midPoint resolves it when the object is written; with a filter only, Terraform knows no dependency on the target, so ordering is up to the configuration. A structured filter stored in midPoint (equal, and, or, not) is read as its text rendering; the provider never rewrites a stored filter unless this value changes.
 - `oid` (String) Target object OID. With a filter and no oid configured, this is computed: the OID midPoint resolved the filter to, recorded on create, update, refresh and import. It is kept while filter, type and relation stay the same, and it is never sent to midPoint (midPoint keeps both the filter and the resolved OID on the reference).
 - `relation` (String) Relation of the reference, e.g. org:manager. Defaults to org:default. A name without a prefix is in the org: namespace, as midPoint stores it: manager is written org:manager.
 - `type` (String) Target object type, e.g. RoleType, ServiceType, OrgType, ArchetypeType.

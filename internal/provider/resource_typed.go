@@ -365,7 +365,8 @@ func (r *typedResource[S]) Delete(ctx context.Context, req resource.DeleteReques
 }
 
 // ImportState takes the object OID; Read then fills everything from the
-// server.
+// server. A built-in (client.IsBuiltinOID) is recorded as adopted, so that
+// the adopt_existing = true its configuration carries plans clean.
 func (r *typedResource[S]) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if req.ID == "" || strings.ContainsAny(req.ID, "/ ") {
 		resp.Diagnostics.AddError("Invalid import ID",
@@ -375,7 +376,7 @@ func (r *typedResource[S]) ImportState(ctx context.Context, req resource.ImportS
 	for name, v := range map[string]attr.Value{
 		"oid":            types.StringValue(req.ID),
 		"id":             types.StringValue(req.ID),
-		"adopt_existing": types.BoolValue(false),
+		"adopt_existing": types.BoolValue(client.IsBuiltinOID(req.ID)),
 		"force_destroy":  types.BoolValue(false),
 	} {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(name), v)...)

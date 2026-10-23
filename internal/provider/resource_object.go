@@ -376,7 +376,8 @@ func (r *objectResource) Delete(ctx context.Context, req resource.DeleteRequest,
 }
 
 // ImportState takes "<type>/<oid>", e.g. "functionLibraries/<oid>"; Read
-// then fills body from the server.
+// then fills body from the server. A built-in (client.IsBuiltinOID) is
+// recorded as adopted.
 func (r *objectResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	typ, oid, ok := strings.Cut(req.ID, "/")
 	if !ok || !restTypePattern.MatchString(typ) || oid == "" || strings.Contains(oid, "/") {
@@ -388,7 +389,7 @@ func (r *objectResource) ImportState(ctx context.Context, req resource.ImportSta
 		"type":           types.StringValue(typ),
 		"oid":            types.StringValue(oid),
 		"id":             types.StringValue(oid),
-		"adopt_existing": types.BoolValue(false),
+		"adopt_existing": types.BoolValue(client.IsBuiltinOID(oid)),
 		"force_destroy":  types.BoolValue(false),
 	} {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(name), v)...)

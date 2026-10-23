@@ -6,6 +6,8 @@ import (
 	"maps"
 	"slices"
 	"strings"
+
+	"github.com/jplana/terraform-provider-midpoint/internal/client"
 )
 
 // Resource is one object of the catalogue projected onto a resource of the
@@ -55,9 +57,6 @@ type Block struct {
 	Blocks []Block
 }
 
-// builtinPrefix is the oid range of the objects midPoint ships.
-const builtinPrefix = "00000000-0000-0000-0000-"
-
 // kindsByRestType maps a REST type to the typed resource that manages it.
 var kindsByRestType = map[string]string{
 	"roles": "midpoint_role", "services": "midpoint_service", "orgs": "midpoint_org",
@@ -85,7 +84,7 @@ func Project(s Source) (Resource, error) {
 
 	r := Resource{Kind: kindsByRestType[s.RestType], OID: oid, Attrs: map[string]any{}}
 	r.Label = Label(name, oid)
-	r.AdoptExisting = strings.HasPrefix(oid, builtinPrefix)
+	r.AdoptExisting = client.IsBuiltinOID(oid)
 	p := &projector{r: &r, rest: body, path: s.Path}
 
 	switch s.RestType {

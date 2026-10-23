@@ -21,8 +21,8 @@ resource "midpoint_service" "grafana" {
                   script = [
                     {
                       code = chomp(<<-EOT
-                        // Grafana users join the viewers group of their team.
-                        return "grafana-viewers-$${basic.stringify(costCenter)}"
+                        // Grafana users get their own viewers group.
+                        return "grafana-viewers-$${basic.stringify(focus?.name)}"
                       EOT
                       )
                     },

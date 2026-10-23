@@ -241,3 +241,11 @@ func unwrap(doc map[string]any, singular string) (map[string]any, error) {
 	}
 	return found, nil
 }
+
+// BuiltinOIDPrefix is the oid range of the objects midPoint ships
+// (00000000-0000-0000-0000-*).
+const BuiltinOIDPrefix = "00000000-0000-0000-0000-"
+
+// IsBuiltinOID reports whether oid is in the range of the objects midPoint
+// ships, which exist before Terraform creates them.
+func IsBuiltinOID(oid string) bool { return strings.HasPrefix(oid, BuiltinOIDPrefix) }

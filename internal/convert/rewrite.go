@@ -234,7 +234,7 @@ func (w *rewriter) reference(oid, typ, hintRest string, hasFilter bool) (ref any
 		w.note("reference %s is not converted; its filter alone is kept and the oid dropped", oid)
 		return nil, true
 	}
-	if !strings.HasPrefix(oid, builtinPrefix) {
+	if !client.IsBuiltinOID(oid) {
 		w.note("reference %s is not converted and not a built-in object; left as a literal oid", oid)
 		return nil, false
 	}

@@ -83,7 +83,7 @@ func TestRender(t *testing.T) {
 		grafana := byOID(t, rs, "8c2e90b4-17d3-4a65-8f0b-d3a6e15c7b22")
 		svc := dig(services, "resource", "midpoint_service", grafana.Label).(map[string]any)
 		body := svc["inducement"].([]any)[0].(map[string]any)["construction"].(map[string]any)["body"].(string)
-		if !strings.HasPrefix(body, `{"attribute":[`) || !strings.Contains(body, "$${basic.stringify(costCenter)}") {
+		if !strings.HasPrefix(body, `{"attribute":[`) || !strings.Contains(body, "$${basic.stringify(focus?.name)}") {
 			t.Errorf("body without a ref = %s", body)
 		}
 		if got := dig(svc, "archetype"); got != "${midpoint_archetype.platform_item.oid}" {
@@ -101,9 +101,10 @@ func TestRender(t *testing.T) {
 			"name":                    "Big",
 			"connector":               map[string]any{"type": "a.b.Csv"},
 			"connector_configuration": map[string]any{"configurationProperties": map[string]any{"filePath": "/x.csv"}},
-			"schema_handling":         map[string]any{"objectType": []any{map[string]any{"kind": "account", "attribute": attrs, "n": json.Number("2.50"), "yes": "yes", "t": true}}},
-			"synchronization":         map[string]any{"objectSynchronization": attrsWithRef(25)},
-			"schema":                  map[string]any{"definition": xsd, "generation_constraints": map[string]any{"generateObjectClass": []any{"ri:AccountObjectClass"}}},
+			"schema_handling": map[string]any{"objectType": []any{map[string]any{"kind": "account", "attribute": attrs, "n": json.Number("2.50"), "yes": "yes", "t": true,
+				"<<": "merge", "on": "off", "1": "one", "=": "value", "plain": "text"}}},
+			"synchronization": map[string]any{"objectSynchronization": attrsWithRef(25)},
+			"schema":          map[string]any{"definition": xsd, "generation_constraints": map[string]any{"generateObjectClass": []any{"ri:AccountObjectClass"}}},
 		}}
 		target := Resource{Kind: "midpoint_role", Label: "target", OID: opRoleOID, Attrs: map[string]any{"name": "t"}}
 		rs := []Resource{res, target}
@@ -128,7 +129,9 @@ func TestRender(t *testing.T) {
 			t.Error("a small attribute was split")
 		}
 		y := string(files["big/schema_handling.yaml"])
-		if !strings.HasPrefix(y, "objectType:\n  - attribute:\n") || !strings.Contains(y, "n: 2.50\n") || !strings.Contains(y, `yes: "yes"`) {
+		if !strings.HasPrefix(y, "objectType:\n  - \"1\": one\n") || !strings.Contains(y, "\"n\": 2.50\n") || !strings.Contains(y, `"yes": "yes"`) ||
+			!strings.Contains(y, `"<<": merge`) || !strings.Contains(y, `"on": "off"`) || !strings.Contains(y, `"1": one`) ||
+			!strings.Contains(y, `"=": value`) || !strings.Contains(y, "plain: text") {
 			t.Errorf("schema_handling.yaml =\n%s", y)
 		}
 		roundTrip(t, files, rs, nil)

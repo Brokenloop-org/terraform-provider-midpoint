@@ -126,7 +126,11 @@ func yamlNode(v any) (*yaml.Node, error) {
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", k, err)
 			}
-			n.Content = append(n.Content, scalar("!!str", k), e)
+			key := scalar("!!str", k)
+			if yaml11Ambiguous(k) {
+				key.Style = yaml.DoubleQuotedStyle
+			}
+			n.Content = append(n.Content, key, e)
 		}
 		return n, nil
 	case []any:
@@ -159,14 +163,15 @@ func sameJSON(a, b any) bool {
 	return okA && okB && reflect.DeepEqual(na, nb)
 }
 
-// yaml11Ambiguous reports whether the plain scalar s could read as
-// something other than a string to a YAML 1.1 parser (Terraform's
-// yamldecode follows 1.1 in places yaml.v3 does not): a bool word such as
-// yes or off, or anything that starts like a number, a timestamp or a
-// special float. Such strings are written double-quoted.
+// yaml11Ambiguous reports whether the plain scalar s, a value or a map
+// key, could read as something other than a plain string to a YAML 1.1
+// parser (Terraform's yamldecode follows 1.1 in places yaml.v3 does not): a
+// bool word such as yes or off, the merge key << or the value key =, or
+// anything that starts like a number, a timestamp or a special float. Such
+// strings are written double-quoted.
 func yaml11Ambiguous(s string) bool {
 	switch strings.ToLower(s) {
-	case "", "y", "yes", "n", "no", "on", "off", "true", "false", "null", "~":
+	case "", "y", "yes", "n", "no", "on", "off", "true", "false", "null", "~", "<<", "=":
 		return true
 	}
 	return strings.ContainsRune("0123456789+-.", rune(s[0]))
