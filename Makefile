@@ -8,6 +8,7 @@ export MIDPOINT_PASSWORD ?= Test5ecr3t
 
 build:
 	go build ./...
+	go build -o dist/midpoint-convert ./cmd/midpoint-convert
 
 test:
 	go test ./...
