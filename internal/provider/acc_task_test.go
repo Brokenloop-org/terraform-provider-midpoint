@@ -38,7 +38,7 @@ func accTaskSuspended(c *client.Client, addr string) resource.TestCheckFunc {
 	}
 }
 
-// The recompute task of the Task 3 fixture, created suspended: it never
+// The recompute task of the complete example, created suspended: it never
 // runs against the live server.
 func TestAccTask_recomputeSuspended(t *testing.T) {
 	testAccPreCheck(t)

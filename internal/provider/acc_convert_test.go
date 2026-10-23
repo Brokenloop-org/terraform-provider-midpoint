@@ -29,7 +29,7 @@ const (
 	accConvertBuiltinOID  = "00000000-0000-0000-0000-000000000328"
 )
 
-// TestAccConvert_roundTrip runs the migration of spec §5 against midPoint:
+// TestAccConvert_roundTrip runs the migration guide against midPoint:
 // it seeds the fixture catalogue as it is (raw JSON, structured filters on
 // the business roles and in the resource's connectorRef), exports and
 // converts what midPoint holds, plans the converted configuration (imports

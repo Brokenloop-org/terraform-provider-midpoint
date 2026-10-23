@@ -78,10 +78,11 @@ Open `converted/report.md` and work through it as described in
 [The conversion report](#the-conversion-report). Decide for each manual
 follow-up item and each `extra` entry whether to fix the HCL or keep it.
 
-## Step 3: Plan the imports against pre-production
+## Step 3: Plan the imports against a test environment
 
 The import blocks need Terraform 1.5 or later. Point Terraform at the
-`converted` directory, configure the provider for pre-production, then:
+`converted` directory, configure the provider for a non-production server,
+then:
 
 ```shell
 cd converted

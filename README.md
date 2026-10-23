@@ -114,7 +114,7 @@ Both data sources fail when nothing matches or more than one object matches.
 | Rule | Behaviour |
 |---|---|
 | No silent overwrite | Creating an object whose `oid` already exists fails and writes nothing; the error says to import it. |
-| `adopt_existing = true` | The existing object is adopted into state instead, and the configuration is applied to it as an update. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warning lists the changes the update will send. Meant for the midPoint built-ins the catalogue customizes (`00000000-0000-0000-0000-*`). Default `false`. See [Adopting a built-in](#adopting-a-built-in). |
+| `adopt_existing = true` | The existing object is adopted into state instead, and the configuration is applied to it as an update. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warning lists the changes the update will send. Meant for the midPoint built-ins a configuration customizes (`00000000-0000-0000-0000-*`). Default `false`. See [Adopting a built-in](#adopting-a-built-in). |
 | Adopted objects are not destroyed | While a resource has `adopt_existing = true` in state, destroying it (or replacing it) fails and sends nothing: "<type>/<oid> was adopted from midPoint; refusing to delete it". To stop managing it, remove it from state with a `removed { lifecycle { destroy = false } }` block; set `force_destroy = true` to delete it anyway. |
 | `force_destroy = true` | Required to delete a service, role, org or archetype that still has members (objects assigned to it or holding it in `roleMembershipRef`), or a resource that still has shadows. Without it the delete fails and names the first few. `midpoint_object` applies the same check for `roles`, `services`, `orgs`, `archetypes` and `resources`. Marks, tasks and object templates are deleted without a check. It also lifts the refusal to delete an adopted object. Default `false`. |
 | `overwrite` never sent | Only when listed in a resource's `options`. |
@@ -363,11 +363,12 @@ make env-down
   [`examples/data-sources`](examples/data-sources): one example per resource
   and data source, rendered into `docs/`.
 
-## Migrating the JSON catalogue
+## Migrating an existing catalogue
 
-The existing JSON object catalogue is migrated once, keeping every OID, with
-the `midpoint-convert` CLI (`make build` produces `dist/midpoint-convert`). It
-emits HCL plus `import` blocks; the import must then plan clean. See the
+An existing catalogue of midPoint object files (JSON, YAML or XML) can be
+migrated once, keeping every OID, with the `midpoint-convert` CLI (`make
+build` produces `dist/midpoint-convert`). It emits HCL plus `import` blocks;
+the import must then plan clean. See the
 [migration guide](docs/guides/migration.md).
 
 ## License
