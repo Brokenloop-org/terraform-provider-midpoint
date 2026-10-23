@@ -9,6 +9,7 @@ export MIDPOINT_PASSWORD ?= Test5ecr3t
 build:
 	go build ./...
 	go build -o dist/midpoint-convert ./cmd/midpoint-convert
+	go build -o dist/terraform-provider-midpoint .
 
 test:
 	go test ./...

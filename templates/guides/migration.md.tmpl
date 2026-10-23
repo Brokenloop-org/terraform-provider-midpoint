@@ -70,7 +70,7 @@ leaves it as it was.
 | Flag | Meaning |
 |---|---|
 | `--format hcl\|json` | `hcl` (default) or Terraform JSON (`.tf.json`). |
-| `--split-files` | Move large free-form attributes of `midpoint_resource` (`capabilities`, `connector_configuration`, `extra`, `schema_handling`, `synchronization`, over 20 lines) to YAML files next to the HCL, referenced with `yamldecode(file("${path.module}/..."))`, and the schema definition to an XSD file. |
+| `--split-files` | Move large free-form attributes of `midpoint_resource` (`capabilities`, `connector_configuration`, `extra`, `schema_handling`, `synchronization`, over 20 lines) to `<label>/<attribute>.yaml` files next to the HCL, referenced with `yamldecode(file("${path.module}/..."))`, and the schema definition to `<label>/schema.xsd`. An attribute that contains a Terraform reference stays inline, with a comment. |
 
 ## Step 2: Review the conversion report
 
@@ -80,8 +80,8 @@ follow-up item and each `extra` entry whether to fix the HCL or keep it.
 
 ## Step 3: Plan the imports against pre-production
 
-Copy or point Terraform at the `converted` directory, configure the provider
-for pre-production, then:
+The import blocks need Terraform 1.5 or later. Point Terraform at the
+`converted` directory, configure the provider for pre-production, then:
 
 ```shell
 cd converted
@@ -120,8 +120,8 @@ retire the tooling that managed these objects before.
 - **Manual follow-up**: items that need a human decision before
   `terraform apply`. Read this first.
 - **Skipped files**: input files that were not converted, with the reason.
-- **Data lookups**: objects referenced but not in the input, emitted as
-  `data.midpoint_object` blocks.
+- **Data lookups**: built-in objects (OID `00000000-0000-0000-0000-*`)
+  referenced but not in the input, emitted as `data.midpoint_object` blocks.
 - **Converted objects**: one row per source file with its resource address.
 - **Notes by file**: per file, what was dropped as server-managed, what was
   placed in `extra`, how references were rewritten, and other remarks.
@@ -145,8 +145,9 @@ inducement {
 }
 ```
 
-A reference to an object that is not in the input (a built-in object you do
-not customize) becomes a data lookup by OID:
+A reference to a built-in object that is not in the input (OID
+`00000000-0000-0000-0000-*`, an object you do not customize) becomes a data
+lookup by OID:
 
 ```hcl
 data "midpoint_object" "user_2" {
@@ -155,7 +156,11 @@ data "midpoint_object" "user_2" {
 }
 ```
 
-A reference from an object to itself stays a literal OID.
+A reference from an object to itself stays a literal OID. So does a reference
+to any other OID that is neither in the input nor built-in; the report lists
+it under "Notes by file". For each, either add the object's file to the input
+and convert again, or replace the literal with a `data.midpoint_object` lookup
+by hand.
 
 ### Filters are text
 
@@ -167,8 +172,8 @@ the value in the configuration changes.
 ### Built-in objects
 
 Objects with an OID of the form `00000000-0000-0000-0000-*` already exist on
-every server, so a plain create would fail. They are written with
-`adopt_existing = true`:
+every server. The converter writes them with `adopt_existing = true`, and an
+import records the same value, so the imported object plans clean:
 
 ```hcl
 resource "midpoint_archetype" "application_role" {
@@ -178,9 +183,11 @@ resource "midpoint_archetype" "application_role" {
 }
 ```
 
-An adopted object takes the whole configuration: items the HCL does not
-configure are removed on the first apply, and the plan warning lists them.
-Deleting it requires `force_destroy = true`.
+In this guide's flow built-ins are imported, so no adoption warning appears.
+If you apply the HCL to a fresh server without the import blocks, the create
+adopts the existing object: it takes the whole configuration, items the HCL
+does not configure are removed, and the plan warning lists them. Deleting an
+adopted object requires `force_destroy = true`.
 
 ### Imports
 
@@ -205,7 +212,9 @@ and you set `connector { type, version }` by hand.
 
 When `owner` or `binding` is unset in the configuration of an imported task,
 the value midPoint holds stays in state, follows the server, and is neither
-sent nor compared. Set either attribute in the HCL to manage it.
+sent nor compared. Set either attribute in the HCL to manage it. A task
+`ownerRef` that is not a plain user reference by OID is dropped and listed
+under manual follow-up.
 
 ### Items without a typed attribute
 
