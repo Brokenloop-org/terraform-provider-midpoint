@@ -208,6 +208,55 @@ func TestResource_importRecordsConnector(t *testing.T) {
 	})
 }
 
+// An imported resource records a static schema definition (one midPoint
+// holds without schema/cachingMetadata), so the configuration that sets it
+// imports with no change; a cached definition stays unrecorded, so a
+// configuration without schema imports with no change either.
+func TestResource_importRecordsStaticSchemaDefinition(t *testing.T) {
+	const addr = "midpoint_resource.csv"
+	const xsd = `<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"><xsd:complexType name="AccountObjectClass"/></xsd:schema>`
+	for name, tc := range map[string]struct {
+		cached bool
+		attrs  string
+	}{
+		// The converter's form: chomp drops the heredoc's final newline.
+		"static": {attrs: "  schema = {\n    definition = chomp(<<-EOT\n      " + xsd + "\n    EOT\n    )\n  }"},
+		"cached": {cached: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newTestStub(t)
+			schema := map[string]any{"definition": map[string]any{"@ns": "http://www.w3.org/2001/XMLSchema", "schema": xsd}}
+			if tc.cached {
+				schema["cachingMetadata"] = map[string]any{"retrievalTimestamp": "2026-10-23T14:14:33.131Z", "serialNumber": "1"}
+			}
+			s.Put("resources", map[string]any{
+				"oid": stubResourceOID, "name": "csv",
+				"connectorRef":           map[string]any{"oid": stubConnectorOID, "type": "c:ConnectorType", "filter": map[string]any{"text": `connectorType = "` + csvConnectorType + `" and connectorVersion = "2.8"`}},
+				"connectorConfiguration": map[string]any{"configurationProperties": map[string]any{"filePath": "/data/accounts.csv"}},
+				"schema":                 schema,
+				"schemaHandling": map[string]any{"objectType": []any{map[string]any{
+					"kind": "account", "intent": "default", "objectClass": []any{"ri:AccountObjectClass"},
+				}}},
+			})
+			cfg := strings.Replace(resourceConfig(`{
+    objectType = [{
+      kind        = "account"
+      intent      = "default"
+      objectClass = ["ri:AccountObjectClass"]
+    }]
+  }`, tc.attrs), "      \"@ns\"    = \"urn:csv\"\n", "", 1)
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: stubProviderFactories(t, s),
+				Steps: []resource.TestStep{
+					{Config: cfg, ResourceName: addr, ImportState: true, ImportStateId: stubResourceOID, ImportStateKind: resource.ImportBlockWithID},
+					{Config: cfg, ResourceName: addr, ImportState: true, ImportStateId: stubResourceOID, ImportStatePersist: true},
+					{Config: cfg, PlanOnly: true},
+				},
+			})
+		})
+	}
+}
+
 // A resource midPoint stores with a structured connectorRef filter (in
 // either operand order) imports with its connector recorded, plans clean
 // after the import, and an edit of another item never rewrites the

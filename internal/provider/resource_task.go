@@ -136,7 +136,7 @@ const (
 // each one recorded: a configuration that sets them as midPoint holds them
 // (the converter's) imports with no change, and one that leaves them unset
 // keeps the recorded values (importedValue) without comparing them.
-func taskImportRead(s *taskState, actual map[string]any) []string {
+func taskImportRead(s *taskState, actual, _ map[string]any) []string {
 	var markers []string
 	if s.Owner.IsNull() {
 		if oid, ok := ownerOID(actual["ownerRef"]); ok {

@@ -55,10 +55,11 @@ type typedResource[S any] struct {
 	onImport func(ctx context.Context, resp *resource.ImportStateResponse)
 	// importRead sets, on the read that follows an import (importReadKey),
 	// the attributes fromBody reads back only when the prior state sets
-	// them, from actual, the canonical body; it runs after fromBody. Later
+	// them, from actual, the canonical body, and raw, the body as midPoint
+	// returned it (with what Canonical strips); it runs after fromBody. Later
 	// reads keep the comparison rules of fromBody. It returns the private
 	// state keys to set (markers of what it recorded); nil for none.
-	importRead func(s *S, actual map[string]any) (markers []string)
+	importRead func(s *S, actual, raw map[string]any) (markers []string)
 	// observe sets the computed attributes of s from actual, the canonical
 	// body of every read (refresh, import, the read-back after a write),
 	// and with a nil actual to null before a create records the object, so
@@ -347,10 +348,11 @@ func (r *typedResource[S]) Read(ctx context.Context, req resource.ReadRequest, r
 	importing, diags := req.Private.GetKey(ctx, importReadKey)
 	resp.Diagnostics.Append(diags...)
 	var markers []string
-	found, diags := r.observingEngine(&s).readInto(ctx, oid.ValueString(), desired, false, func(actual map[string]any) {
+	eng := r.observingEngine(&s)
+	found, diags := eng.readInto(ctx, oid.ValueString(), desired, false, func(actual map[string]any) {
 		resp.Diagnostics.Append(r.fromBody(ctx, &s, actual)...)
 		if len(importing) > 0 && r.importRead != nil {
-			markers = r.importRead(&s, actual)
+			markers = r.importRead(&s, actual, eng.raw)
 		}
 	})
 	resp.Diagnostics.Append(diags...)

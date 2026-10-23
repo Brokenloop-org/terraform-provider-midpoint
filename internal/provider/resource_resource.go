@@ -170,14 +170,44 @@ func connectorFromRef(ref any) (m connectorModel, ok bool) {
 // state, so that a configuration written from the server object imports
 // with no change. A reference by oid alone leaves it null: the
 // configuration then sets it with one no-op update.
-func resourceImportRead(s *resourceState, actual map[string]any) []string {
-	if !s.Connector.IsNull() {
-		return nil
+func resourceImportRead(s *resourceState, actual, raw map[string]any) []string {
+	if s.Connector.IsNull() {
+		if m, ok := connectorFromRef(actual["connectorRef"]); ok {
+			s.Connector = types.ObjectValueMust(connectorAttrTypes, map[string]attr.Value{"type": m.Type, "version": m.Version})
+		}
 	}
-	if m, ok := connectorFromRef(actual["connectorRef"]); ok {
-		s.Connector = types.ObjectValueMust(connectorAttrTypes, map[string]attr.Value{"type": m.Type, "version": m.Version})
-	}
+	recordStaticSchemaDefinition(s, actual, raw)
 	return nil
+}
+
+// recordStaticSchemaDefinition sets the schema definition of an imported
+// resource from actual when midPoint holds it as configuration: without
+// schema/cachingMetadata in raw, the stamp of a schema it fetched from the
+// connector and cached (Canonical strips it, so only raw tells them apart).
+// A cached definition stays unrecorded, compared only when configured.
+func recordStaticSchemaDefinition(s *resourceState, actual, raw map[string]any) {
+	if rawSchema, _ := raw["schema"].(map[string]any); rawSchema == nil || rawSchema["cachingMetadata"] != nil {
+		return
+	}
+	sch, _ := actual["schema"].(map[string]any)
+	def, _ := sch["definition"].(map[string]any)
+	text, ok := def["schema"].(string)
+	if !ok {
+		return
+	}
+	m := resourceSchemaModel{GenerationConstraints: types.DynamicNull(), Definition: types.StringNull()}
+	if !s.Schema.IsNull() && !s.Schema.IsUnknown() {
+		attrs := s.Schema.Attributes()
+		m.GenerationConstraints, _ = attrs["generation_constraints"].(types.Dynamic)
+		m.Definition, _ = attrs["definition"].(types.String)
+	}
+	if !m.Definition.IsNull() {
+		return
+	}
+	m.Definition = types.StringValue(text)
+	s.Schema = types.ObjectValueMust(resourceSchemaAttrTypes, map[string]attr.Value{
+		"generation_constraints": m.GenerationConstraints, "definition": m.Definition,
+	})
 }
 
 // resourceToBody is the body of s: the simple fields, connectorRef from
