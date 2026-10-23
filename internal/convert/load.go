@@ -71,7 +71,10 @@ var wrapperTypes = func() map[string]string {
 }()
 
 // Load reads every object file below roots (directories or single files) in
-// path order. Files that are not objects are skipped with a Note. Files with
+// path order. Files that are not objects (templates, other extensions, an
+// unknown or missing wrapper key) are skipped with a Note; a JSON, YAML or
+// XML file that cannot be parsed is an error, so a typo never silently drops
+// an object. Files with
 // the same OID and identical canonical content yield one Source; differing
 // content is a *ConflictError.
 func Load(roots []string) ([]Source, []Note, error) {
@@ -148,7 +151,7 @@ func loadFile(p string) (src Source, dropped []string, skip string, err error) {
 	}
 	doc, err := decode(data)
 	if err != nil {
-		return src, nil, "cannot parse: " + err.Error(), nil
+		return src, nil, "", fmt.Errorf("%s: cannot parse: %w", p, err)
 	}
 	if len(doc) != 1 {
 		return src, nil, "not a single wrapped object", nil
@@ -160,37 +163,90 @@ func loadFile(p string) (src Source, dropped []string, skip string, err error) {
 			return src, nil, fmt.Sprintf("top-level key %q is not a known object type", key), nil
 		}
 		src = Source{Path: p, RestType: restType, Body: normalize.Canonical(restType, body)}
-		dropped = droppedItems(restType, nil, body, nil)
+		dropped = droppedItems(body, src.Body)
 	}
 	src.OID, _ = src.Body["oid"].(string)
 	src.Name, _ = src.Body["name"].(string)
-	slices.Sort(dropped)
-	return src, slices.Compact(dropped), "", nil
+	return src, dropped, "", nil
 }
 
-// droppedItems collects the paths in v that normalize.Canonical drops as
-// server-managed.
-func droppedItems(restType string, path []string, v any, out []string) []string {
+// stripPrefix removes the namespace prefix normalize.Canonical strips from
+// item names.
+func stripPrefix(k string) string {
+	for _, p := range []string{"c:", "t:", "q:"} {
+		if strings.HasPrefix(k, p) {
+			return k[len(p):]
+		}
+	}
+	return k
+}
+
+// canonicalPaths collects the item paths (names only, no list indexes) of v.
+// The value is true when the item holds a container, whose children are
+// listed too.
+func canonicalPaths(path []string, v any, out map[string]bool) {
 	switch t := v.(type) {
 	case map[string]any:
 		for k, child := range t {
-			name := k
-			for _, pre := range []string{"c:", "t:", "q:"} {
-				name = strings.TrimPrefix(name, pre)
-			}
-			ip := append(slices.Clip(path), name)
-			if name != "@id" && normalize.IsServerManaged(restType, ip) {
-				out = append(out, strings.Join(ip, "/"))
-				continue
-			}
-			out = droppedItems(restType, ip, child, out)
+			p := append(slices.Clip(path), k)
+			_, isMap := child.(map[string]any)
+			_, isList := child.([]any)
+			out[strings.Join(p, "/")] = isMap || isList
+			canonicalPaths(p, child, out)
 		}
 	case []any:
 		for _, e := range t {
-			out = droppedItems(restType, path, e, out)
+			canonicalPaths(path, e, out)
 		}
 	}
-	return out
+}
+
+// droppedItems lists the items present in raw but absent from canon, the
+// output of normalize.Canonical for raw. Diffing the two keeps the notes in
+// step with Canonical whatever it drops. Only the topmost missing item is
+// listed, extended down a chain of single-key maps (a container Canonical
+// pruned empty is reported by what it held, e.g. "capabilities/native").
+func droppedItems(raw, canon map[string]any) []string {
+	keep := map[string]bool{}
+	canonicalPaths(nil, canon, keep)
+	var out []string
+	var walk func(path []string, v any)
+	walk = func(path []string, v any) {
+		switch t := v.(type) {
+		case map[string]any:
+			for k, child := range t {
+				p := append(slices.Clip(path), stripPrefix(k))
+				container, kept := keep[strings.Join(p, "/")]
+				switch {
+				case !kept:
+					out = append(out, strings.Join(chain(p, child), "/"))
+				case container:
+					walk(p, child)
+				}
+			}
+		case []any:
+			for _, e := range t {
+				walk(path, e)
+			}
+		}
+	}
+	walk(nil, raw)
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// chain extends path through v while v is a map with a single key.
+func chain(path []string, v any) []string {
+	for {
+		m, ok := v.(map[string]any)
+		if !ok || len(m) != 1 {
+			return path
+		}
+		for k, child := range m {
+			path = append(slices.Clip(path), stripPrefix(k))
+			v = child
+		}
+	}
 }
 
 func decodeJSON(data []byte) (map[string]any, error) {

@@ -136,7 +136,6 @@ func TestLoad(t *testing.T) {
 		writeFile(t, filepath.Join(dir, "unknown.json"), `{"widget":{"oid":"33333333-3333-3333-3333-333333333333"}}`)
 		writeFile(t, filepath.Join(dir, "two.json"), `{"role":{},"org":{}}`)
 		writeFile(t, filepath.Join(dir, "README.md"), `# hi`)
-		writeFile(t, filepath.Join(dir, "broken.json"), `{not json`)
 		srcs, notes, err := Load([]string{dir})
 		if err != nil {
 			t.Fatal(err)
@@ -144,9 +143,20 @@ func TestLoad(t *testing.T) {
 		if len(srcs) != 1 || srcs[0].OID != "22222222-2222-2222-2222-222222222222" {
 			t.Fatalf("sources = %+v, want only ok.json", srcs)
 		}
-		for _, f := range []string{"tpl.tmpl.json", "unknown.json", "two.json", "README.md", "broken.json"} {
+		for _, f := range []string{"tpl.tmpl.json", "unknown.json", "two.json", "README.md"} {
 			if !noteFor(notes, f, "skipped") {
 				t.Errorf("no skip note for %s: %v", f, notes)
+			}
+		}
+	})
+
+	t.Run("malformed object file errors", func(t *testing.T) {
+		for _, name := range []string{"broken.json", "broken.yaml", "broken.xml"} {
+			dir := t.TempDir()
+			writeFile(t, filepath.Join(dir, name), "{not: [valid")
+			_, _, err := Load([]string{dir})
+			if err == nil || !strings.Contains(err.Error(), name) {
+				t.Errorf("%s: err = %v, want an error naming the file", name, err)
 			}
 		}
 	})
@@ -179,6 +189,8 @@ func TestLoad(t *testing.T) {
 		writeFile(t, filepath.Join(dir, "r.xml"), `<?xml version="1.0"?>
 <role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3" oid="66666666-6666-6666-6666-666666666666">
   <name>xml role</name>
+  <description xsi:type="xsd:string" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">typed text</description>
+  <activation/>
   <inducement id="1"><targetRef oid="77777777-7777-7777-7777-777777777777" type="c:ServiceType"/></inducement>
   <inducement id="2"><targetRef oid="88888888-8888-8888-8888-888888888888" type="c:ServiceType"/></inducement>
 </role>`)
@@ -193,9 +205,23 @@ func TestLoad(t *testing.T) {
 		if !ok || len(ind) != 2 {
 			t.Fatalf("inducement = %#v, want 2 values", srcs[0].Body["inducement"])
 		}
+		if srcs[0].Body["description"] != "typed text" {
+			t.Errorf("description = %#v, want the text without xsi:type", srcs[0].Body["description"])
+		}
+		if act, ok := srcs[0].Body["activation"].(map[string]any); !ok || len(act) != 0 {
+			t.Errorf("activation = %#v, want {} for an empty element", srcs[0].Body["activation"])
+		}
 		first := ind[0].(map[string]any)
 		if first["@id"] != "1" {
 			t.Errorf("first inducement = %#v, want @id 1", first)
+		}
+	})
+
+	t.Run("xml text with attributes errors", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFile(t, filepath.Join(dir, "r.xml"), `<role oid="99999999-9999-9999-9999-999999999999"><name lang="en">x</name></role>`)
+		if _, _, err := Load([]string{dir}); err == nil {
+			t.Fatal("want an error for text mixed with attributes")
 		}
 	})
 
@@ -227,4 +253,30 @@ func TestLoad(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestRestTypesWrapperKeys(t *testing.T) {
+	// Wrapper keys written out independently of client.SingularOf.
+	want := map[string]string{
+		"accessCertificationCampaigns": "accessCertificationCampaign", "accessCertificationDefinitions": "accessCertificationDefinition",
+		"archetypes": "archetype", "connectorHosts": "connectorHost", "connectors": "connector", "dashboards": "dashboard",
+		"forms": "form", "functionLibraries": "functionLibrary", "genericObjects": "genericObject", "lookupTables": "lookupTable",
+		"marks": "mark", "nodes": "node", "objectCollections": "objectCollection", "objectTemplates": "objectTemplate",
+		"orgs": "org", "policies": "policy", "reports": "report", "resources": "resource", "roles": "role",
+		"securityPolicies": "securityPolicy", "services": "service", "shadows": "shadow", "systemConfigurations": "systemConfiguration",
+		"tasks": "task", "users": "user", "valuePolicies": "valuePolicy",
+	}
+	if len(restTypes) != len(want) {
+		t.Errorf("restTypes has %d entries, table has %d", len(restTypes), len(want))
+	}
+	for _, rt := range restTypes {
+		key, ok := want[rt]
+		if !ok {
+			t.Errorf("%s missing from the table", rt)
+			continue
+		}
+		if wrapperTypes[key] != rt {
+			t.Errorf("wrapper key %q maps to %q, want %q", key, wrapperTypes[key], rt)
+		}
+	}
 }
