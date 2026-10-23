@@ -713,3 +713,44 @@ func TestEngineUpdate_differenceWithoutDeltaWarns(t *testing.T) {
 		t.Errorf("unexpected warnings:\n%s", diagText(diags))
 	}
 }
+
+// TestEngine_structuredServerFilter: a reference midPoint stores with a
+// structured filter whose text rendering is the configured text filter is
+// equal to the configuration; changing another item sends only that item,
+// never a rewrite of the filter or of the container holding it.
+func TestEngine_structuredServerFilter(t *testing.T) {
+	e, s := testEngine(t, testRoleSpec, nil)
+	seeded := seededRole()
+	seeded["inducement"] = []any{map[string]any{"@id": json.Number("1"), "targetRef": map[string]any{
+		"oid": engOtherRoleOID, "type": "c:RoleType", "relation": "org:default",
+		"filter": map[string]any{"equal": map[string]any{"path": "name", "value": "grafana / viewer"}},
+	}}}
+	s.Put("roles", seeded)
+	desired := desiredRole()
+	desired["inducement"] = []any{map[string]any{"targetRef": map[string]any{
+		"type": "c:RoleType", "filter": map[string]any{"text": `name = "grafana / viewer"`},
+	}}}
+
+	actual, _, diags := e.read(context.Background(), engRoleOID)
+	noErrors(t, diags)
+	equal, deltas, err := e.reconcile(context.Background(), desired, actual)
+	if err != nil || !equal || len(deltas) != 0 {
+		t.Fatalf("reconcile = %v, %v, %v; want equal with no deltas", equal, deltas, err)
+	}
+
+	desired["description"] = "new"
+	noErrors(t, e.update(context.Background(), engRoleOID, desired, nil))
+	patches := requests(s, http.MethodPatch)
+	if len(patches) != 1 {
+		t.Fatalf("sent %d PATCHes, want 1", len(patches))
+	}
+	if got := patches[0].Query["options"]; !reflect.DeepEqual(got, []string{"raw"}) {
+		t.Errorf("update options = %v, want [raw] (no reevaluateSearchFilters)", got)
+	}
+	want := map[string]any{"objectModification": map[string]any{"itemDelta": []any{
+		map[string]any{"modificationType": "replace", "path": "description", "value": "new"},
+	}}}
+	if got := asJSON(t, patches[0].Body); !reflect.DeepEqual(got, asJSON(t, want)) {
+		t.Fatalf("PATCH body = %v\nwant %v", got, want)
+	}
+}

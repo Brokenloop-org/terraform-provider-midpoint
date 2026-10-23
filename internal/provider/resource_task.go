@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -101,14 +102,117 @@ func taskFromBody(ctx context.Context, s *taskState, actual map[string]any) diag
 		if prior.Owner.IsNull() {
 			return
 		}
-		if ref, ok := rest["ownerRef"].(map[string]any); ok {
-			if t, ok := refFromJSON(ref); ok && !t.OID.IsNull() && t.Filter.IsNull() &&
-				(t.Type.IsNull() || t.Type.ValueString() == "UserType") && t.Relation.ValueString() == defaultRelation {
-				s.Owner = t.OID
-				delete(rest, "ownerRef")
-			}
+		if oid, ok := ownerOID(rest["ownerRef"]); ok {
+			s.Owner = oid
+			delete(rest, "ownerRef")
 		}
 	})
+}
+
+// ownerOID is the owner attribute that expresses the ownerRef ref: a plain
+// reference to a user by oid; ok is false for anything else.
+func ownerOID(ref any) (types.String, bool) {
+	m, ok := ref.(map[string]any)
+	if !ok {
+		return types.StringNull(), false
+	}
+	t, ok := refFromJSON(m)
+	if !ok || t.OID.IsNull() || !t.Filter.IsNull() ||
+		!(t.Type.IsNull() || t.Type.ValueString() == "UserType") || t.Relation.ValueString() != defaultRelation {
+		return types.StringNull(), false
+	}
+	return t.OID, true
+}
+
+// Private state keys that mark an owner or binding an import recorded
+// from the server rather than the configuration (see importedValue).
+const (
+	importedOwnerKey   = "imported_owner"
+	importedBindingKey = "imported_binding"
+)
+
+// taskImportRead records the owner and binding of an imported task, which
+// taskFromBody reads back only when the prior state sets them, and marks
+// each one recorded: a configuration that sets them as midPoint holds them
+// (the converter's) imports with no change, and one that leaves them unset
+// keeps the recorded values (importedValue) without comparing them.
+func taskImportRead(s *taskState, actual map[string]any) []string {
+	var markers []string
+	if s.Owner.IsNull() {
+		if oid, ok := ownerOID(actual["ownerRef"]); ok {
+			s.Owner = oid
+			markers = append(markers, importedOwnerKey)
+		}
+	}
+	if b, ok := actual["binding"].(string); ok && s.Binding.IsNull() {
+		s.Binding = types.StringValue(b)
+		markers = append(markers, importedBindingKey)
+	}
+	return markers
+}
+
+// importedValue plans owner and binding, which are optional and computed:
+// the configured value when set (and the import marker key is cleared);
+// unset, the state value when an import recorded it (key in private), so
+// that it stays in state, tracking the server, without a change; else null.
+// taskBodyModel leaves an unconfigured value out of the body, so it is
+// never sent nor compared, as for an attribute that is unset.
+type importedValue struct{ key string }
+
+func (m importedValue) Description(context.Context) string {
+	return "Unset, keeps the value an import recorded from midPoint, which is then neither sent nor compared; otherwise null."
+}
+
+func (m importedValue) MarkdownDescription(ctx context.Context) string { return m.Description(ctx) }
+
+func (m importedValue) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if req.Plan.Raw.IsNull() {
+		return // destroy
+	}
+	if !req.ConfigValue.IsNull() {
+		if !req.State.Raw.IsNull() {
+			resp.Diagnostics.Append(resp.Private.SetKey(ctx, m.key, nil)...)
+		}
+		return
+	}
+	resp.PlanValue = types.StringNull()
+	if req.State.Raw.IsNull() || req.StateValue.IsNull() {
+		return
+	}
+	marker, diags := req.Private.GetKey(ctx, m.key)
+	resp.Diagnostics.Append(diags...)
+	if len(marker) > 0 {
+		resp.PlanValue = req.StateValue
+	}
+}
+
+// taskBodyModel is the model a create or update builds the body from: s
+// without the owner and binding config does not set (an imported value
+// importedValue kept in the plan).
+func taskBodyModel(ctx context.Context, s *taskState, config tfsdk.Config) (*taskState, diag.Diagnostics) {
+	var owner, binding types.String
+	var diags diag.Diagnostics
+	diags.Append(config.GetAttribute(ctx, path.Root("owner"), &owner)...)
+	diags.Append(config.GetAttribute(ctx, path.Root("binding"), &binding)...)
+	out := *s
+	if owner.IsNull() {
+		out.Owner = types.StringNull()
+	}
+	if binding.IsNull() {
+		out.Binding = types.StringNull()
+	}
+	return &out, diags
+}
+
+// optionalImportedString is an optional, computed string attribute planned
+// by importedValue with key.
+func optionalImportedString(desc, key string) schema.Attribute {
+	return schema.StringAttribute{
+		Description:   desc,
+		Optional:      true,
+		Computed:      true,
+		PlanModifiers: []planmodifier.String{importedValue{key: key}},
+	}
 }
 
 // replaceUnlessPreexisting requires replacement when
@@ -139,9 +243,10 @@ func NewTaskResource() resource.Resource {
 			map[string]schema.Attribute{
 				"name":        nameAttribute(),
 				"description": optionalString("Description."),
-				"owner": optionalString("OID of the owning user (ownerRef). When unset midPoint makes the calling " +
-					"user the owner, and the owner is not compared. An imported task reads it back as null until it " +
-					"is configured, so a config that sets it plans one no-op update after the import."),
+				"owner": optionalImportedString("OID of the owning user (ownerRef). When unset midPoint makes the "+
+					"calling user the owner, and the owner is not compared. An import records the owner midPoint "+
+					"holds: a config that sets it imports with no change, and while the config leaves it unset the "+
+					"recorded value stays in state, following midPoint, and is neither sent nor compared.", importedOwnerKey),
 				"initial_execution_state": schema.StringAttribute{
 					Description: "Execution state the task is created in: suspended (the default) or runnable. It is " +
 						"written only on create; later suspending or resuming the task in midPoint is not drift. Changing " +
@@ -160,9 +265,10 @@ func NewTaskResource() resource.Resource {
 							"Changing it re-creates a task the provider created; never an imported or adopted one."),
 					},
 				},
-				"binding": optionalString("Binding (binding): loose or tight. When unset midPoint defaults it " +
-					"(loose) and it is not compared. An imported task reads it back as null until it is configured, " +
-					"so a config that sets it plans one no-op update after the import."),
+				"binding": optionalImportedString("Binding (binding): loose or tight. When unset midPoint defaults "+
+					"it (loose) and it is not compared. An import records the binding midPoint holds: a config that "+
+					"sets it imports with no change, and while the config leaves it unset the recorded value stays "+
+					"in state, following midPoint, and is neither sent nor compared.", importedBindingKey),
 				"recurrence": optionalString("Recurrence (recurrence): single or recurring."),
 				"schedule": optionalDynamic("Schedule (schedule) in midPoint naming, e.g. " +
 					"{ recurrence = \"recurring\", interval = 3600 }."),
@@ -173,8 +279,10 @@ func NewTaskResource() resource.Resource {
 		toBody: func(ctx context.Context, s *taskState, create, _ bool) (map[string]any, diag.Diagnostics) {
 			return taskToBody(ctx, s, create)
 		},
-		fromBody: taskFromBody,
-		validate: simpleValidator(taskSpec.ShortName, (*taskState).fields),
+		fromBody:   taskFromBody,
+		importRead: taskImportRead,
+		bodyModel:  taskBodyModel,
+		validate:   simpleValidator(taskSpec.ShortName, (*taskState).fields),
 		onImport: func(ctx context.Context, resp *resource.ImportStateResponse) {
 			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("initial_execution_state"),
 				types.StringValue(executionSuspended))...)

@@ -53,6 +53,12 @@ type typedResource[S any] struct {
 	// onImport sets kind-specific attributes after an import by OID (which
 	// also marks the object preexisting); nil for none.
 	onImport func(ctx context.Context, resp *resource.ImportStateResponse)
+	// importRead sets, on the read that follows an import (importReadKey),
+	// the attributes fromBody reads back only when the prior state sets
+	// them, from actual, the canonical body; it runs after fromBody. Later
+	// reads keep the comparison rules of fromBody. It returns the private
+	// state keys to set (markers of what it recorded); nil for none.
+	importRead func(s *S, actual map[string]any) (markers []string)
 	// observe sets the computed attributes of s from actual, the canonical
 	// body of every read (refresh, import, the read-back after a write),
 	// and with a nil actual to null before a create records the object, so
@@ -80,6 +86,10 @@ func (r *typedResource[S]) configuredModel(ctx context.Context, s *S, config tfs
 // attributes (a task's initial_execution_state) are then not known, and a
 // change to them never re-creates the object.
 const preexistingKey = "preexisting"
+
+// importReadKey is the private state key ImportState sets for the read
+// that follows it; that read removes it.
+const importReadKey = "import_read"
 
 // markPreexisting sets preexistingKey in private.
 func markPreexisting(ctx context.Context, private interface {
@@ -334,12 +344,24 @@ func (r *typedResource[S]) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
+	importing, diags := req.Private.GetKey(ctx, importReadKey)
+	resp.Diagnostics.Append(diags...)
+	var markers []string
 	found, diags := r.observingEngine(&s).readInto(ctx, oid.ValueString(), desired, false, func(actual map[string]any) {
 		resp.Diagnostics.Append(r.fromBody(ctx, &s, actual)...)
+		if len(importing) > 0 && r.importRead != nil {
+			markers = r.importRead(&s, actual)
+		}
 	})
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	if len(importing) > 0 {
+		resp.Diagnostics.Append(resp.Private.SetKey(ctx, importReadKey, nil)...)
+	}
+	for _, key := range markers {
+		resp.Diagnostics.Append(resp.Private.SetKey(ctx, key, []byte("true"))...)
 	}
 	if !found {
 		resp.State.RemoveResource(ctx)
@@ -365,7 +387,8 @@ func (r *typedResource[S]) Delete(ctx context.Context, req resource.DeleteReques
 }
 
 // ImportState takes the object OID; Read then fills everything from the
-// server.
+// server. A built-in (client.IsBuiltinOID) is recorded as adopted, so that
+// the adopt_existing = true its configuration carries plans clean.
 func (r *typedResource[S]) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if req.ID == "" || strings.ContainsAny(req.ID, "/ ") {
 		resp.Diagnostics.AddError("Invalid import ID",
@@ -375,12 +398,13 @@ func (r *typedResource[S]) ImportState(ctx context.Context, req resource.ImportS
 	for name, v := range map[string]attr.Value{
 		"oid":            types.StringValue(req.ID),
 		"id":             types.StringValue(req.ID),
-		"adopt_existing": types.BoolValue(false),
+		"adopt_existing": types.BoolValue(client.IsBuiltinOID(req.ID)),
 		"force_destroy":  types.BoolValue(false),
 	} {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(name), v)...)
 	}
 	resp.Diagnostics.Append(markPreexisting(ctx, resp.Private)...)
+	resp.Diagnostics.Append(resp.Private.SetKey(ctx, importReadKey, []byte("true"))...)
 	if r.onImport != nil {
 		r.onImport(ctx, resp)
 	}

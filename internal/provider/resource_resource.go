@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -118,6 +119,65 @@ func connectorFilter(typ, version string) string {
 		text += " and connectorVersion = " + axiomString(version)
 	}
 	return text
+}
+
+// connectorFilterPattern matches the filter connectorFilter writes; the
+// groups are the quoted type and the optional quoted version.
+var connectorFilterPattern = regexp.MustCompile(`^connectorType = ("(?:[^"\\]|\\.)*")(?: and connectorVersion = ("(?:[^"\\]|\\.)*"))?$`)
+
+// connectorFromRef is the connector attribute whose connectorRef is ref:
+// ok only for a filter-only reference (a resolved oid next to it is
+// allowed) whose filter is exactly the one connectorFilter writes for some
+// type and version, so that the reference compares equal on the next read.
+func connectorFromRef(ref any) (m connectorModel, ok bool) {
+	r, isMap := ref.(map[string]any)
+	if !isMap {
+		return m, false
+	}
+	f, isMap := r["filter"].(map[string]any)
+	if !isMap {
+		return m, false
+	}
+	text, isText := f["text"].(string)
+	if !isText {
+		if text, isText = normalize.FilterText(f); !isText {
+			return m, false
+		}
+	}
+	sub := connectorFilterPattern.FindStringSubmatch(text)
+	if sub == nil {
+		return m, false
+	}
+	unquote := func(q string) string {
+		return strings.NewReplacer(`\\`, `\`, `\"`, `"`).Replace(q[1 : len(q)-1])
+	}
+	typ, version := unquote(sub[1]), ""
+	if sub[2] != "" {
+		version = unquote(sub[2])
+	}
+	if typ == "" || connectorFilter(typ, version) != text {
+		return m, false
+	}
+	m.Type, m.Version = types.StringValue(typ), types.StringNull()
+	if version != "" {
+		m.Version = types.StringValue(version)
+	}
+	return m, true
+}
+
+// resourceImportRead records the connector of an imported resource from
+// its connectorRef filter, which resourceFromBody keeps only from the prior
+// state, so that a configuration written from the server object imports
+// with no change. A reference by oid alone leaves it null: the
+// configuration then sets it with one no-op update.
+func resourceImportRead(s *resourceState, actual map[string]any) []string {
+	if !s.Connector.IsNull() {
+		return nil
+	}
+	if m, ok := connectorFromRef(actual["connectorRef"]); ok {
+		s.Connector = types.ObjectValueMust(connectorAttrTypes, map[string]attr.Value{"type": m.Type, "version": m.Version})
+	}
+	return nil
 }
 
 // resourceToBody is the body of s: the simple fields, connectorRef from
@@ -304,8 +364,9 @@ func NewResourceResource() resource.Resource {
 				"connector": schema.SingleNestedAttribute{
 					Description: "The connector, found by a search filter on connectorType (and connectorVersion when " +
 						"version is set). midPoint resolves the filter when it creates or updates the resource; the " +
-						"OID it finds is connector_oid. An imported resource reads back without it until it is " +
-						"configured, so a config sets it with one no-op update after the import.",
+						"OID it finds is connector_oid. An import records the connector from the connectorRef filter " +
+						"when it is the one this attribute writes; a resource that references its connector by OID " +
+						"alone imports without it, and the config then sets it with one update.",
 					Required: true,
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
@@ -369,8 +430,9 @@ func NewResourceResource() resource.Resource {
 		toBody: func(ctx context.Context, s *resourceState, _, _ bool) (map[string]any, diag.Diagnostics) {
 			return resourceToBody(ctx, s)
 		},
-		fromBody: resourceFromBody,
-		validate: validateResource,
-		observe:  observeConnectorOID,
+		fromBody:   resourceFromBody,
+		importRead: resourceImportRead,
+		validate:   validateResource,
+		observe:    observeConnectorOID,
 	}
 }

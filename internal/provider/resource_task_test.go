@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -107,10 +108,15 @@ func TestTask_createSuspendedByDefault(t *testing.T) {
 				}),
 			},
 			refreshIsClean(),
+			// An import records the owner and binding midPoint set (see
+			// TestTask_importRecordsOwnerAndBinding); with them unset in the
+			// config the import is clean.
 			{
-				ResourceName:      addr,
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName:            addr,
+				ImportState:             true,
+				ImportStateCheck:        checkImportedOwnerAndBinding,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"owner", "binding"},
 			},
 			{
 				Config:          taskConfig("v2", ""),
@@ -315,6 +321,136 @@ func TestTask_importedIsNeverReplaced(t *testing.T) {
 						if n := len(requests(s, m)); n != 0 {
 							return fmt.Errorf("%d %s requests, want none", n, m)
 						}
+					}
+					return nil
+				}),
+			},
+			refreshIsClean(),
+		},
+	})
+}
+
+// checkImportedOwnerAndBinding checks that an imported task recorded the
+// owner and binding serverFillsTask set.
+func checkImportedOwnerAndBinding(st []*terraform.InstanceState) error {
+	a := st[0].Attributes
+	if a["owner"] != accAdministratorOID || a["binding"] != "loose" {
+		return fmt.Errorf("imported owner/binding = %q/%q, want %s/loose", a["owner"], a["binding"], accAdministratorOID)
+	}
+	return nil
+}
+
+// An import records the owner and binding the server holds. A config that
+// sets them as midPoint holds them (the converter's) imports with no
+// change, and so does one that leaves them unset: the recorded values stay
+// in state, unsent and uncompared. Configuring them later is compared as
+// usual, and removing them again plans null.
+func TestTask_importRecordsOwnerAndBinding(t *testing.T) {
+	s := newTestStub(t)
+	const addr = "midpoint_task.t"
+	const otherOwner = "0a000000-0000-4000-8000-0000000000aa"
+	body := map[string]any{"oid": stubTaskOID, "name": "recompute nobody", "description": "v1", "activity": taskActivity,
+		"executionState": "suspended", "schedulingState": "suspended"}
+	serverFillsTask(s, body)
+	withOwner := func(owner string) string {
+		return taskConfig("v1", fmt.Sprintf("  owner   = %q\n  binding = \"loose\"", owner))
+	}
+	unset := taskConfig("v1", "")
+	noWrites := checkStub(func() error {
+		for _, m := range []string{"POST", "DELETE", "PATCH"} {
+			if n := len(requests(s, m)); n != 0 {
+				return fmt.Errorf("%d %s requests, want none", n, m)
+			}
+		}
+		return nil
+	})
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{
+				Config:             unset,
+				ResourceName:       addr,
+				ImportState:        true,
+				ImportStateId:      stubTaskOID,
+				ImportStatePersist: true,
+				ImportStateCheck:   checkImportedOwnerAndBinding,
+			},
+			// (1) set as midPoint holds them: a clean import block
+			{
+				Config:          withOwner(accAdministratorOID),
+				ResourceName:    addr,
+				ImportState:     true,
+				ImportStateId:   stubTaskOID,
+				ImportStateKind: resource.ImportBlockWithID,
+			},
+			// (2) unset: a clean import block too
+			{
+				Config:          unset,
+				ResourceName:    addr,
+				ImportState:     true,
+				ImportStateId:   stubTaskOID,
+				ImportStateKind: resource.ImportBlockWithID,
+			},
+			{
+				Config: unset,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("owner"), knownvalue.StringExact(accAdministratorOID)),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("binding"), knownvalue.StringExact("loose")),
+				},
+				Check: noWrites,
+			},
+			// A change in midPoint to an unset owner is followed, never a
+			// difference.
+			{
+				PreConfig: func() {
+					b := stubBody(s, "tasks", stubTaskOID)
+					b["ownerRef"] = map[string]any{"oid": otherOwner, "type": "c:UserType"}
+					s.Put("tasks", b)
+				},
+				Config:   unset,
+				PlanOnly: true,
+			},
+			{
+				Config: unset,
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("owner"), knownvalue.StringExact(otherOwner)),
+				},
+				Check: noWrites,
+			},
+			// (3) configuring a different owner is an update that sends it
+			{
+				Config: withOwner(accAdministratorOID),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)},
+				},
+				Check: checkStub(func() error {
+					patches := requests(s, "PATCH")
+					if len(patches) != 1 {
+						return fmt.Errorf("want one PATCH, got %d", len(patches))
+					}
+					if got := fmt.Sprint(asJSON(t, patches[0].Body)); !strings.Contains(got, "ownerRef") || strings.Contains(got, "binding") {
+						return fmt.Errorf("PATCH body = %s, want the ownerRef alone", got)
+					}
+					return nil
+				}),
+			},
+			refreshIsClean(),
+			// Configured, then removed: null again, nothing sent.
+			{
+				Config: unset,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("owner"), knownvalue.Null()),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("binding"), knownvalue.Null()),
+				},
+				Check: checkStub(func() error {
+					if n := len(requests(s, "PATCH")); n != 1 {
+						return fmt.Errorf("%d PATCH requests in all, want the one of the owner change", n)
 					}
 					return nil
 				}),
