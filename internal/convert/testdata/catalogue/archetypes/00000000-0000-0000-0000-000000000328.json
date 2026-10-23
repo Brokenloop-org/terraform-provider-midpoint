@@ -1,0 +1,13 @@
+{
+  "archetype": {
+    "oid": "00000000-0000-0000-0000-000000000328",
+    "name": "Application role",
+    "description": "Application roles are basic roles related to applications.",
+    "assignment": {
+      "identifier": "holderType",
+      "assignmentRelation": {
+        "holderType": "#RoleType"
+      }
+    }
+  }
+}

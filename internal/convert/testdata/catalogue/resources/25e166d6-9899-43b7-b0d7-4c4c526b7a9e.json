@@ -1,0 +1,36 @@
+{
+  "resource": {
+    "oid": "25e166d6-9899-43b7-b0d7-4c4c526b7a9e",
+    "name": "Users CSV",
+    "lifecycleState": "active",
+    "connectorRef": {
+      "type": "c:ConnectorType",
+      "filter": {
+        "and": {
+          "equal": [
+            { "path": "connectorType", "value": "com.evolveum.polygon.connector.csv.CsvConnector" },
+            { "path": "connectorVersion", "value": "2.8" }
+          ]
+        }
+      }
+    },
+    "connectorConfiguration": {
+      "@ns": "http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/connector-schema-3",
+      "configurationProperties": {
+        "@ns": "http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon.connector.csv.CsvConnector",
+        "filePath": "/data/users.csv",
+        "encoding": "utf-8",
+        "fieldDelimiter": ",",
+        "uniqueAttribute": "USERNAME",
+        "nameAttribute": "USERNAME"
+      }
+    },
+    "capabilities": {
+      "native": {
+        "schema": {},
+        "create": {},
+        "read": {}
+      }
+    }
+  }
+}

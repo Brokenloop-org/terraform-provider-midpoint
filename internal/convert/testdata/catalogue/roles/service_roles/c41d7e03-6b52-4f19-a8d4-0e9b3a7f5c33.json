@@ -1,0 +1,29 @@
+{
+  "role": {
+    "oid": "c41d7e03-6b52-4f19-a8d4-0e9b3a7f5c33",
+    "name": "grafana / viewer",
+    "description": "Read-only access to Grafana dashboards.",
+    "displayName": "Grafana viewer",
+    "assignment": {
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000328",
+        "relation": "org:default",
+        "type": "c:ArchetypeType"
+      }
+    },
+    "inducement": {
+      "targetRef": {
+        "oid": "8c2e90b4-17d3-4a65-8f0b-d3a6e15c7b22",
+        "relation": "org:default",
+        "type": "c:ServiceType"
+      }
+    },
+    "requestable": true,
+    "roleMembershipRef": [
+      { "oid": "00000000-0000-0000-0000-000000000328", "type": "c:ArchetypeType", "relation": "org:default" }
+    ],
+    "@metadata": {
+      "storage": { "createTimestamp": "2025-03-01T10:15:30.000Z" }
+    }
+  }
+}

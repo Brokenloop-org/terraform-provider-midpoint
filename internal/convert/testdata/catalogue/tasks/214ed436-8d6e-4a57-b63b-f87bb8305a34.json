@@ -1,0 +1,21 @@
+{
+  "task": {
+    "oid": "214ed436-8d6e-4a57-b63b-f87bb8305a34",
+    "name": "Users CSV reconciliation",
+    "executionState": "suspended",
+    "taskIdentifier": "1700000000000-0-1",
+    "binding": "loose",
+    "ownerRef": { "oid": "00000000-0000-0000-0000-000000000002", "type": "c:UserType" },
+    "activity": {
+      "work": {
+        "reconciliation": {
+          "resourceObjects": {
+            "resourceRef": { "oid": "25e166d6-9899-43b7-b0d7-4c4c526b7a9e", "type": "c:ResourceType" },
+            "kind": "account",
+            "intent": "default"
+          }
+        }
+      }
+    }
+  }
+}

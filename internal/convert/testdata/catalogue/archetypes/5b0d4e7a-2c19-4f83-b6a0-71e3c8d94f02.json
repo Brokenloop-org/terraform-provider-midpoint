@@ -1,0 +1,13 @@
+{
+  "archetype": {
+    "oid": "5b0d4e7a-2c19-4f83-b6a0-71e3c8d94f02",
+    "name": "Platform item",
+    "description": "Marks services and business roles of the platform catalogue.",
+    "archetypePolicy": {
+      "display": {
+        "label": "Platform item",
+        "pluralLabel": "Platform items"
+      }
+    }
+  }
+}

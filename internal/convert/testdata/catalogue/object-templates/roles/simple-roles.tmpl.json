@@ -1,0 +1,7 @@
+{
+  "role": {
+    "oid": "${oid}",
+    "name": "${name}",
+    "description": "${description}"
+  }
+}

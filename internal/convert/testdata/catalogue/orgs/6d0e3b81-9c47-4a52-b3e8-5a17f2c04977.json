@@ -1,0 +1,43 @@
+{
+  "org": {
+    "oid": "6d0e3b81-9c47-4a52-b3e8-5a17f2c04977",
+    "name": "Acme Corp / Platform",
+    "displayName": "Acme Corp / Platform",
+    "identifier": "platform",
+    "assignment": [
+      {
+        "targetRef": {
+          "oid": "1a9c5d70-3e84-4b26-9f0d-8c71b4a2e655",
+          "relation": "org:default",
+          "type": "c:OrgType"
+        }
+      },
+      {
+        "targetRef": {
+          "oid": "1a9c5d70-3e84-4b26-9f0d-8c71b4a2e655",
+          "relation": "org:default",
+          "type": "c:OrgType"
+        },
+        "tenantRef": {
+          "oid": "1a9c5d70-3e84-4b26-9f0d-8c71b4a2e655",
+          "type": "c:OrgType"
+        }
+      }
+    ],
+    "inducement": {
+      "targetRef": {
+        "oid": "e7b30a96-4d85-4c21-b1f7-92a05d6c8e44",
+        "relation": "org:default",
+        "type": "c:RoleType"
+      }
+    },
+    "iteration": 0,
+    "iterationToken": "",
+    "operationExecution": [
+      {
+        "status": "success",
+        "timestamp": "2025-03-02T08:00:00.000Z"
+      }
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "role": {
+    "oid": "035d31a5-7403-4aff-86a8-0f941e5a6403",
+    "name": "Security Reviewer",
+    "description": "Provides access to security office tooling.",
+    "displayName": "Security Reviewer",
+    "assignment": {
+      "targetRef": {
+        "oid": "5b0d4e7a-2c19-4f83-b6a0-71e3c8d94f02",
+        "relation": "org:default",
+        "type": "c:ArchetypeType"
+      }
+    },
+    "inducement": {
+      "targetRef": {
+        "type": "c:RoleType",
+        "filter": {
+          "equal": {
+            "path": "name",
+            "value": "vault / operator"
+          }
+        }
+      }
+    },
+    "requestable": false,
+    "riskLevel": "high"
+  }
+}

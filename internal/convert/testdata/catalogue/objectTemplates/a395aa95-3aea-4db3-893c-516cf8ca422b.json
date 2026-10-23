@@ -1,0 +1,20 @@
+{
+  "objectTemplate": {
+    "oid": "a395aa95-3aea-4db3-893c-516cf8ca422b",
+    "name": "Person Object Template",
+    "description": "Generates the full name of a person.",
+    "mapping": [
+      {
+        "name": "fullName",
+        "strength": "weak",
+        "source": [ { "path": "givenName" }, { "path": "familyName" } ],
+        "expression": {
+          "script": {
+            "code": "basic.concatName(givenName, familyName)"
+          }
+        },
+        "target": { "path": "fullName" }
+      }
+    ]
+  }
+}

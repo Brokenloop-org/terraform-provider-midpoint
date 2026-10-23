@@ -1,0 +1,24 @@
+{
+  "role": {
+    "oid": "9a5bdeed-fa50-4a7d-bebc-604e5ddf0298",
+    "name": "vault / operator",
+    "description": "Operate the Vault cluster.",
+    "displayName": "Vault operator",
+    "assignment": {
+      "targetRef": {
+        "oid": "00000000-0000-0000-0000-000000000328",
+        "relation": "org:default",
+        "type": "c:ArchetypeType"
+      }
+    },
+    "inducement": {
+      "targetRef": {
+        "oid": "3f6a1c52-8d0e-4b7a-9a41-5c2e7d9b0a11",
+        "relation": "org:default",
+        "type": "c:ServiceType"
+      }
+    },
+    "requestable": true,
+    "riskLevel": "high"
+  }
+}

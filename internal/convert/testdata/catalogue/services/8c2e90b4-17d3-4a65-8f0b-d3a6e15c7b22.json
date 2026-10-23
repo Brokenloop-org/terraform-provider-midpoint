@@ -1,0 +1,20 @@
+{
+  "service": {
+    "oid": "8c2e90b4-17d3-4a65-8f0b-d3a6e15c7b22",
+    "name": "Grafana",
+    "description": "Dashboards and alerting.",
+    "displayName": "Grafana",
+    "identifier": "grafana",
+    "assignment": {
+      "targetRef": {
+        "oid": "5b0d4e7a-2c19-4f83-b6a0-71e3c8d94f02",
+        "relation": "org:default",
+        "type": "c:ArchetypeType"
+      }
+    },
+    "metadata": {
+      "createTimestamp": "2025-03-01T10:15:30.000Z",
+      "creatorRef": { "oid": "00000000-0000-0000-0000-000000000002", "type": "c:UserType" }
+    }
+  }
+}

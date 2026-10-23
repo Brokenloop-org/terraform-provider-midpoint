@@ -1,0 +1,16 @@
+{
+  "service": {
+    "oid": "3f6a1c52-8d0e-4b7a-9a41-5c2e7d9b0a11",
+    "name": "Vault",
+    "description": "Secrets management platform.",
+    "displayName": "Vault",
+    "identifier": "vault",
+    "assignment": {
+      "targetRef": {
+        "oid": "5b0d4e7a-2c19-4f83-b6a0-71e3c8d94f02",
+        "relation": "org:default",
+        "type": "c:ArchetypeType"
+      }
+    }
+  }
+}
