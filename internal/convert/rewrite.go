@@ -5,9 +5,11 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/jplana/terraform-provider-midpoint/internal/client"
+	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
 )
 
 // Ref is a Terraform expression that stands for a value, e.g.
@@ -46,16 +48,31 @@ func (d DataLookup) Address() string { return "data.midpoint_object." + d.Label 
 //     is kept;
 //   - otherwise with a filter: the oid is dropped and the filter alone
 //     remains, midPoint resolves it;
+//   - no oid, only a filter on the name (name = "x") of a converted object
+//     of the claimed type: the filter is kept and the oid becomes a Ref to
+//     that object, so that Terraform creates it first (midPoint resolves the
+//     filter when the referring object is stored and fails if the target
+//     does not exist yet; the oid it would store is the same);
 //   - otherwise a built-in oid (00000000-0000-0000-0000-*) becomes a Ref to
 //     a data.midpoint_object looked up by oid;
 //   - any other oid stays literal and a note reports it.
 //
 // Notes carry the resource address (e.g. "midpoint_role.vault") as Path.
 func Rewrite(rs []Resource) (out []Resource, data []DataLookup, notes []Note) {
-	w := &rewriter{byOID: map[string]Resource{}, lookups: map[string]string{}, labels: map[string]bool{}}
+	w := &rewriter{byOID: map[string]Resource{}, byName: map[string]*Resource{},
+		lookups: map[string]string{}, labels: map[string]bool{}}
 	for _, r := range rs {
 		if r.OID != "" {
 			w.byOID[r.OID] = r
+		}
+		if name, ok := r.Attrs["name"].(string); ok && r.Kind != "midpoint_object" {
+			key := r.Kind + "\x00" + name
+			if _, dup := w.byName[key]; dup {
+				w.byName[key] = nil // ambiguous: never matched
+			} else {
+				r := r
+				w.byName[key] = &r
+			}
 		}
 	}
 	out = make([]Resource, len(rs))
@@ -68,6 +85,7 @@ func Rewrite(rs []Resource) (out []Resource, data []DataLookup, notes []Note) {
 
 type rewriter struct {
 	byOID   map[string]Resource
+	byName  map[string]*Resource // kind + "\x00" + name; nil when ambiguous
 	cur     Resource
 	lookups map[string]string // oid -> label of its data lookup
 	labels  map[string]bool
@@ -137,6 +155,12 @@ func (w *rewriter) blocks(bs []Block) []Block {
 			}
 			nb.Attrs[k] = v
 		}
+		if _, hasOID := b.Attrs["oid"]; b.Type == "target" && !hasOID && hasFilter {
+			typ, _ := b.Attrs["type"].(string)
+			if ref := w.byNameFilter(typ, b.Attrs["filter"]); ref != nil {
+				nb.Attrs["oid"] = ref
+			}
+		}
 		out[i] = nb
 	}
 	return out
@@ -155,6 +179,15 @@ func (w *rewriter) value(key string, v any) any {
 		out := make(map[string]any, len(t))
 		for _, k := range sortedKeys(t) {
 			out[k] = w.value(k, t[k])
+		}
+		if _, hasOID := t["oid"]; strings.HasSuffix(key, "Ref") && !hasOID && t["filter"] != nil {
+			typ, _ := t["type"].(string)
+			if typ == "" && refKeyTypes[key] != "" {
+				typ = client.SingularOf(refKeyTypes[key])
+			}
+			if ref := w.byNameFilter(typ, t["filter"]); ref != nil {
+				out["oid"] = ref
+			}
 		}
 		return out
 	case []any:
@@ -254,6 +287,46 @@ func (w *rewriter) reference(oid, typ, hintRest string, hasFilter bool) (ref any
 	}
 	return Ref{Address: "data.midpoint_object." + label + ".oid"}, false
 }
+
+// byNameFilter returns a Ref to the converted object of type typ that the
+// filter selects by name (name = "x", as text or structured), with a note;
+// nil when the filter is anything else or no single converted object of
+// that type has the name.
+func (w *rewriter) byNameFilter(typ string, filter any) any {
+	rest, ok := restTypeOf(typ)
+	if !ok {
+		return nil
+	}
+	text, ok := filter.(string)
+	if !ok {
+		m, isMap := filter.(map[string]any)
+		if !isMap {
+			return nil
+		}
+		if text, ok = normalize.FilterText(m); !ok {
+			return nil
+		}
+	}
+	sub := nameFilterPattern.FindStringSubmatch(strings.TrimSpace(text))
+	if sub == nil {
+		return nil
+	}
+	name, err := strconv.Unquote(sub[1])
+	if err != nil {
+		return nil
+	}
+	target := w.byName[kindOf(rest)+"\x00"+name]
+	if target == nil || target.OID == "" || target.OID == w.cur.OID {
+		return nil
+	}
+	addr := target.Kind + "." + target.Label
+	w.note("the filter %s selects the converted %s; its oid is referenced so that Terraform creates it first", text, addr)
+	return Ref{Address: addr + ".oid"}
+}
+
+// nameFilterPattern matches a text filter on the name alone; the group is
+// the quoted name.
+var nameFilterPattern = regexp.MustCompile(`^name = ("(?:[^"\\]|\\.)*")$`)
 
 // dataLabel is the unique label of a lookup: the singular of the REST type,
 // "_", and the oid without its leading zeros (archetype_328).

@@ -42,6 +42,7 @@ resource "midpoint_role" "security_reviewer" {
 
   inducement {
     target {
+      oid    = midpoint_role.vault_operator.oid
       type   = "RoleType"
       filter = "name = \"vault / operator\""
     }

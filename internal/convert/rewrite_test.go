@@ -54,6 +54,7 @@ const (
 	acmeOID    = "1a9c5d70-3e84-4b26-9f0d-8c71b4a2e655"
 	taskOID    = "214ed436-8d6e-4a57-b63b-f87bb8305a34"
 	resOID     = "25e166d6-9899-43b7-b0d7-4c4c526b7a9e"
+	secRoleOID = "035d31a5-7403-4aff-86a8-0f941e5a6403"
 )
 
 func TestRewrite(t *testing.T) {
@@ -164,6 +165,60 @@ func TestRewrite(t *testing.T) {
 		}
 		if len(notes) == 0 {
 			t.Error("no note for the dropped oid")
+		}
+	})
+
+	t.Run("filter on a converted name", func(t *testing.T) {
+		rs := catalogue(t)
+		out, _, notes := Rewrite(rs)
+		op := byOID(t, rs, opRoleOID)
+		tb := targets(byOID(t, out, secRoleOID))
+		if len(tb) != 1 || tb[0].Attrs["oid"] != (Ref{Address: "midpoint_role." + op.Label + ".oid"}) ||
+			tb[0].Attrs["filter"] != `name = "vault / operator"` {
+			t.Errorf("security reviewer target = %+v", tb)
+		}
+		var noted bool
+		for _, n := range notes {
+			noted = noted || strings.Contains(n.Message, "midpoint_role."+op.Label)
+		}
+		if !noted {
+			t.Errorf("no note for the resolved filter: %v", notes)
+		}
+
+		target := func(filter any, typ string) Resource {
+			return Resource{Kind: "midpoint_role", Label: "r", OID: "aaaaaaaa-0000-4000-8000-000000000002", Attrs: map[string]any{},
+				Blocks: []Block{{Type: "inducement", Blocks: []Block{{Type: "target", Attrs: map[string]any{
+					"filter": filter, "type": typ}}}}}}
+		}
+		svc := Resource{Kind: "midpoint_service", Label: "s", OID: "aaaaaaaa-0000-4000-8000-000000000001",
+			Attrs: map[string]any{"name": "Vault"}}
+		for _, tc := range []struct {
+			name   string
+			in     []Resource
+			wantOK bool
+		}{
+			{"text", []Resource{svc, target(`name = "Vault"`, "ServiceType")}, true},
+			{"structured", []Resource{svc, target(map[string]any{"equal": map[string]any{"path": "name", "value": "Vault"}}, "c:ServiceType")}, true},
+			{"other type", []Resource{svc, target(`name = "Vault"`, "RoleType")}, false},
+			{"other name", []Resource{svc, target(`name = "Grafana"`, "ServiceType")}, false},
+			{"not a name filter", []Resource{svc, target(`identifier = "Vault"`, "ServiceType")}, false},
+			{"ambiguous", []Resource{svc, {Kind: "midpoint_service", Label: "s2", OID: "aaaaaaaa-0000-4000-8000-000000000003",
+				Attrs: map[string]any{"name": "Vault"}}, target(`name = "Vault"`, "ServiceType")}, false},
+		} {
+			out, _, _ := Rewrite(tc.in)
+			got := targets(out[len(out)-1])[0].Attrs["oid"]
+			if want := (Ref{Address: "midpoint_service.s.oid"}); tc.wantOK && got != want || !tc.wantOK && got != nil {
+				t.Errorf("%s: oid = %v", tc.name, got)
+			}
+		}
+
+		// a reference map in a free-form attribute
+		task := Resource{Kind: "midpoint_task", Label: "t", OID: "aaaaaaaa-0000-4000-8000-000000000004", Attrs: map[string]any{
+			"activity": map[string]any{"objectRef": map[string]any{"type": "ServiceType", "filter": `name = "Vault"`}}}}
+		out, _, _ = Rewrite([]Resource{svc, task})
+		ref := out[1].Attrs["activity"].(map[string]any)["objectRef"].(map[string]any)
+		if ref["oid"] != (Ref{Address: "midpoint_service.s.oid"}) || ref["filter"] != `name = "Vault"` {
+			t.Errorf("objectRef = %v", ref)
 		}
 	})
 
