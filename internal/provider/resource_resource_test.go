@@ -208,6 +208,73 @@ func TestResource_importRecordsConnector(t *testing.T) {
 	})
 }
 
+// A resource midPoint stores with a structured connectorRef filter (in
+// either operand order) imports with its connector recorded, plans clean
+// after the import, and an edit of another item never rewrites the
+// connectorRef.
+func TestResource_importStructuredConnectorRefPlansClean(t *testing.T) {
+	const addr = "midpoint_resource.csv"
+	for name, conds := range map[string][]any{
+		"type first":    {map[string]any{"path": "connectorType", "value": csvConnectorType}, map[string]any{"path": "connectorVersion", "value": "2.8"}},
+		"version first": {map[string]any{"path": "connectorVersion", "value": "2.8"}, map[string]any{"path": "connectorType", "value": csvConnectorType}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newTestStub(t)
+			storedRef := map[string]any{"oid": stubConnectorOID, "type": "c:ConnectorType",
+				"filter": map[string]any{"and": map[string]any{"equal": conds}}}
+			s.Put("resources", map[string]any{
+				"oid": stubResourceOID, "name": "csv",
+				"connectorRef":           storedRef,
+				"connectorConfiguration": map[string]any{"configurationProperties": map[string]any{"filePath": "/data/accounts.csv"}},
+				"schemaHandling": map[string]any{"objectType": []any{map[string]any{
+					"kind": "account", "intent": "default", "objectClass": []any{"ri:AccountObjectClass"},
+				}}},
+			})
+			cfg := func(attrs string) string {
+				c := resourceConfig(`{
+    objectType = [{
+      kind        = "account"
+      intent      = "default"
+      objectClass = ["ri:AccountObjectClass"]
+    }]
+  }`, attrs)
+				return strings.Replace(c, "      \"@ns\"    = \"urn:csv\"\n", "", 1)
+			}
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: stubProviderFactories(t, s),
+				Steps: []resource.TestStep{
+					{Config: cfg(""), ResourceName: addr, ImportState: true, ImportStateId: stubResourceOID, ImportStateKind: resource.ImportBlockWithID},
+					{Config: cfg(""), ResourceName: addr, ImportState: true, ImportStateId: stubResourceOID, ImportStatePersist: true},
+					{Config: cfg(""), PlanOnly: true},
+					{
+						Config: cfg(`  description = "edited"`),
+						ConfigPlanChecks: resource.ConfigPlanChecks{
+							PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)},
+						},
+						Check: checkStub(func() error {
+							patches := requests(s, "PATCH")
+							if len(patches) != 1 {
+								return fmt.Errorf("want one PATCH, got %d", len(patches))
+							}
+							want := asJSON(t, map[string]any{"objectModification": map[string]any{"itemDelta": []any{
+								map[string]any{"modificationType": "add", "path": "description", "value": "edited"},
+							}}})
+							if got := asJSON(t, patches[0].Body); !reflect.DeepEqual(got, want) {
+								return fmt.Errorf("PATCH body = %v, want %v", got, want)
+							}
+							if got := asJSON(t, stubBody(s, "resources", stubResourceOID)["connectorRef"]); !reflect.DeepEqual(got, asJSON(t, storedRef)) {
+								return fmt.Errorf("stored connectorRef = %v, want it unchanged %v", got, storedRef)
+							}
+							return nil
+						}),
+					},
+					refreshIsClean(),
+				},
+			})
+		})
+	}
+}
+
 func TestConnectorFromRef(t *testing.T) {
 	const typ = `com.evolveum.polygon.connector.csv.CsvConnector`
 	text := func(s string) map[string]any { return map[string]any{"filter": map[string]any{"text": s}} }
@@ -225,6 +292,10 @@ func TestConnectorFromRef(t *testing.T) {
 		{"escaped", text(connectorFilter(`a"b\c`, "1")), `a"b\c`, "1", true, false},
 		{"structured", map[string]any{"filter": map[string]any{"equal": map[string]any{
 			"path": "connectorType", "value": typ}}}, typ, "", true, true},
+		{"structured and, version first", map[string]any{"filter": map[string]any{"and": map[string]any{"equal": []any{
+			map[string]any{"path": "connectorVersion", "value": "2.8"},
+			map[string]any{"path": "connectorType", "value": typ},
+		}}}}, typ, "2.8", true, false},
 		{"oid only", map[string]any{"oid": stubConnectorOID}, "", "", false, false},
 		{"other filter", text(`connectorType = "x" and connectorHostRef matches (oid = "y")`), "", "", false, false},
 		{"other spacing", text(`connectorType="x"`), "", "", false, false},
