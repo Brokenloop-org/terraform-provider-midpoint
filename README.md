@@ -365,13 +365,10 @@ make env-down
 
 ## Migrating the JSON catalogue
 
-The existing JSON object catalogue is to be migrated once, keeping every OID,
-with the `midpoint-convert` CLI. It emits HCL plus `import` blocks; the import
-must then plan clean. Its design and implementation plan are in
-[`docs/superpowers/plans/2026-10-22-midpoint-convert.md`](docs/superpowers/plans/2026-10-22-midpoint-convert.md)
-(see also the design spec,
-[`docs/superpowers/specs/2026-10-22-midpoint-provider-design.md`](docs/superpowers/specs/2026-10-22-midpoint-provider-design.md),
-§4.6 and §5).
+The existing JSON object catalogue is migrated once, keeping every OID, with
+the `midpoint-convert` CLI (`make build` produces `dist/midpoint-convert`). It
+emits HCL plus `import` blocks; the import must then plan clean. See the
+[migration guide](docs/guides/migration.md).
 
 ## License
 
