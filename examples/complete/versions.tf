@@ -3,7 +3,7 @@ terraform {
 
   required_providers {
     midpoint = {
-      source = "jplana/midpoint"
+      source = "brokenloop-org/midpoint"
     }
   }
 }

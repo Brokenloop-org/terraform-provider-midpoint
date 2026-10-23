@@ -11,8 +11,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/client"
-	"github.com/jplana/terraform-provider-midpoint/internal/mpstub"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/client"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/mpstub"
 )
 
 const (

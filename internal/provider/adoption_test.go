@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/mpstub"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/mpstub"
 )
 
 // planDiagRecorder wraps the provider server and records the diagnostics of

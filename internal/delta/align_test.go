@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/normalize"
 )
 
 // mustJSON decodes s with json.Number numbers, like canonical bodies.

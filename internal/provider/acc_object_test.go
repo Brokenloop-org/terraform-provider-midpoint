@@ -14,8 +14,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/client"
-	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/client"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/normalize"
 )
 
 // endUserRoleOID is midPoint's built-in End user role.

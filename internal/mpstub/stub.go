@@ -20,7 +20,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/client"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/client"
 )
 
 // restPath is the REST base path the client appends to the server URL.

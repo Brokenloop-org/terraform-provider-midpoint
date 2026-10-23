@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/normalize"
 )
 
 // commonAttributes are the attributes every midPoint resource has:

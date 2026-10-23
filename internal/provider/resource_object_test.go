@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/mpstub"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/mpstub"
 )
 
 const (
