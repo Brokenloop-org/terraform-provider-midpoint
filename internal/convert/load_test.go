@@ -66,7 +66,7 @@ func TestLoad(t *testing.T) {
 			{"9a5bdeed-fa50-4a7d-bebc-604e5ddf0298", "roles", "vault / operator"},
 			{oidTenant, "orgs", "Acme Corp"},
 			{oidBuiltin, "archetypes", "Application role"},
-			{"a395aa95-3aea-4db3-893c-516cf8ca422b", "objectTemplates", "Person Object Template"},
+			{"a395aa95-3aea-4db3-893c-516cf8ca422b", "objectTemplates", "Acme Person Template"},
 			{"26d8fa29-0eb4-412b-93bb-da9ecfbb8a1a", "marks", "Missing from CSV - review"},
 			{"214ed436-8d6e-4a57-b63b-f87bb8305a34", "tasks", "Users CSV reconciliation"},
 			{oidResource, "resources", "Users CSV"},

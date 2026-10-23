@@ -292,7 +292,7 @@ func TestProject(t *testing.T) {
 
 	t.Run("object template and mark", func(t *testing.T) {
 		r := fixture(t, "a395aa95-3aea-4db3-893c-516cf8ca422b")
-		if r.Kind != "midpoint_object_template" || r.Label != "person_object_template" {
+		if r.Kind != "midpoint_object_template" || r.Label != "acme_person_template" {
 			t.Errorf("kind/label = %s/%s", r.Kind, r.Label)
 		}
 		mapping, _ := r.Attrs["mapping"].([]any)

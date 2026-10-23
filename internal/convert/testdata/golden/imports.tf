@@ -24,7 +24,7 @@ import {
 }
 
 import {
-  to = midpoint_object_template.person_object_template
+  to = midpoint_object_template.acme_person_template
   id = "a395aa95-3aea-4db3-893c-516cf8ca422b"
 }
 

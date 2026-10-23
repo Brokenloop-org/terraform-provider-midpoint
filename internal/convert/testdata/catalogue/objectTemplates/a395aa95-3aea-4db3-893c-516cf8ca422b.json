@@ -1,7 +1,7 @@
 {
   "objectTemplate": {
     "oid": "a395aa95-3aea-4db3-893c-516cf8ca422b",
-    "name": "Person Object Template",
+    "name": "Acme Person Template",
     "description": "Generates the full name of a person.",
     "mapping": [
       {
