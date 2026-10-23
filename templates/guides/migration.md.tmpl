@@ -162,12 +162,34 @@ it under "Notes by file". For each, either add the object's file to the input
 and convert again, or replace the literal with a `data.midpoint_object` lookup
 by hand.
 
+Objects that reference each other in a cycle (A to B to A, or longer, such as
+an archetype whose object template refers back to the archetype) cannot be
+ordered by Terraform. The converter breaks each cycle: one reference of the
+cycle (the one from the lexically largest `source → target` pair) stays a
+literal OID, and the report notes it on the source object, naming both ends
+and the whole cycle. In this guide's flow the objects already exist, so the
+literal OID changes nothing. On a server where they do not exist yet,
+Terraform does not wait for the target of that one reference.
+
 ### Filters are text
 
-Structured `equal`, `and`, `or` and `not` filters stored in midPoint are read
-back as their text (Axiom) rendering, so the HCL carries text filters such as
-`name = "grafana / viewer"`. The provider never rewrites a stored filter unless
-the value in the configuration changes.
+Structured filters stored in midPoint, built of `equal` conditions joined by
+`and`, `or` and `not`, are read back as their text (Axiom) rendering, so the
+HCL carries text filters such as `name = "grafana / viewer"`. The operands of
+`and` and `or` are sorted in the rendering, so their stored order does not
+matter.
+
+When the rendering of a stored structured filter equals the text filter in
+the configuration, the provider treats the two as equal: the import plans
+clean, and an apply that changes another attribute of the object (its
+description, say) sends only that change. The stored filter stays in its
+structured form and is never rewritten. Changing the `filter` value in the
+HCL is a change the plan shows, and the apply writes the new text filter.
+
+A stored filter that has no text rendering (for example a `substring` or a
+`matching` rule) is not converted to a `filter` attribute: the whole
+assignment or inducement holding it is placed in `extra` and listed in the
+report.
 
 ### Built-in objects
 
@@ -203,7 +225,10 @@ import {
 ### Resource connectors
 
 An imported `midpoint_resource` gets its `connector` (`type`, `version`) from
-a `connectorRef` that filters on connector type and version. A `connectorRef`
+a `connectorRef` that filters on connector type and version, as a text filter
+or a structured one with the conditions in either order. Like any other
+filter, a structured `connectorRef` filter that renders to the configured
+connector is never rewritten. A `connectorRef`
 that holds only an OID cannot be converted, because `connector_oid` is
 computed and cannot be configured; the report lists it under manual follow-up
 and you set `connector { type, version }` by hand.
@@ -225,10 +250,8 @@ extra". Server-managed items in the input are dropped and listed under
 
 ## Known limitations
 
-- **Reference cycles.** Only self-references are left literal. Two objects that
-  reference each other (A to B to A) become a Terraform dependency cycle, and
-  `terraform plan` fails with a cycle error. Break it by hand, for example by
-  replacing one reference with a literal OID.
+- **Reference cycles.** One reference per cycle is left as a literal OID (see
+  [References](#references)), so it creates no Terraform dependency.
 - **OID-only `connectorRef`.** See [Resource connectors](#resource-connectors).
 - **Strings in another Unicode form.** The provider compares strictly. If
   midPoint returns a string in a different Unicode normal form than the file

@@ -133,7 +133,7 @@ Optional:
 
 Optional:
 
-- `filter` (String) midPoint text query selecting the target, e.g. name = "vault / operator". midPoint resolves it when the object is written; with a filter only, Terraform knows no dependency on the target, so ordering is up to the configuration. A structured filter stored in midPoint (equal, and, or, not) is read as its text rendering; the provider never rewrites a stored filter unless this value changes.
+- `filter` (String) midPoint text query selecting the target, e.g. name = "vault / operator". midPoint resolves it when the object is written; with a filter only, Terraform knows no dependency on the target, so ordering is up to the configuration. A structured filter stored in midPoint (equal conditions joined by and, or, not) is read as its text rendering, with the operands of and/or sorted; when that rendering equals this value the stored filter counts as equal and is never rewritten, also when another item of the object changes. A stored filter that has no text rendering is not read into this block: the item holding the reference stays in extra.
 - `oid` (String) Target object OID. With a filter and no oid configured, this is computed: the OID midPoint resolved the filter to, recorded on create, update, refresh and import. It is kept while filter, type and relation stay the same, and it is never sent to midPoint (midPoint keeps both the filter and the resolved OID on the reference).
 - `relation` (String) Relation of the reference, e.g. org:manager. Defaults to org:default. A name without a prefix is in the org: namespace, as midPoint stores it: manager is written org:manager.
 - `type` (String) Target object type, e.g. RoleType, ServiceType, OrgType, ArchetypeType.
@@ -168,7 +168,7 @@ Optional:
 
 Optional:
 
-- `filter` (String) midPoint text query selecting the target, e.g. name = "vault / operator". midPoint resolves it when the object is written; with a filter only, Terraform knows no dependency on the target, so ordering is up to the configuration. A structured filter stored in midPoint (equal, and, or, not) is read as its text rendering; the provider never rewrites a stored filter unless this value changes.
+- `filter` (String) midPoint text query selecting the target, e.g. name = "vault / operator". midPoint resolves it when the object is written; with a filter only, Terraform knows no dependency on the target, so ordering is up to the configuration. A structured filter stored in midPoint (equal conditions joined by and, or, not) is read as its text rendering, with the operands of and/or sorted; when that rendering equals this value the stored filter counts as equal and is never rewritten, also when another item of the object changes. A stored filter that has no text rendering is not read into this block: the item holding the reference stays in extra.
 - `oid` (String) Target object OID. With a filter and no oid configured, this is computed: the OID midPoint resolved the filter to, recorded on create, update, refresh and import. It is kept while filter, type and relation stay the same, and it is never sent to midPoint (midPoint keeps both the filter and the resolved OID on the reference).
 - `relation` (String) Relation of the reference, e.g. org:manager. Defaults to org:default. A name without a prefix is in the org: namespace, as midPoint stores it: manager is written org:manager.
 - `type` (String) Target object type, e.g. RoleType, ServiceType, OrgType, ArchetypeType.

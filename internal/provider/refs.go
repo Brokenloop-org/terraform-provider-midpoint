@@ -50,7 +50,7 @@ func targetBlock() schema.SingleNestedBlock {
 					"midPoint (equal conditions joined by and, or, not) is read as its text rendering, with the " +
 					"operands of and/or sorted; when that rendering equals this value the stored filter counts as " +
 					"equal and is never rewritten, also when another item of the object changes. A stored filter " +
-					"that has no text rendering is not read into this block: the reference stays in extra.",
+					"that has no text rendering is not read into this block: the item holding the reference stays in extra.",
 				Optional: true,
 			},
 			"type": schema.StringAttribute{
