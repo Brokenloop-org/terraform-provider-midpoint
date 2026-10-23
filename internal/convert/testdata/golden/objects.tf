@@ -1,0 +1,23 @@
+resource "midpoint_object" "naming_functions" {
+  type = "functionLibraries"
+  oid  = "7e2b8f10-5a36-4d94-a0c7-3b69d1e48f77"
+
+  body = {
+    description = "Helpers for generating names."
+    function = [
+      {
+        name = "upperFirst"
+        parameter = [
+          { name = "value", type = "xsd:string" },
+        ]
+        returnType = "xsd:string"
+        script = [
+          {
+            code = "value == null ? null : value.substring(0, 1).toUpperCase() + value.substring(1)"
+          },
+        ]
+      },
+    ]
+    name = "Naming functions"
+  }
+}

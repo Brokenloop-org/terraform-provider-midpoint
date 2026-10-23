@@ -12,9 +12,37 @@
         "type": "c:ArchetypeType"
       }
     },
+    "inducement": [
+      {
+        "construction": {
+          "resourceRef": {
+            "oid": "25e166d6-9899-43b7-b0d7-4c4c526b7a9e",
+            "type": "c:ResourceType"
+          },
+          "kind": "account",
+          "intent": "default",
+          "attribute": [
+            {
+              "ref": "ri:GROUPS",
+              "outbound": {
+                "strength": "strong",
+                "expression": {
+                  "script": {
+                    "code": "// Grafana users join the viewers group of their team.\nreturn \"grafana-viewers-${basic.stringify(costCenter)}\""
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ],
     "metadata": {
       "createTimestamp": "2025-03-01T10:15:30.000Z",
-      "creatorRef": { "oid": "00000000-0000-0000-0000-000000000002", "type": "c:UserType" }
+      "creatorRef": {
+        "oid": "00000000-0000-0000-0000-000000000002",
+        "type": "c:UserType"
+      }
     }
   }
 }

@@ -23,11 +23,12 @@ docs:
 	go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name terraform-provider-midpoint
 
 # validate-examples builds the provider into dist/ and runs terraform init and
-# validate on every example directory against it, through a dev_overrides CLI
-# config. Each directory is validated standalone, in a temporary copy; one
-# without a required_providers block gets one for jplana/midpoint. Output is
-# shown only for a directory that fails.
-EXAMPLE_DIRS = examples/complete examples/provider $(wildcard examples/resources/*) $(wildcard examples/data-sources/*)
+# validate on every example directory, and on the converter's golden output,
+# against it, through a dev_overrides CLI config. Each directory is validated
+# standalone, in a temporary copy; one without a required_providers block gets
+# one for jplana/midpoint. Output is shown only for a directory that fails.
+EXAMPLE_DIRS = examples/complete examples/provider $(wildcard examples/resources/*) $(wildcard examples/data-sources/*) \
+	internal/convert/testdata/golden
 
 validate-examples:
 	go build -o ./dist/terraform-provider-midpoint .

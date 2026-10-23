@@ -8,8 +8,14 @@
       "filter": {
         "and": {
           "equal": [
-            { "path": "connectorType", "value": "com.evolveum.polygon.connector.csv.CsvConnector" },
-            { "path": "connectorVersion", "value": "2.8" }
+            {
+              "path": "connectorType",
+              "value": "com.evolveum.polygon.connector.csv.CsvConnector"
+            },
+            {
+              "path": "connectorVersion",
+              "value": "2.8"
+            }
           ]
         }
       }
@@ -24,6 +30,55 @@
         "uniqueAttribute": "USERNAME",
         "nameAttribute": "USERNAME"
       }
+    },
+    "schemaHandling": {
+      "objectType": [
+        {
+          "kind": "account",
+          "intent": "default",
+          "displayName": "Default account",
+          "default": true,
+          "delineation": {
+            "objectClass": "ri:AccountObjectClass"
+          },
+          "focus": {
+            "type": "c:UserType"
+          },
+          "attribute": [
+            {
+              "ref": "ri:USERNAME",
+              "outbound": {
+                "strength": "strong",
+                "source": [
+                  {
+                    "path": "name"
+                  }
+                ],
+                "expression": {
+                  "script": {
+                    "code": "// The login is the lower-cased midPoint name.\nname?.toLowerCase()"
+                  }
+                }
+              }
+            },
+            {
+              "ref": "ri:DISPLAY_NAME",
+              "outbound": {
+                "source": [
+                  {
+                    "path": "fullName"
+                  }
+                ],
+                "expression": {
+                  "script": {
+                    "code": "def n = fullName?.orig\nreturn n ? \"${n} (CSV)\" : null\n"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
     },
     "capabilities": {
       "native": {
