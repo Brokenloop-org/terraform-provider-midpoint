@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
@@ -43,12 +44,13 @@ func TestAccTask_recomputeSuspended(t *testing.T) {
 	testAccPreCheck(t)
 	c := accClient(t)
 	name := acctest.RandomWithPrefix("tf-acc-task")
-	cfg := func(desc string) string {
+	cfg := func(desc string, attrs ...string) string {
 		return fmt.Sprintf(`
 resource "midpoint_task" "recompute" {
   name                    = %q
   description             = %q
   initial_execution_state = "suspended"
+%s
   activity = {
     work = {
       recomputation = {
@@ -60,7 +62,7 @@ resource "midpoint_task" "recompute" {
     }
   }
 }
-`, name, desc)
+`, name, desc, strings.Join(attrs, "\n"))
 	}
 	const addr = "midpoint_task.recompute"
 	resource.Test(t, resource.TestCase{
@@ -92,9 +94,12 @@ resource "midpoint_task" "recompute" {
 				),
 			},
 			emptyPlanAfterRefresh(),
-			{ResourceName: addr, ImportState: true, ImportStateVerify: true},
+			// An import records the owner (the caller) and binding midPoint
+			// set; a config that sets them as midPoint holds them imports
+			// with no change.
+			{ResourceName: addr, ImportState: true, ImportStateVerify: true, ImportStateVerifyIgnore: []string{"owner", "binding"}},
 			{
-				Config:          cfg("second"),
+				Config:          cfg("second", fmt.Sprintf("  owner = %q", accAdministratorOID), `  binding = "loose"`),
 				ResourceName:    addr,
 				ImportState:     true,
 				ImportStateKind: resource.ImportBlockWithID,

@@ -160,21 +160,91 @@ resource "midpoint_resource" "any_version" {
 				),
 			},
 			refreshIsClean(),
-			// An import reads back no connector (connector_oid holds the
-			// reference) and no schema definition (compared only when
-			// configured: it is usually the schema midPoint cached), and
-			// the single objectClass in canonical (list) form.
+			// An import reads the connector back from the connectorRef
+			// filter, the configuration properties without their "@ns"
+			// annotation, no schema definition (compared only when
+			// configured: it is usually the schema midPoint cached), and the
+			// single objectClass in canonical (list) form.
 			{
 				ResourceName:      addr,
 				ImportState:       true,
 				ImportStateVerify: true,
 				ImportStateVerifyIgnore: []string{
-					"connector", "schema.definition", "schema_handling.objectType.0.objectClass",
+					"connector_configuration.configurationProperties.%",
+					"connector_configuration.configurationProperties.@ns",
+					"schema.definition", "schema_handling.objectType.0.objectClass",
 				},
 			},
 		},
 		CheckDestroy: checkGone(s, "resources", &oid),
 	})
+}
+
+// An imported resource records the connector its connectorRef filter
+// selects, so the configuration that set it imports with no change.
+func TestResource_importRecordsConnector(t *testing.T) {
+	s := newTestStub(t)
+	const addr = "midpoint_resource.csv"
+	cfg := resourceConfig(`{
+    objectType = [{
+      kind        = "account"
+      intent      = "default"
+      objectClass = ["ri:AccountObjectClass"]
+    }]
+  }`, "")
+	// "@ns" is an annotation an import cannot read back.
+	cfg = strings.Replace(cfg, "      \"@ns\"    = \"urn:csv\"\n", "", 1)
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{Config: cfg},
+			{
+				Config:          cfg,
+				ResourceName:    addr,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithID,
+			},
+		},
+	})
+}
+
+func TestConnectorFromRef(t *testing.T) {
+	const typ = `com.evolveum.polygon.connector.csv.CsvConnector`
+	text := func(s string) map[string]any { return map[string]any{"filter": map[string]any{"text": s}} }
+	tests := []struct {
+		name          string
+		ref           any
+		typ, version  string
+		wantOK        bool
+		wantNoVersion bool
+	}{
+		{"type and version", text(connectorFilter(typ, "2.8")), typ, "2.8", true, false},
+		{"type only", text(connectorFilter(typ, "")), typ, "", true, true},
+		{"resolved oid kept", map[string]any{"oid": stubConnectorOID, "type": "ConnectorType",
+			"filter": map[string]any{"text": connectorFilter(typ, "2.8")}}, typ, "2.8", true, false},
+		{"escaped", text(connectorFilter(`a"b\c`, "1")), `a"b\c`, "1", true, false},
+		{"structured", map[string]any{"filter": map[string]any{"equal": map[string]any{
+			"path": "connectorType", "value": typ}}}, typ, "", true, true},
+		{"oid only", map[string]any{"oid": stubConnectorOID}, "", "", false, false},
+		{"other filter", text(`connectorType = "x" and connectorHostRef matches (oid = "y")`), "", "", false, false},
+		{"other spacing", text(`connectorType="x"`), "", "", false, false},
+		{"empty type", text(`connectorType = ""`), "", "", false, false},
+		{"not a map", "x", "", "", false, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m, ok := connectorFromRef(tc.ref)
+			if ok != tc.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
+			}
+			if !ok {
+				return
+			}
+			if m.Type.ValueString() != tc.typ || m.Version.ValueString() != tc.version || m.Version.IsNull() != tc.wantNoVersion {
+				t.Errorf("connector = %v/%v, want %q/%q", m.Type, m.Version, tc.typ, tc.version)
+			}
+		})
+	}
 }
 
 // midPoint resolves the connector filter to an OID that differs per

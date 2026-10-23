@@ -107,13 +107,16 @@ func TestTask_createSuspendedByDefault(t *testing.T) {
 				}),
 			},
 			refreshIsClean(),
+			// An import records the owner and binding midPoint set (see
+			// TestTask_importRecordsOwnerAndBinding).
 			{
-				ResourceName:      addr,
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName:            addr,
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"owner", "binding"},
 			},
 			{
-				Config:          taskConfig("v2", ""),
+				Config:          taskConfig("v2", fmt.Sprintf("  owner   = %q\n  binding = \"loose\"", accAdministratorOID)),
 				ResourceName:    addr,
 				ImportState:     true,
 				ImportStateKind: resource.ImportBlockWithID,
@@ -315,6 +318,63 @@ func TestTask_importedIsNeverReplaced(t *testing.T) {
 						if n := len(requests(s, m)); n != 0 {
 							return fmt.Errorf("%d %s requests, want none", n, m)
 						}
+					}
+					return nil
+				}),
+			},
+			refreshIsClean(),
+		},
+	})
+}
+
+// An import records the owner and binding the server holds, which a read
+// otherwise compares only when configured: a configuration that sets them
+// as midPoint holds them (the converter's) imports with no change. One that
+// leaves them unset plans an update that sends nothing (they are compared
+// only when configured) and leaves them unset.
+func TestTask_importRecordsOwnerAndBinding(t *testing.T) {
+	s := newTestStub(t)
+	const addr = "midpoint_task.t"
+	body := map[string]any{"oid": stubTaskOID, "name": "recompute nobody", "description": "v1", "activity": taskActivity,
+		"executionState": "suspended", "schedulingState": "suspended"}
+	serverFillsTask(s, body)
+	withOwner := taskConfig("v1", fmt.Sprintf("  owner   = %q\n  binding = \"loose\"", accAdministratorOID))
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{
+				Config:          withOwner,
+				ResourceName:    addr,
+				ImportState:     true,
+				ImportStateId:   stubTaskOID,
+				ImportStateKind: resource.ImportBlockWithID,
+			},
+			{
+				Config:             taskConfig("v1", ""),
+				ResourceName:       addr,
+				ImportState:        true,
+				ImportStateId:      stubTaskOID,
+				ImportStatePersist: true,
+				ImportStateCheck: func(st []*terraform.InstanceState) error {
+					a := st[0].Attributes
+					if a["owner"] != accAdministratorOID || a["binding"] != "loose" {
+						return fmt.Errorf("imported owner/binding = %q/%q, want %s/loose", a["owner"], a["binding"], accAdministratorOID)
+					}
+					return nil
+				},
+			},
+			{
+				Config: taskConfig("v1", ""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("owner"), knownvalue.Null()),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("binding"), knownvalue.Null()),
+				},
+				Check: checkStub(func() error {
+					if n := len(requests(s, "PATCH")); n != 0 {
+						return fmt.Errorf("%d PATCH requests, want none", n)
 					}
 					return nil
 				}),

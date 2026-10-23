@@ -48,7 +48,7 @@ resource "midpoint_resource" "hr" {
 
 ### Required
 
-- `connector` (Attributes) The connector, found by a search filter on connectorType (and connectorVersion when version is set). midPoint resolves the filter when it creates or updates the resource; the OID it finds is connector_oid. An imported resource reads back without it until it is configured, so a config sets it with one no-op update after the import. (see [below for nested schema](#nestedatt--connector))
+- `connector` (Attributes) The connector, found by a search filter on connectorType (and connectorVersion when version is set). midPoint resolves the filter when it creates or updates the resource; the OID it finds is connector_oid. An import records the connector from the connectorRef filter when it is the one this attribute writes; a resource that references its connector by OID alone imports without it, and the config then sets it with one update. (see [below for nested schema](#nestedatt--connector))
 - `name` (String) Object name.
 
 ### Optional

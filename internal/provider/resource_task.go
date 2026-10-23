@@ -101,14 +101,41 @@ func taskFromBody(ctx context.Context, s *taskState, actual map[string]any) diag
 		if prior.Owner.IsNull() {
 			return
 		}
-		if ref, ok := rest["ownerRef"].(map[string]any); ok {
-			if t, ok := refFromJSON(ref); ok && !t.OID.IsNull() && t.Filter.IsNull() &&
-				(t.Type.IsNull() || t.Type.ValueString() == "UserType") && t.Relation.ValueString() == defaultRelation {
-				s.Owner = t.OID
-				delete(rest, "ownerRef")
-			}
+		if oid, ok := ownerOID(rest["ownerRef"]); ok {
+			s.Owner = oid
+			delete(rest, "ownerRef")
 		}
 	})
+}
+
+// ownerOID is the owner attribute that expresses the ownerRef ref: a plain
+// reference to a user by oid; ok is false for anything else.
+func ownerOID(ref any) (types.String, bool) {
+	m, ok := ref.(map[string]any)
+	if !ok {
+		return types.StringNull(), false
+	}
+	t, ok := refFromJSON(m)
+	if !ok || t.OID.IsNull() || !t.Filter.IsNull() ||
+		!(t.Type.IsNull() || t.Type.ValueString() == "UserType") || t.Relation.ValueString() != defaultRelation {
+		return types.StringNull(), false
+	}
+	return t.OID, true
+}
+
+// taskImportRead records the owner and binding of an imported task, which
+// taskFromBody reads back only when the prior state sets them, so that a
+// configuration written from the server object (the converter's) imports
+// with no change. Once set they are compared like configured ones.
+func taskImportRead(s *taskState, actual map[string]any) {
+	if s.Owner.IsNull() {
+		if oid, ok := ownerOID(actual["ownerRef"]); ok {
+			s.Owner = oid
+		}
+	}
+	if b, ok := actual["binding"].(string); ok && s.Binding.IsNull() {
+		s.Binding = types.StringValue(b)
+	}
 }
 
 // replaceUnlessPreexisting requires replacement when
@@ -140,8 +167,9 @@ func NewTaskResource() resource.Resource {
 				"name":        nameAttribute(),
 				"description": optionalString("Description."),
 				"owner": optionalString("OID of the owning user (ownerRef). When unset midPoint makes the calling " +
-					"user the owner, and the owner is not compared. An imported task reads it back as null until it " +
-					"is configured, so a config that sets it plans one no-op update after the import."),
+					"user the owner, and the owner is not compared. An import records the owner midPoint holds, so a " +
+					"config that sets it imports with no change, and one that leaves it unset plans one update after " +
+					"the import that sends nothing."),
 				"initial_execution_state": schema.StringAttribute{
 					Description: "Execution state the task is created in: suspended (the default) or runnable. It is " +
 						"written only on create; later suspending or resuming the task in midPoint is not drift. Changing " +
@@ -161,8 +189,9 @@ func NewTaskResource() resource.Resource {
 					},
 				},
 				"binding": optionalString("Binding (binding): loose or tight. When unset midPoint defaults it " +
-					"(loose) and it is not compared. An imported task reads it back as null until it is configured, " +
-					"so a config that sets it plans one no-op update after the import."),
+					"(loose) and it is not compared. An import records the binding midPoint holds, so a config that " +
+					"sets it imports with no change, and one that leaves it unset plans one update after the import " +
+					"that sends nothing."),
 				"recurrence": optionalString("Recurrence (recurrence): single or recurring."),
 				"schedule": optionalDynamic("Schedule (schedule) in midPoint naming, e.g. " +
 					"{ recurrence = \"recurring\", interval = 3600 }."),
@@ -173,8 +202,9 @@ func NewTaskResource() resource.Resource {
 		toBody: func(ctx context.Context, s *taskState, create, _ bool) (map[string]any, diag.Diagnostics) {
 			return taskToBody(ctx, s, create)
 		},
-		fromBody: taskFromBody,
-		validate: simpleValidator(taskSpec.ShortName, (*taskState).fields),
+		fromBody:   taskFromBody,
+		importRead: taskImportRead,
+		validate:   simpleValidator(taskSpec.ShortName, (*taskState).fields),
 		onImport: func(ctx context.Context, resp *resource.ImportStateResponse) {
 			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("initial_execution_state"),
 				types.StringValue(executionSuspended))...)
