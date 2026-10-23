@@ -19,7 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/client"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/client"
 )
 
 // resourceShortNames are the keys accepted in default_options.

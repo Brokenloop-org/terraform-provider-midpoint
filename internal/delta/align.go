@@ -3,7 +3,7 @@ package delta
 import (
 	"strings"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/normalize"
 )
 
 // compareOnlyWhenConfigured are root items midPoint fills in when the

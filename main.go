@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/provider"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/provider"
 )
 
 // version is set by the release build via -ldflags.
@@ -19,7 +19,7 @@ func main() {
 	flag.Parse()
 
 	err := providerserver.Serve(context.Background(), provider.New(version), providerserver.ServeOpts{
-		Address: "registry.terraform.io/jplana/midpoint",
+		Address: "registry.terraform.io/brokenloop-org/midpoint",
 		Debug:   debug,
 	})
 	if err != nil {

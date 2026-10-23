@@ -13,8 +13,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/delta"
-	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/delta"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/normalize"
 )
 
 // focusKind describes one role-like resource: midpoint_service,

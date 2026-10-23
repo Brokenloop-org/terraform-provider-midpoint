@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/mpstub"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/mpstub"
 )
 
 // stubProviderFactories returns provider factories whose provider talks to

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/delta"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/delta"
 )
 
 // containerItems are the multi-valued container items whose values midPoint

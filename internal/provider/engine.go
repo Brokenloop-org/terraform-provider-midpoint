@@ -10,9 +10,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/client"
-	"github.com/jplana/terraform-provider-midpoint/internal/delta"
-	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/client"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/delta"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/normalize"
 )
 
 // engineSpec describes one midPoint object type to the CRUD engine.

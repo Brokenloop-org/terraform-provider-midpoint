@@ -1,4 +1,4 @@
-module github.com/jplana/terraform-provider-midpoint
+module github.com/Brokenloop-org/terraform-provider-midpoint
 
 go 1.25.8
 

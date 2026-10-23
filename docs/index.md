@@ -34,7 +34,7 @@ Safety rules that apply to every resource:
 terraform {
   required_providers {
     midpoint = {
-      source = "jplana/midpoint"
+      source = "brokenloop-org/midpoint"
     }
   }
 }

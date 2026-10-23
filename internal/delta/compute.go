@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jplana/terraform-provider-midpoint/internal/client"
-	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/client"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/normalize"
 )
 
 // Modification types of an ItemDeltaType.

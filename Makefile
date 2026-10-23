@@ -25,19 +25,19 @@ docs:
 # validate-examples builds the provider into dist/ and runs terraform init and
 # validate on every example directory against it, through a dev_overrides CLI
 # config. Each directory is validated standalone, in a temporary copy; one
-# without a required_providers block gets one for jplana/midpoint. Output is
+# without a required_providers block gets one for brokenloop-org/midpoint. Output is
 # shown only for a directory that fails.
 EXAMPLE_DIRS = examples/complete examples/provider $(wildcard examples/resources/*) $(wildcard examples/data-sources/*)
 
 validate-examples:
 	go build -o ./dist/terraform-provider-midpoint .
-	@printf 'provider_installation {\n  dev_overrides {\n    "jplana/midpoint" = "%s"\n  }\n  direct {}\n}\n' "$(CURDIR)/dist" > dist/terraformrc
+	@printf 'provider_installation {\n  dev_overrides {\n    "brokenloop-org/midpoint" = "%s"\n  }\n  direct {}\n}\n' "$(CURDIR)/dist" > dist/terraformrc
 	@set -e; export TF_CLI_CONFIG_FILE="$(CURDIR)/dist/terraformrc"; \
 	for dir in $(EXAMPLE_DIRS); do \
 		tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
 		cp -R "$$dir/." "$$tmp/"; \
 		if ! grep -qs required_providers "$$tmp"/*.tf; then \
-			printf 'terraform {\n  required_providers {\n    midpoint = { source = "jplana/midpoint" }\n  }\n}\n' > "$$tmp/zz_required_providers.tf"; \
+			printf 'terraform {\n  required_providers {\n    midpoint = { source = "brokenloop-org/midpoint" }\n  }\n}\n' > "$$tmp/zz_required_providers.tf"; \
 		fi; \
 		terraform -chdir="$$tmp" init -backend=false -input=false -no-color > "$$tmp/init.log" 2>&1 || { cat "$$tmp/init.log"; exit 1; }; \
 		terraform -chdir="$$tmp" validate -no-color > "$$tmp/validate.log" 2>&1 || { echo "FAIL $$dir"; cat "$$tmp/validate.log"; exit 1; }; \

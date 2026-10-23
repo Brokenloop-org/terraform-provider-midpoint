@@ -28,7 +28,7 @@ examples are in [`examples/`](examples/).
 terraform {
   required_providers {
     midpoint = {
-      source = "jplana/midpoint"
+      source = "brokenloop-org/midpoint"
     }
   }
 }
@@ -45,7 +45,7 @@ go build -o ./dist/terraform-provider-midpoint .
 cat > dist/terraformrc <<EOF
 provider_installation {
   dev_overrides {
-    "jplana/midpoint" = "$PWD/dist"
+    "brokenloop-org/midpoint" = "$PWD/dist"
   }
   direct {}
 }
