@@ -2,6 +2,7 @@ package convert
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -361,4 +362,103 @@ func TestRewriteGatesAndHints(t *testing.T) {
 			t.Errorf("data = %+v", data)
 		}
 	})
+}
+
+// cycleObject is a role labelled label (oid "aaaaaaaa-0000-4000-8000-00000000000<n>")
+// whose inducements target the given oids.
+func cycleObject(label string, n int, targets ...int) Resource {
+	r := Resource{Kind: "midpoint_role", Label: label, OID: cycleOID(n), Attrs: map[string]any{"name": label}}
+	for _, t := range targets {
+		r.Blocks = append(r.Blocks, Block{Type: "inducement", Attrs: map[string]any{}, Blocks: []Block{
+			{Type: "target", Attrs: map[string]any{"oid": cycleOID(t), "type": "RoleType"}},
+		}})
+	}
+	return r
+}
+
+func cycleOID(n int) string { return "aaaaaaaa-0000-4000-8000-00000000000" + string(rune('0'+n)) }
+
+// targetOIDs is the oid attribute of each inducement target of r.
+func targetOIDs(r Resource) []any {
+	var out []any
+	for _, b := range targets(r) {
+		out = append(out, b.Attrs["oid"])
+	}
+	return out
+}
+
+func TestRewriteBreaksCycles(t *testing.T) {
+	ref := func(label string) any { return Ref{Address: "midpoint_role." + label + ".oid"} }
+	tests := []struct {
+		name      string
+		in        []Resource
+		want      map[string][]any // label -> target oids after rewriting
+		wantNotes []Note
+	}{
+		{
+			name: "two-node cycle",
+			in:   []Resource{cycleObject("a", 1, 2), cycleObject("b", 2, 1)},
+			want: map[string][]any{"a": {ref("b")}, "b": {cycleOID(1)}},
+			wantNotes: []Note{{Path: "midpoint_role.b", Message: "the reference from midpoint_role.b to midpoint_role.a is left as the literal oid " +
+				cycleOID(1) + " to break the reference cycle midpoint_role.a → midpoint_role.b → midpoint_role.a " +
+				"(Terraform cannot order objects that reference each other)"}},
+		},
+		{
+			name: "three-node cycle and a tail",
+			in:   []Resource{cycleObject("c", 3, 1), cycleObject("a", 1, 2), cycleObject("b", 2, 3), cycleObject("d", 4, 1)},
+			want: map[string][]any{"a": {ref("b")}, "b": {ref("c")}, "c": {cycleOID(1)}, "d": {ref("a")}},
+			wantNotes: []Note{{Path: "midpoint_role.c", Message: "the reference from midpoint_role.c to midpoint_role.a is left as the literal oid " +
+				cycleOID(1) + " to break the reference cycle midpoint_role.a → midpoint_role.b → midpoint_role.c → midpoint_role.a " +
+				"(Terraform cannot order objects that reference each other)"}},
+		},
+		{
+			name: "two cycles sharing a node",
+			in:   []Resource{cycleObject("a", 1, 2, 3), cycleObject("b", 2, 1), cycleObject("c", 3, 1)},
+			want: map[string][]any{"a": {ref("b"), ref("c")}, "b": {cycleOID(1)}, "c": {cycleOID(1)}},
+		},
+		{
+			name: "no cycle",
+			in:   []Resource{cycleObject("a", 1, 2, 3), cycleObject("b", 2, 3), cycleObject("c", 3)},
+			want: map[string][]any{"a": {ref("b"), ref("c")}, "b": {ref("c")}, "c": nil},
+		},
+		{
+			name: "self-reference is no cycle",
+			in:   []Resource{cycleObject("a", 1, 1)},
+			want: map[string][]any{"a": {cycleOID(1)}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, _, notes := Rewrite(tt.in)
+			for _, r := range out {
+				if got := targetOIDs(r); !reflect.DeepEqual(got, tt.want[r.Label]) {
+					t.Errorf("%s targets = %v, want %v", r.Label, got, tt.want[r.Label])
+				}
+			}
+			var cycleNotes []Note
+			for _, n := range notes {
+				if strings.Contains(n.Message, "reference cycle") {
+					cycleNotes = append(cycleNotes, n)
+				}
+			}
+			if tt.wantNotes != nil && !reflect.DeepEqual(cycleNotes, tt.wantNotes) {
+				t.Errorf("notes = %v\nwant %v", cycleNotes, tt.wantNotes)
+			}
+			if tt.wantNotes == nil && strings.HasPrefix(tt.name, "no") && len(cycleNotes) != 0 {
+				t.Errorf("unexpected cycle notes %v", cycleNotes)
+			}
+			// Deterministic: the input order does not matter.
+			rev := slices.Clone(tt.in)
+			slices.Reverse(rev)
+			out2, _, notes2 := Rewrite(rev)
+			for _, r := range out2 {
+				if got := targetOIDs(r); !reflect.DeepEqual(got, tt.want[r.Label]) {
+					t.Errorf("reversed input: %s targets = %v, want %v", r.Label, got, tt.want[r.Label])
+				}
+			}
+			if len(notes2) != len(notes) {
+				t.Errorf("reversed input gave %d notes, want %d", len(notes2), len(notes))
+			}
+		})
+	}
 }

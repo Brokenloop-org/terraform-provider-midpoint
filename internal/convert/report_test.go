@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -52,5 +54,38 @@ func TestReport_unmatchedRewriteNotesAreKept(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("report lacks %q:\n%s", want, got)
 		}
+	}
+}
+
+// Two converted roles that induce each other convert to HCL with one
+// reference left literal, and the report names both ends.
+func TestConvert_referenceCycleIsBroken(t *testing.T) {
+	dir := t.TempDir()
+	const a, b = "aaaaaaaa-0000-4000-8000-000000000001", "aaaaaaaa-0000-4000-8000-000000000002"
+	role := func(oid, name, target string) string {
+		return `{"role":{"oid":"` + oid + `","name":"` + name + `","inducement":[{"targetRef":{"oid":"` + target + `","type":"c:RoleType"}}]}}`
+	}
+	for name, body := range map[string]string{"a.json": role(a, "a", b), "b.json": role(b, "b", a)} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	files, rep, err := Convert([]string{dir}, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hcl := string(files["roles.tf"])
+	for _, want := range []string{"oid  = midpoint_role.b.oid", `oid  = "` + a + `"`} {
+		if !strings.Contains(hcl, want) {
+			t.Errorf("roles.tf lacks %q:\n%s", want, hcl)
+		}
+	}
+	if strings.Contains(hcl, "midpoint_role.a.oid") {
+		t.Errorf("roles.tf still references midpoint_role.a:\n%s", hcl)
+	}
+	want := "- references: the reference from midpoint_role.b to midpoint_role.a is left as the literal oid " + a +
+		" to break the reference cycle midpoint_role.a → midpoint_role.b → midpoint_role.a"
+	if md := string(rep.Markdown()); !strings.Contains(md, want) {
+		t.Errorf("report lacks %q:\n%s", want, md)
 	}
 }

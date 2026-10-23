@@ -57,6 +57,10 @@ func (d DataLookup) Address() string { return "data.midpoint_object." + d.Label 
 //     a data.midpoint_object looked up by oid;
 //   - any other oid stays literal and a note reports it.
 //
+// Finally, Refs that form a cycle between converted objects (A → B → A)
+// are broken: one edge per cycle goes back to a literal oid, with a note
+// naming both ends (see breakCycles).
+//
 // Notes carry the resource address (e.g. "midpoint_role.vault") as Path.
 func Rewrite(rs []Resource) (out []Resource, data []DataLookup, notes []Note) {
 	w := &rewriter{byOID: map[string]Resource{}, byName: map[string]*Resource{},
@@ -80,7 +84,7 @@ func Rewrite(rs []Resource) (out []Resource, data []DataLookup, notes []Note) {
 		w.cur = r
 		out[i] = w.resource(r)
 	}
-	return out, w.data, w.notes
+	return out, w.data, breakCycles(out, w.notes)
 }
 
 type rewriter struct {
