@@ -147,3 +147,37 @@ func TestMain_usageExit1(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteFiles_failureLeavesOutUntouched(t *testing.T) {
+	parent := t.TempDir()
+	out := filepath.Join(parent, "out")
+	// "a" is a file, so "a/b" cannot be written: the failure comes midway.
+	err := writeFiles(out, map[string][]byte{"a": []byte("x"), "a/b": []byte("y"), "z": []byte("z")})
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	entries, _ := os.ReadDir(parent)
+	if len(entries) != 0 {
+		t.Errorf("parent holds %v after a failed write", entries)
+	}
+
+	// An existing empty out stays empty and usable.
+	if err := os.Mkdir(out, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFiles(out, map[string][]byte{"a": []byte("x"), "a/b": []byte("y")}); err == nil {
+		t.Fatal("want an error")
+	}
+	if entries, _ := os.ReadDir(out); len(entries) != 0 {
+		t.Errorf("out holds %v after a failed write", entries)
+	}
+	if err := checkOut(out); err != nil {
+		t.Errorf("rerun would be refused: %v", err)
+	}
+	if err := writeFiles(out, map[string][]byte{"a": []byte("x")}); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(out, "a")); string(b) != "x" {
+		t.Errorf("a = %q", b)
+	}
+}

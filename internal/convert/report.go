@@ -11,6 +11,7 @@ import (
 type Report struct {
 	entries []entry // sorted by source path
 	skipped []Note  // skipped files and duplicates, sorted by path
+	other   []Note  // notes that match no converted object, sorted
 	data    []DataLookup
 	read    int
 }
@@ -61,10 +62,18 @@ func newReport(srcs []Source, rs []Resource, data []DataLookup, loadNotes, rewri
 	for _, n := range rewriteNotes {
 		if i, ok := byAddress[n.Path]; ok {
 			rep.entries[i].refs = append(rep.entries[i].refs, n.Message)
+		} else {
+			rep.other = append(rep.other, n)
 		}
 	}
 	rep.read = len(srcs) + len(rep.skipped)
 	sort.SliceStable(rep.entries, func(i, j int) bool { return rep.entries[i].path < rep.entries[j].path })
+	sort.SliceStable(rep.other, func(i, j int) bool {
+		if rep.other[i].Path != rep.other[j].Path {
+			return rep.other[i].Path < rep.other[j].Path
+		}
+		return rep.other[i].Message < rep.other[j].Message
+	})
 	sort.SliceStable(rep.skipped, func(i, j int) bool { return rep.skipped[i].Path < rep.skipped[j].Path })
 	for i := range rep.entries {
 		e := &rep.entries[i]
@@ -77,7 +86,7 @@ func newReport(srcs []Source, rs []Resource, data []DataLookup, loadNotes, rewri
 
 // Markdown renders the report. The sections are Summary, Manual follow-up,
 // Skipped files, Data lookups, Converted objects (one table row per source
-// file) and Notes by file (one ### per file that has notes).
+// file) and Notes by file (one ### per file that has notes) and Other notes (notes that match no converted object).
 func (r Report) Markdown() []byte {
 	var b strings.Builder
 	b.WriteString("# midpoint-convert report\n")
@@ -150,6 +159,14 @@ func (r Report) Markdown() []byte {
 	}
 	if !any {
 		b.WriteString("\nNone.\n")
+	}
+
+	b.WriteString("\n## Other notes\n\n")
+	if len(r.other) == 0 {
+		b.WriteString("None.\n")
+	}
+	for _, n := range r.other {
+		fmt.Fprintf(&b, "- `%s`: %s\n", n.Path, n.Message)
 	}
 	return []byte(b.String())
 }

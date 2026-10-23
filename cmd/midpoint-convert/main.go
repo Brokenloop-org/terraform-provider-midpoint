@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/jplana/terraform-provider-midpoint/internal/convert"
 )
@@ -59,18 +60,47 @@ func cli(args []string, stderr io.Writer) int {
 		return 1
 	}
 	files["report.md"] = report.Markdown()
-	for name, data := range files {
-		p := filepath.Join(*out, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			fmt.Fprintln(stderr, "midpoint-convert:", err)
-			return 1
-		}
-		if err := os.WriteFile(p, data, 0o644); err != nil {
-			fmt.Fprintln(stderr, "midpoint-convert:", err)
-			return 1
-		}
+	if err := writeFiles(*out, files); err != nil {
+		fmt.Fprintln(stderr, "midpoint-convert:", err)
+		return 1
 	}
 	return 0
+}
+
+// writeFiles writes files below out in sorted order. It writes into a
+// temporary sibling directory and renames it to out, so a failure leaves out
+// as it was.
+func writeFiles(out string, files map[string][]byte) error {
+	parent := filepath.Dir(filepath.Clean(out))
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.MkdirTemp(parent, ".midpoint-convert-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmp) // a no-op after the rename
+	if err := os.Chmod(tmp, 0o755); err != nil {
+		return err
+	}
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		p := filepath.Join(tmp, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(p, files[name], 0o644); err != nil {
+			return err
+		}
+	}
+	if err := os.Remove(out); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err // checkOut guarantees an existing out is empty
+	}
+	return os.Rename(tmp, out)
 }
 
 // checkOut refuses an existing output directory that is not empty, so a run

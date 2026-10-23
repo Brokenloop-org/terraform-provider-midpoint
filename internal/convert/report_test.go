@@ -39,3 +39,18 @@ func TestReport_sectionsAndDeterminism(t *testing.T) {
 		t.Error("report is not deterministic")
 	}
 }
+
+func TestReport_unmatchedRewriteNotesAreKept(t *testing.T) {
+	srcs := []Source{{Path: "a.json"}}
+	rs := []Resource{{Kind: "midpoint_role", Label: "a"}}
+	notes := []Note{
+		{"midpoint_role.a", "matched note"},
+		{"midpoint_role.ghost", "unmatched note"},
+	}
+	got := string(newReport(srcs, rs, nil, nil, notes).Markdown())
+	for _, want := range []string{"matched note", "## Other notes\n\n- `midpoint_role.ghost`: unmatched note\n"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("report lacks %q:\n%s", want, got)
+		}
+	}
+}
