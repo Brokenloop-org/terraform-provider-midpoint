@@ -1,13 +1,14 @@
 package convert
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )
 
 // resource projects a midPoint resource. It inverts the provider's
 // resourceToBody (internal/provider/resource_resource.go).
-func (p *projector) resource() {
+func (p *projector) resource() error {
 	p.takeAll(simpleMap{
 		strings: map[string]string{"name": "name", "description": "description", "lifecycleState": "lifecycle_state"},
 		dynamics: map[string]string{
@@ -20,20 +21,27 @@ func (p *projector) resource() {
 		p.note("connector_configuration holds a clearValue (a clear-text secret); it will be in Terraform state")
 	}
 
-	if ref, ok := p.rest["connectorRef"].(map[string]any); ok {
-		if typ, version, ok := connectorFromRef(ref); ok {
-			c := map[string]any{"type": typ}
-			if version != "" {
-				c["version"] = version
-			}
-			p.r.Attrs["connector"] = c
-			delete(p.rest, "connectorRef")
-			if _, hasOID := ref["oid"]; hasOID {
-				p.note("connectorRef: oid dropped, midPoint resolves the connector from type and version")
-			}
-		} else {
-			p.note("connectorRef: not a filter on connectorType (and connectorVersion), kept in extra; connector must be set by hand")
+	ref, _ := p.rest["connectorRef"].(map[string]any)
+	typ, version, ok := connectorFromRef(ref)
+	switch {
+	case ok:
+		c := map[string]any{"type": typ}
+		if version != "" {
+			c["version"] = version
 		}
+		p.r.Attrs["connector"] = c
+		delete(p.rest, "connectorRef")
+		if _, hasOID := ref["oid"]; hasOID {
+			p.note("connectorRef: oid dropped, midPoint resolves the connector from type and version")
+		}
+	case ref != nil && ref["oid"] != nil:
+		// connector_oid is computed in the provider (the oid midPoint
+		// resolved from connector), so it cannot be configured: the
+		// connector type cannot be derived from an oid alone.
+		delete(p.rest, "connectorRef")
+		p.note("manual follow-up: connectorRef is the oid %v without a filter on connectorType; set connector { type, version } by hand (connector_oid is computed and cannot be configured)", ref["oid"])
+	default:
+		return fmt.Errorf("%s: resource has no connectorRef with a filter on connectorType or an oid; a resource without its connector is unusable", p.path)
 	}
 
 	// capabilities is capabilities/configured; native is server-managed.
@@ -76,6 +84,7 @@ func (p *projector) resource() {
 		}
 		delete(p.rest, "schema")
 	}
+	return nil
 }
 
 // connectorFromRef reads the connector type and version from the filter of
@@ -233,7 +242,10 @@ func (p *projector) task() {
 			p.r.Attrs["owner"] = oid
 			delete(p.rest, "ownerRef")
 		} else {
-			p.note("ownerRef: not a plain user reference by oid, kept in extra")
+			// The provider reserves ownerRef (extra must not hold it), so
+			// it cannot be kept anywhere.
+			delete(p.rest, "ownerRef")
+			p.note("manual follow-up: ownerRef %v is not a plain user reference by oid and was dropped; midPoint makes the caller the owner", ref)
 		}
 	}
 }

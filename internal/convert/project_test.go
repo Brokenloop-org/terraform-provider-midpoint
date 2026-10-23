@@ -2,6 +2,7 @@ package convert
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -209,14 +210,54 @@ func TestProject(t *testing.T) {
 		}
 	})
 
-	t.Run("resource connector not expressible stays in extra", func(t *testing.T) {
+	t.Run("resource connector by oid only needs follow-up", func(t *testing.T) {
 		s := Source{RestType: "resources", OID: "11111111-1111-4111-8111-111111111111", Body: map[string]any{
 			"name":         "x",
 			"connectorRef": map[string]any{"type": "ConnectorType", "oid": "9e2f0000-0000-4000-8000-000000000000"},
 		}}
-		r, _ := Project(s)
-		if _, ok := r.Attrs["connector"]; ok || r.Extra["connectorRef"] == nil {
+		r, err := Project(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := r.Attrs["connector"]; ok || len(r.Extra) != 0 {
 			t.Errorf("attrs/extra = %v/%v", r.Attrs, r.Extra)
+		}
+		if _, ok := r.Attrs["connector_oid"]; ok {
+			t.Error("connector_oid is computed in the provider and must not be emitted")
+		}
+		if len(r.Notes) != 1 || !strings.HasPrefix(r.Notes[0], "manual follow-up:") {
+			t.Errorf("notes = %q", r.Notes)
+		}
+	})
+
+	t.Run("resource without connector is an error", func(t *testing.T) {
+		s := Source{Path: "resources/x.json", RestType: "resources", Body: map[string]any{
+			"name":         "x",
+			"connectorRef": map[string]any{"type": "ConnectorType", "filter": map[string]any{"text": `name = "x"`}},
+		}}
+		_, err := Project(s)
+		if err == nil || !strings.Contains(err.Error(), "resources/x.json") {
+			t.Errorf("err = %v", err)
+		}
+		s.Body = map[string]any{"name": "x"}
+		if _, err := Project(s); err == nil {
+			t.Error("want error without connectorRef")
+		}
+	})
+
+	t.Run("task owner not plain is dropped with follow-up", func(t *testing.T) {
+		r, err := Project(Source{RestType: "tasks", Body: map[string]any{
+			"name":     "t",
+			"ownerRef": map[string]any{"oid": "00000000-0000-0000-0000-000000000002", "type": "UserType", "relation": "org:manager"},
+		}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := r.Attrs["owner"]; ok || len(r.Extra) != 0 {
+			t.Errorf("attrs/extra = %v/%v", r.Attrs, r.Extra)
+		}
+		if len(r.Notes) != 1 || !strings.HasPrefix(r.Notes[0], "manual follow-up:") {
+			t.Errorf("notes = %q", r.Notes)
 		}
 	})
 
@@ -374,35 +415,6 @@ func TestProject(t *testing.T) {
 			t.Error("want error")
 		}
 	})
-}
-
-func TestFilterText(t *testing.T) {
-	eq := func(path string, v any) map[string]any {
-		return map[string]any{"path": path, "value": []any{v}}
-	}
-	tests := []struct {
-		name   string
-		filter any
-		want   string
-		ok     bool
-	}{
-		{"text", map[string]any{"text": `name = "x"`}, `name = "x"`, true},
-		{"equal", map[string]any{"equal": eq("name", "a \"b\"")}, `name = "a \"b\""`, true},
-		{"and", map[string]any{"and": map[string]any{"equal": []any{eq("name", "a"), eq("order", 2.0)}}}, `name = "a" and order = 2`, true},
-		{"or in and", map[string]any{"and": map[string]any{"equal": eq("a", "1"), "or": map[string]any{"equal": []any{eq("b", "2"), eq("c", true)}}}},
-			`a = "1" and (b = "2" or c = true)`, true},
-		{"substring", map[string]any{"substring": eq("name", "a")}, "", false},
-		{"matching", map[string]any{"equal": map[string]any{"path": "name", "value": []any{"a"}, "matching": "polyStringNorm"}}, "", false},
-		{"two values", map[string]any{"equal": map[string]any{"path": "name", "value": []any{"a", "b"}}}, "", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, ok := filterText(tt.filter)
-			if ok != tt.ok || got != tt.want {
-				t.Errorf("filterText = %q, %v; want %q, %v", got, ok, tt.want, tt.ok)
-			}
-		})
-	}
 }
 
 func TestLabel(t *testing.T) {

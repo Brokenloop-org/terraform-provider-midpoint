@@ -3,8 +3,9 @@ package convert
 import (
 	"encoding/json"
 	"math"
-	"strconv"
 	"strings"
+
+	"github.com/jplana/terraform-provider-midpoint/internal/normalize"
 )
 
 const defaultRelation = "org:default"
@@ -265,7 +266,7 @@ func targetBlock(m map[string]any) (Block, bool) {
 				b.Attrs["relation"] = s
 			}
 		case "filter":
-			text, ok := filterText(v)
+			text, ok := normalize.FilterText(asMap(v))
 			if !ok {
 				return b, false
 			}
@@ -332,98 +333,8 @@ func plainResourceRef(v any) (string, bool) {
 	return oid, true
 }
 
-// axiomString quotes s for a midPoint text query (the provider's
-// axiomString).
-func axiomString(s string) string {
-	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
-}
-
-// filterText is the text query (Axiom) of the canonical filter f: a text
-// filter as is, or a structured filter built of equal conditions on a path
-// with one scalar value, joined by and / or. ok is false for other filters.
-func filterText(f any) (string, bool) {
-	m, isMap := f.(map[string]any)
-	if !isMap {
-		return "", false
-	}
-	if t, ok := m["text"].(string); ok && len(m) == 1 {
-		return t, true
-	}
-	// A node with one and/or child is that child, without its parentheses.
-	for len(m) == 1 {
-		var k string
-		for k = range m {
-		}
-		child, ok := m[k].(map[string]any)
-		if !ok || (k != "and" && k != "or") {
-			break
-		}
-		if k == "or" {
-			return filterJoin(child, " or ", true)
-		}
-		m = child
-	}
-	return filterJoin(m, " and ", true)
-}
-
-// filterJoin renders the children of a filter node joined by sep: the node's
-// own children are conjuncts (and), the children of an or node alternatives.
-// A compound with several parts below the top is parenthesized.
-func filterJoin(node map[string]any, sep string, top bool) (string, bool) {
-	var parts []string
-	for _, k := range sortedKeys(node) {
-		for _, child := range asList(node[k]) {
-			cm, ok := child.(map[string]any)
-			if !ok {
-				return "", false
-			}
-			var s string
-			switch k {
-			case "equal":
-				s, ok = equalText(cm)
-			case "and":
-				s, ok = filterJoin(cm, " and ", false)
-			case "or":
-				s, ok = filterJoin(cm, " or ", false)
-			default:
-				ok = false
-			}
-			if !ok {
-				return "", false
-			}
-			parts = append(parts, s)
-		}
-	}
-	if len(parts) == 0 {
-		return "", false
-	}
-	s := strings.Join(parts, sep)
-	if !top && len(parts) > 1 {
-		s = "(" + s + ")"
-	}
-	return s, true
-}
-
-// equalText renders an equal condition: path = value, for a path and one
-// scalar value and nothing else (no matching rule).
-func equalText(c map[string]any) (string, bool) {
-	path, ok := c["path"].(string)
-	if !ok || len(c) != 2 {
-		return "", false
-	}
-	vals := asList(c["value"])
-	if len(vals) != 1 {
-		return "", false
-	}
-	switch v := vals[0].(type) {
-	case string:
-		return path + " = " + axiomString(v), true
-	case bool:
-		return path + " = " + strconv.FormatBool(v), true
-	case float64:
-		return path + " = " + strconv.FormatFloat(v, 'f', -1, 64), true
-	case json.Number:
-		return path + " = " + v.String(), true
-	}
-	return "", false
+// asMap is v as a map, nil when it is not one.
+func asMap(v any) map[string]any {
+	m, _ := v.(map[string]any)
+	return m
 }

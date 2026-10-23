@@ -86,13 +86,15 @@ func Project(s Source) (Resource, error) {
 	r := Resource{Kind: kindsByRestType[s.RestType], OID: oid, Attrs: map[string]any{}}
 	r.Label = Label(name, oid)
 	r.AdoptExisting = strings.HasPrefix(oid, builtinPrefix)
-	p := &projector{r: &r, rest: body}
+	p := &projector{r: &r, rest: body, path: s.Path}
 
 	switch s.RestType {
 	case "roles", "services", "orgs", "archetypes":
 		p.focus(s.RestType)
 	case "resources":
-		p.resource()
+		if err := p.resource(); err != nil {
+			return Resource{}, err
+		}
 	case "tasks":
 		p.task()
 	case "objectTemplates":
@@ -122,6 +124,7 @@ func Project(s Source) (Resource, error) {
 type projector struct {
 	r    *Resource
 	rest map[string]any
+	path string
 }
 
 // simpleMap maps root items to typed attributes: string items to string
