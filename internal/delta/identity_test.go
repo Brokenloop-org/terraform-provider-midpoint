@@ -195,3 +195,23 @@ func TestKey_listsAreSets(t *testing.T) {
 		t.Error("value order inside a multi-valued item changed the key")
 	}
 }
+
+// midPoint returns an empty container value with only its "@id" ("object":
+// {"@id":33}); the prior state of a read drops empty values. Both name the
+// same authorization.
+func TestKey_emptyValuesAreAbsent(t *testing.T) {
+	absent := map[string]any{"name": "auth-person-read"}
+	for _, v := range []map[string]any{
+		{"name": "auth-person-read", "object": map[string]any{"@id": 33}},
+		{"name": "auth-person-read", "object": []any{map[string]any{}}},
+		{"name": "auth-person-read", "object": []any{}},
+		{"name": "auth-person-read", "object": map[string]any{"@id": 33, "owner": map[string]any{}}},
+	} {
+		if Key("authorization", v) != Key("authorization", absent) {
+			t.Errorf("Key(%v) != Key(%v)", v, absent)
+		}
+	}
+	if Key("authorization", map[string]any{"object": map[string]any{"type": "RoleType"}}) == Key("authorization", map[string]any{}) {
+		t.Error("a non-empty value has the key of an absent one")
+	}
+}
