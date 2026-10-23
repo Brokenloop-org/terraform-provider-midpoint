@@ -27,8 +27,10 @@ func axiomString(s string) string {
 
 // FilterText is the text query (Axiom) of the canonical search filter m: a
 // text filter as is, or a structured filter built of equal conditions on a
-// path with one scalar value, joined by and, or and not. ok is false for any
-// other filter. The converter writes this text into the configuration and the
+// path with one scalar value, joined by and, or and not. The operands of an
+// and or an or are sorted (as rendered text), so two structured filters that
+// list the same operands in a different order have the same text. ok is false
+// for any other filter. The converter writes this text into the configuration and the
 // provider reads a structured filter stored in midPoint as the same text, so
 // both sides agree byte for byte.
 func FilterText(m map[string]any) (string, bool) {
@@ -89,6 +91,9 @@ func filterJoin(node map[string]any, sep string, top bool) (string, bool) {
 	if len(parts) == 0 {
 		return "", false
 	}
+	// The operands of and/or are a set: sorted, the text does not depend on
+	// the order midPoint (or a hand-written filter) lists them in.
+	slices.Sort(parts)
 	s := strings.Join(parts, sep)
 	if !top && len(parts) > 1 {
 		s = "(" + s + ")"

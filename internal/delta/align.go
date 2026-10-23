@@ -57,7 +57,9 @@ var partialContainersByType = map[string][]string{
 // Compute see only real differences:
 //
 //   - a reference whose desired value has a filter and no oid loses the
-//     server-resolved oid; one whose desired value has an oid and no filter
+//     server-resolved oid; a structured actual filter whose text rendering
+//     (normalize.FilterText) equals the desired text filter takes the
+//     desired text form; one whose desired value has an oid and no filter
 //     loses the filter; type and the "@type" annotation are dropped when the
 //     desired value has none, and relation "org:default" when the desired
 //     value has no relation;
@@ -213,6 +215,9 @@ func alignMap(d, a map[string]any) map[string]any {
 
 func alignReference(d, a map[string]any) map[string]any {
 	out := deepCopyMap(a)
+	if textFilterMatches(d["filter"], a["filter"]) {
+		out["filter"] = deepCopy(d["filter"])
+	}
 	if d["filter"] != nil && d["oid"] == nil {
 		delete(out, "oid")
 	}
@@ -231,6 +236,32 @@ func alignReference(d, a map[string]any) map[string]any {
 		delete(out, "relation")
 	}
 	return out
+}
+
+// textFilterMatches reports whether the desired filter d is a text filter
+// ({"text": T}) and the actual filter a is a structured filter (not a text
+// filter) whose text rendering (normalize.FilterText) is T. Such a filter is
+// the one the configuration states, written in midPoint's structured form:
+// the provider reads it as T, so it compares equal to {"text": T} and is
+// never rewritten. Any other pair of filters compares as is.
+func textFilterMatches(d, a any) bool {
+	dm, ok := d.(map[string]any)
+	if !ok || len(dm) != 1 {
+		return false
+	}
+	want, ok := dm["text"].(string)
+	if !ok {
+		return false
+	}
+	am, ok := a.(map[string]any)
+	if !ok {
+		return false
+	}
+	if _, isText := am["text"]; isText {
+		return false
+	}
+	got, ok := normalize.FilterText(am)
+	return ok && got == want
 }
 
 func alignList(name string, d, a []any) []any {

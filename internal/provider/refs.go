@@ -47,8 +47,10 @@ func targetBlock() schema.SingleNestedBlock {
 				Description: "midPoint text query selecting the target, e.g. name = \"vault / operator\". " +
 					"midPoint resolves it when the object is written; with a filter only, Terraform knows no " +
 					"dependency on the target, so ordering is up to the configuration. A structured filter stored in " +
-					"midPoint (equal, and, or, not) is read as its text rendering; the provider never rewrites a stored " +
-					"filter unless this value changes.",
+					"midPoint (equal conditions joined by and, or, not) is read as its text rendering, with the " +
+					"operands of and/or sorted; when that rendering equals this value the stored filter counts as " +
+					"equal and is never rewritten, also when another item of the object changes. A stored filter " +
+					"that has no text rendering is not read into this block: the reference stays in extra.",
 				Optional: true,
 			},
 			"type": schema.StringAttribute{

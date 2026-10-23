@@ -47,6 +47,42 @@ func TestAlign(t *testing.T) {
 			wantActual: `{"connectorRef":{"oid":"c1","filter":{"filter":{"text":"b"}},"relation":"org:default","type":"ConnectorType"}}`,
 		},
 		{
+			name:       "structured_filter_rendering_desired_text_takes_text_form",
+			desired:    `{"inducement":[{"targetRef":{"filter":{"text":"name = \"g\""},"type":"RoleType"}}]}`,
+			actual:     `{"inducement":[{"@id":1,"targetRef":{"oid":"g1","filter":{"equal":{"path":"name","value":["g"]}},"type":"RoleType","relation":"org:default"}}]}`,
+			wantActual: `{"inducement":[{"@id":1,"targetRef":{"filter":{"text":"name = \"g\""},"type":"RoleType"}}]}`,
+		},
+		{
+			name:       "structured_and_filter_in_any_order_takes_text_form",
+			desired:    `{"connectorRef":{"filter":{"text":"connectorType = \"t\" and connectorVersion = \"2\""},"type":"ConnectorType"}}`,
+			actual:     `{"connectorRef":{"oid":"c1","filter":{"and":{"equal":[{"path":"connectorVersion","value":"2"},{"path":"connectorType","value":"t"}]}},"type":"ConnectorType"}}`,
+			wantActual: `{"connectorRef":{"filter":{"text":"connectorType = \"t\" and connectorVersion = \"2\""},"type":"ConnectorType"}}`,
+		},
+		{
+			name:       "structured_filter_rendering_other_text_untouched",
+			desired:    `{"targetRef":{"filter":{"text":"name = \"g\""}}}`,
+			actual:     `{"targetRef":{"oid":"h1","filter":{"equal":{"path":"name","value":"h"}}}}`,
+			wantActual: `{"targetRef":{"filter":{"equal":{"path":"name","value":"h"}}}}`,
+		},
+		{
+			name:       "unrenderable_structured_filter_untouched",
+			desired:    `{"targetRef":{"filter":{"text":"name = \"g\""}}}`,
+			actual:     `{"targetRef":{"filter":{"substring":{"path":"name","value":"g"}}}}`,
+			wantActual: `{"targetRef":{"filter":{"substring":{"path":"name","value":"g"}}}}`,
+		},
+		{
+			name:       "other_text_filter_untouched",
+			desired:    `{"targetRef":{"filter":{"text":"name = \"g\""}}}`,
+			actual:     `{"targetRef":{"filter":{"text":"name = 'g'"}}}`,
+			wantActual: `{"targetRef":{"filter":{"text":"name = 'g'"}}}`,
+		},
+		{
+			name:       "desired_structured_filter_untouched",
+			desired:    `{"targetRef":{"filter":{"equal":{"path":"name","value":"h"}}}}`,
+			actual:     `{"targetRef":{"filter":{"equal":{"path":"name","value":"g"}}}}`,
+			wantActual: `{"targetRef":{"filter":{"equal":{"path":"name","value":"g"}}}}`,
+		},
+		{
 			name:       "missing_type_dropped",
 			desired:    `{"targetRef":{"oid":"r1","relation":"org:default"}}`,
 			actual:     `{"targetRef":{"oid":"r1","type":"RoleType","relation":"org:default"}}`,

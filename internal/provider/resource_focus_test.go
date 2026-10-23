@@ -802,3 +802,94 @@ resource "midpoint_role" "business" {
 		},
 	})
 }
+
+// TestRole_importStructuredFilterEditIsNarrow imports a role whose
+// inducement midPoint stores with a structured filter (as the converter
+// writes it: oid and the filter's text rendering, or the filter alone).
+// The import plans clean, and editing the description afterwards sends
+// exactly "replace description": the inducement, its @id and its stored
+// filter stay as they are.
+func TestRole_importStructuredFilterEditIsNarrow(t *testing.T) {
+	const roleOID = "e7b30a96-4d85-4c21-b1f7-92a05d6c8e44"
+	const addr = "midpoint_role.r"
+	for name, oidLine := range map[string]string{
+		"oid and filter": fmt.Sprintf("      oid    = %q\n", stubOtherOID),
+		"filter only":    "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newTestStub(t)
+			storedFilter := map[string]any{"equal": map[string]any{"path": "name", "value": "grafana / viewer"}}
+			s.Put("roles", map[string]any{
+				"oid": roleOID, "name": "Observability Engineer", "description": "v1",
+				"inducement": []any{map[string]any{"@id": 7, "targetRef": map[string]any{
+					"oid": stubOtherOID, "type": "c:RoleType", "relation": "org:default", "filter": storedFilter,
+				}}},
+			})
+			cfg := func(desc string) string {
+				return fmt.Sprintf(`
+resource "midpoint_role" "r" {
+  name        = "Observability Engineer"
+  oid         = %q
+  description = %q
+
+  inducement {
+    target {
+%s      type   = "RoleType"
+      filter = "name = \"grafana / viewer\""
+    }
+  }
+}
+`, roleOID, desc, oidLine)
+			}
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: stubProviderFactories(t, s),
+				Steps: []resource.TestStep{
+					{Config: cfg("v1"), ResourceName: addr, ImportState: true, ImportStateId: roleOID, ImportStateKind: resource.ImportBlockWithID},
+					{Config: cfg("v1"), ResourceName: addr, ImportState: true, ImportStateId: roleOID, ImportStatePersist: true},
+					{
+						Config: cfg("v1"),
+						ConfigPlanChecks: resource.ConfigPlanChecks{
+							PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+						},
+					},
+					{
+						Config: cfg("v2"),
+						ConfigPlanChecks: resource.ConfigPlanChecks{
+							PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)},
+						},
+						Check: checkStub(func() error {
+							for _, m := range []string{"POST", "PUT", "DELETE"} {
+								if n := len(requests(s, m)); n != 0 {
+									return fmt.Errorf("%d %s requests, want none", n, m)
+								}
+							}
+							patches := requests(s, "PATCH")
+							if len(patches) != 1 {
+								return fmt.Errorf("want one PATCH, got %d", len(patches))
+							}
+							if got := patches[0].Query["options"]; slices.Contains(got, "reevaluateSearchFilters") {
+								return fmt.Errorf("update options = %v, want no reevaluateSearchFilters", got)
+							}
+							want := asJSON(t, map[string]any{"objectModification": map[string]any{"itemDelta": []any{
+								map[string]any{"modificationType": "replace", "path": "description", "value": "v2"},
+							}}})
+							if got := asJSON(t, patches[0].Body); !reflect.DeepEqual(got, want) {
+								return fmt.Errorf("PATCH body = %v, want %v", got, want)
+							}
+							ind := asList(stubBody(s, "roles", roleOID)["inducement"])
+							if len(ind) != 1 {
+								return fmt.Errorf("stored inducements = %v, want the one", ind)
+							}
+							m := asJSON(t, ind[0]).(map[string]any)
+							if fmt.Sprint(m["@id"]) != "7" || !reflect.DeepEqual(m["targetRef"].(map[string]any)["filter"], asJSON(t, storedFilter)) {
+								return fmt.Errorf("stored inducement = %v, want @id 7 and the structured filter", m)
+							}
+							return nil
+						}),
+					},
+					refreshIsClean(),
+				},
+			})
+		})
+	}
+}
