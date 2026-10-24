@@ -41,7 +41,7 @@ func (c *Client) Get(ctx context.Context, typ, oid string, o GetOptions) (*Objec
 	for _, e := range o.Exclude {
 		q.Add("exclude", e)
 	}
-	_, body, err := c.do(ctx, http.MethodGet, objectPath(typ, oid), q, nil)
+	resp, body, err := c.do(ctx, http.MethodGet, objectPath(typ, oid), q, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +53,12 @@ func (c *Client) Get(ctx context.Context, typ, oid string, o GetOptions) (*Objec
 	content, err := unwrap(doc, SingularOf(typ))
 	if err != nil {
 		return nil, fmt.Errorf("decoding %s/%s: %w", typ, oid, err)
+	}
+	// A read midPoint cannot complete answers HTTP 250 (partial error) with
+	// the OperationResult in place of the object.
+	if t, _ := content["@type"].(string); strings.HasSuffix(t, "OperationResultType") {
+		msg, _ := content["message"].(string)
+		return nil, &APIError{Status: resp.StatusCode, Message: msg, Body: string(body)}
 	}
 	obj := &Object{Type: typ, OID: oid, Body: content}
 	if s, ok := content["oid"].(string); ok && s != "" {
@@ -241,3 +247,11 @@ func unwrap(doc map[string]any, singular string) (map[string]any, error) {
 	}
 	return found, nil
 }
+
+// BuiltinOIDPrefix is the oid range of the objects midPoint ships
+// (00000000-0000-0000-0000-*).
+const BuiltinOIDPrefix = "00000000-0000-0000-0000-"
+
+// IsBuiltinOID reports whether oid is in the range of the objects midPoint
+// ships, which exist before Terraform creates them.
+func IsBuiltinOID(oid string) bool { return strings.HasPrefix(oid, BuiltinOIDPrefix) }

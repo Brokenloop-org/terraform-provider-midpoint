@@ -466,7 +466,7 @@ func TestFocusFromBody(t *testing.T) {
 				map[string]any{"@id": json.Number("1"), "targetRef": map[string]any{"oid": fServiceOID, "type": "c:ServiceType"}},
 				// A non-text filter cannot be written in a target block.
 				map[string]any{"@id": json.Number("2"), "targetRef": map[string]any{
-					"type": "c:RoleType", "filter": map[string]any{"equal": map[string]any{"path": "name", "value": "x"}},
+					"type": "c:RoleType", "filter": map[string]any{"substring": map[string]any{"path": "name", "value": "x"}},
 				}},
 			},
 			"activation": map[string]any{"administrativeStatus": "enabled", "lockoutStatus": "normal"},
@@ -480,7 +480,7 @@ func TestFocusFromBody(t *testing.T) {
 			"tenant":  true,
 			"inducement": []any{map[string]any{"targetRef": map[string]any{
 				"type": "RoleType", "relation": "org:default",
-				"filter": map[string]any{"equal": map[string]any{"path": "name", "value": []any{"x"}}},
+				"filter": map[string]any{"substring": map[string]any{"path": "name", "value": []any{"x"}}},
 			}}},
 			"activation": map[string]any{"administrativeStatus": "enabled", "lockoutStatus": "normal"},
 		}

@@ -62,6 +62,10 @@ type engine struct {
 	// or not it differs from the desired body. Resources use it for
 	// computed attributes, e.g. a resource's connector_oid.
 	observe func(actual map[string]any)
+	// raw is the body of the last successful read as midPoint returned it,
+	// before canonicalization: what Canonical strips (a cache stamp, say)
+	// is still there.
+	raw map[string]any
 }
 
 // newEngine returns the engine for spec using the configured provider.
@@ -162,6 +166,7 @@ func (e *engine) read(ctx context.Context, oid string) (actual map[string]any, f
 		diags.AddError("Cannot read object", fmt.Sprintf("reading %s: %s", e.ref(oid), err))
 		return nil, false, diags
 	}
+	e.raw = obj.Body
 	return normalize.Canonical(e.spec.RestType, obj.Body), true, diags
 }
 

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// keyPrefixes are the namespace prefixes the old JSON catalogue used on item
+// keyPrefixes are the namespace prefixes older midPoint JSON exports use on item
 // names (common, types, query).
 var keyPrefixes = []string{"c:", "t:", "q:"}
 

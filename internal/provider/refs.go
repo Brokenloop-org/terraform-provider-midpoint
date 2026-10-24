@@ -12,6 +12,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/normalize"
 )
 
 // defaultRelation is the relation midPoint gives a reference that has none.
@@ -44,7 +46,11 @@ func targetBlock() schema.SingleNestedBlock {
 			"filter": schema.StringAttribute{
 				Description: "midPoint text query selecting the target, e.g. name = \"vault / operator\". " +
 					"midPoint resolves it when the object is written; with a filter only, Terraform knows no " +
-					"dependency on the target, so ordering is up to the configuration.",
+					"dependency on the target, so ordering is up to the configuration. A structured filter stored in " +
+					"midPoint (equal conditions joined by and, or, not) is read as its text rendering, with the " +
+					"operands of and/or sorted; when that rendering equals this value the stored filter counts as " +
+					"equal and is never rewritten, also when another item of the object changes. A stored filter " +
+					"that has no text rendering is not read into this block: the item holding the reference stays in extra.",
 				Optional: true,
 			},
 			"type": schema.StringAttribute{
@@ -119,12 +125,15 @@ func refFromJSON(m map[string]any) (t targetRef, ok bool) {
 			}
 			t.Relation = types.StringValue(s)
 		case "filter":
+			// A structured filter midPoint stored is read as its text
+			// rendering (normalize.FilterText, the one the converter
+			// writes); any other filter is not expressible.
 			f, isMap := v.(map[string]any)
-			if !isMap || len(f) != 1 {
+			if !isMap {
 				return t, false
 			}
-			text, isStr := f["text"].(string)
-			if !isStr {
+			text, textOK := normalize.FilterText(f)
+			if !textOK {
 				return t, false
 			}
 			t.Filter = types.StringValue(text)

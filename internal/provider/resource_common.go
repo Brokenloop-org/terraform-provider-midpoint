@@ -27,7 +27,8 @@ func commonAttributes(spec engineSpec) map[string]schema.Attribute {
 				"update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an " +
 				"object whose oid already exists fails and nothing is written. While it is true, destroying the object " +
 				"fails unless force_destroy is set: an adopted object is not Terraform's to delete. Remove it from state " +
-				"with a removed block (lifecycle { destroy = false }) to stop managing it. Defaults to false.",
+				"with a removed block (lifecycle { destroy = false }) to stop managing it. Importing a midPoint built-in " +
+				"(oid 00000000-0000-0000-0000-*) records it as adopted (true); any other import records false. Defaults to false.",
 			Optional: true,
 			Computed: true,
 			Default:  booldefault.StaticBool(false),

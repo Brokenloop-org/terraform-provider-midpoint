@@ -7,9 +7,9 @@ import "slices"
 // reference, because the repository rejects them otherwise.
 const optionReevaluateSearchFilters = "reevaluateSearchFilters"
 
-// readExcludes are the heaviest server-managed items, left out of every read
-// (spec §4.4). Canonical drops them anyway; excluding them saves the
-// transfer where midPoint honours the exclusion.
+// readExcludes are the heaviest server-managed items, left out of every read.
+// Canonical drops them anyway; excluding them saves the transfer where
+// midPoint honours the exclusion.
 var readExcludes = []string{
 	"metadata", "operationExecution", "roleMembershipRef", "linkRef", "fetchResult", "operationalStateHistory",
 }

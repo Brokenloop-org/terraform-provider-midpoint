@@ -160,21 +160,211 @@ resource "midpoint_resource" "any_version" {
 				),
 			},
 			refreshIsClean(),
-			// An import reads back no connector (connector_oid holds the
-			// reference) and no schema definition (compared only when
-			// configured: it is usually the schema midPoint cached), and
-			// the single objectClass in canonical (list) form.
+			// An import reads the connector back from the connectorRef
+			// filter, the configuration properties without their "@ns"
+			// annotation, no schema definition (compared only when
+			// configured: it is usually the schema midPoint cached), and the
+			// single objectClass in canonical (list) form.
 			{
 				ResourceName:      addr,
 				ImportState:       true,
 				ImportStateVerify: true,
 				ImportStateVerifyIgnore: []string{
-					"connector", "schema.definition", "schema_handling.objectType.0.objectClass",
+					"connector_configuration.configurationProperties.%",
+					"connector_configuration.configurationProperties.@ns",
+					"schema.definition", "schema_handling.objectType.0.objectClass",
 				},
 			},
 		},
 		CheckDestroy: checkGone(s, "resources", &oid),
 	})
+}
+
+// An imported resource records the connector its connectorRef filter
+// selects, so the configuration that set it imports with no change.
+func TestResource_importRecordsConnector(t *testing.T) {
+	s := newTestStub(t)
+	const addr = "midpoint_resource.csv"
+	cfg := resourceConfig(`{
+    objectType = [{
+      kind        = "account"
+      intent      = "default"
+      objectClass = ["ri:AccountObjectClass"]
+    }]
+  }`, "")
+	// "@ns" is an annotation an import cannot read back.
+	cfg = strings.Replace(cfg, "      \"@ns\"    = \"urn:csv\"\n", "", 1)
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{Config: cfg},
+			{
+				Config:          cfg,
+				ResourceName:    addr,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithID,
+			},
+		},
+	})
+}
+
+// An imported resource records a static schema definition (one midPoint
+// holds without schema/cachingMetadata), so the configuration that sets it
+// imports with no change; a cached definition stays unrecorded, so a
+// configuration without schema imports with no change either.
+func TestResource_importRecordsStaticSchemaDefinition(t *testing.T) {
+	const addr = "midpoint_resource.csv"
+	const xsd = `<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"><xsd:complexType name="AccountObjectClass"/></xsd:schema>`
+	for name, tc := range map[string]struct {
+		cached bool
+		attrs  string
+	}{
+		// The converter's form: chomp drops the heredoc's final newline.
+		"static": {attrs: "  schema = {\n    definition = chomp(<<-EOT\n      " + xsd + "\n    EOT\n    )\n  }"},
+		"cached": {cached: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newTestStub(t)
+			schema := map[string]any{"definition": map[string]any{"@ns": "http://www.w3.org/2001/XMLSchema", "schema": xsd}}
+			if tc.cached {
+				schema["cachingMetadata"] = map[string]any{"retrievalTimestamp": "2026-10-23T14:14:33.131Z", "serialNumber": "1"}
+			}
+			s.Put("resources", map[string]any{
+				"oid": stubResourceOID, "name": "csv",
+				"connectorRef":           map[string]any{"oid": stubConnectorOID, "type": "c:ConnectorType", "filter": map[string]any{"text": `connectorType = "` + csvConnectorType + `" and connectorVersion = "2.8"`}},
+				"connectorConfiguration": map[string]any{"configurationProperties": map[string]any{"filePath": "/data/accounts.csv"}},
+				"schema":                 schema,
+				"schemaHandling": map[string]any{"objectType": []any{map[string]any{
+					"kind": "account", "intent": "default", "objectClass": []any{"ri:AccountObjectClass"},
+				}}},
+			})
+			cfg := strings.Replace(resourceConfig(`{
+    objectType = [{
+      kind        = "account"
+      intent      = "default"
+      objectClass = ["ri:AccountObjectClass"]
+    }]
+  }`, tc.attrs), "      \"@ns\"    = \"urn:csv\"\n", "", 1)
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: stubProviderFactories(t, s),
+				Steps: []resource.TestStep{
+					{Config: cfg, ResourceName: addr, ImportState: true, ImportStateId: stubResourceOID, ImportStateKind: resource.ImportBlockWithID},
+					{Config: cfg, ResourceName: addr, ImportState: true, ImportStateId: stubResourceOID, ImportStatePersist: true},
+					{Config: cfg, PlanOnly: true},
+				},
+			})
+		})
+	}
+}
+
+// A resource midPoint stores with a structured connectorRef filter (in
+// either operand order) imports with its connector recorded, plans clean
+// after the import, and an edit of another item never rewrites the
+// connectorRef.
+func TestResource_importStructuredConnectorRefPlansClean(t *testing.T) {
+	const addr = "midpoint_resource.csv"
+	for name, conds := range map[string][]any{
+		"type first":    {map[string]any{"path": "connectorType", "value": csvConnectorType}, map[string]any{"path": "connectorVersion", "value": "2.8"}},
+		"version first": {map[string]any{"path": "connectorVersion", "value": "2.8"}, map[string]any{"path": "connectorType", "value": csvConnectorType}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newTestStub(t)
+			storedRef := map[string]any{"oid": stubConnectorOID, "type": "c:ConnectorType",
+				"filter": map[string]any{"and": map[string]any{"equal": conds}}}
+			s.Put("resources", map[string]any{
+				"oid": stubResourceOID, "name": "csv",
+				"connectorRef":           storedRef,
+				"connectorConfiguration": map[string]any{"configurationProperties": map[string]any{"filePath": "/data/accounts.csv"}},
+				"schemaHandling": map[string]any{"objectType": []any{map[string]any{
+					"kind": "account", "intent": "default", "objectClass": []any{"ri:AccountObjectClass"},
+				}}},
+			})
+			cfg := func(attrs string) string {
+				c := resourceConfig(`{
+    objectType = [{
+      kind        = "account"
+      intent      = "default"
+      objectClass = ["ri:AccountObjectClass"]
+    }]
+  }`, attrs)
+				return strings.Replace(c, "      \"@ns\"    = \"urn:csv\"\n", "", 1)
+			}
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: stubProviderFactories(t, s),
+				Steps: []resource.TestStep{
+					{Config: cfg(""), ResourceName: addr, ImportState: true, ImportStateId: stubResourceOID, ImportStateKind: resource.ImportBlockWithID},
+					{Config: cfg(""), ResourceName: addr, ImportState: true, ImportStateId: stubResourceOID, ImportStatePersist: true},
+					{Config: cfg(""), PlanOnly: true},
+					{
+						Config: cfg(`  description = "edited"`),
+						ConfigPlanChecks: resource.ConfigPlanChecks{
+							PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)},
+						},
+						Check: checkStub(func() error {
+							patches := requests(s, "PATCH")
+							if len(patches) != 1 {
+								return fmt.Errorf("want one PATCH, got %d", len(patches))
+							}
+							want := asJSON(t, map[string]any{"objectModification": map[string]any{"itemDelta": []any{
+								map[string]any{"modificationType": "add", "path": "description", "value": "edited"},
+							}}})
+							if got := asJSON(t, patches[0].Body); !reflect.DeepEqual(got, want) {
+								return fmt.Errorf("PATCH body = %v, want %v", got, want)
+							}
+							if got := asJSON(t, stubBody(s, "resources", stubResourceOID)["connectorRef"]); !reflect.DeepEqual(got, asJSON(t, storedRef)) {
+								return fmt.Errorf("stored connectorRef = %v, want it unchanged %v", got, storedRef)
+							}
+							return nil
+						}),
+					},
+					refreshIsClean(),
+				},
+			})
+		})
+	}
+}
+
+func TestConnectorFromRef(t *testing.T) {
+	const typ = `com.evolveum.polygon.connector.csv.CsvConnector`
+	text := func(s string) map[string]any { return map[string]any{"filter": map[string]any{"text": s}} }
+	tests := []struct {
+		name          string
+		ref           any
+		typ, version  string
+		wantOK        bool
+		wantNoVersion bool
+	}{
+		{"type and version", text(connectorFilter(typ, "2.8")), typ, "2.8", true, false},
+		{"type only", text(connectorFilter(typ, "")), typ, "", true, true},
+		{"resolved oid kept", map[string]any{"oid": stubConnectorOID, "type": "ConnectorType",
+			"filter": map[string]any{"text": connectorFilter(typ, "2.8")}}, typ, "2.8", true, false},
+		{"escaped", text(connectorFilter(`a"b\c`, "1")), `a"b\c`, "1", true, false},
+		{"structured", map[string]any{"filter": map[string]any{"equal": map[string]any{
+			"path": "connectorType", "value": typ}}}, typ, "", true, true},
+		{"structured and, version first", map[string]any{"filter": map[string]any{"and": map[string]any{"equal": []any{
+			map[string]any{"path": "connectorVersion", "value": "2.8"},
+			map[string]any{"path": "connectorType", "value": typ},
+		}}}}, typ, "2.8", true, false},
+		{"oid only", map[string]any{"oid": stubConnectorOID}, "", "", false, false},
+		{"other filter", text(`connectorType = "x" and connectorHostRef matches (oid = "y")`), "", "", false, false},
+		{"other spacing", text(`connectorType="x"`), "", "", false, false},
+		{"empty type", text(`connectorType = ""`), "", "", false, false},
+		{"not a map", "x", "", "", false, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m, ok := connectorFromRef(tc.ref)
+			if ok != tc.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
+			}
+			if !ok {
+				return
+			}
+			if m.Type.ValueString() != tc.typ || m.Version.ValueString() != tc.version || m.Version.IsNull() != tc.wantNoVersion {
+				t.Errorf("connector = %v/%v, want %q/%q", m.Type, m.Version, tc.typ, tc.version)
+			}
+		})
+	}
 }
 
 // midPoint resolves the connector filter to an OID that differs per

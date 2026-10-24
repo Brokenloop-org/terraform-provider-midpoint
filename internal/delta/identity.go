@@ -29,8 +29,9 @@ const defaultRelation = "org:default"
 //     construction's (resourceRef oid or filter, kind, intent); plus order;
 //   - objectType: kind and intent;
 //   - attribute and association: ref;
-//   - anything else: the whole value, ignoring "@id" and the order of map
-//     keys and of the values of multi-valued items.
+//   - anything else: the whole value, ignoring "@id", empty values
+//     (emptyValue) and the order of map keys and of the values of
+//     multi-valued items.
 //
 // Numbers are keyed by value, so 2 and 2.0 have the same key.
 func Key(itemName string, v any) string {
@@ -111,6 +112,32 @@ func tuple(parts ...any) string {
 // sorted (the values of a multi-valued item are a set) and numbers by exact
 // value. Two values with the same fingerprint are equal under
 // normalize.Equal up to the order of list values.
+// emptyValue reports whether v carries nothing: nil, a map with only "@id"
+// and empty values, or a list of empty values. midPoint returns an empty
+// container as {"@id": n} and a read's prior state drops empty values, so
+// an empty item and an absent one identify the same value.
+func emptyValue(v any) bool {
+	switch t := v.(type) {
+	case nil:
+		return true
+	case map[string]any:
+		for k, e := range t {
+			if k != "@id" && !emptyValue(e) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		for _, e := range t {
+			if !emptyValue(e) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
 func fingerprint(v any) string {
 	var b strings.Builder
 	writeFingerprint(&b, v)
@@ -132,7 +159,7 @@ func writeFingerprint(b *strings.Builder, v any) {
 	case map[string]any:
 		keys := make([]string, 0, len(t))
 		for k, e := range t {
-			if k != "@id" && e != nil {
+			if k != "@id" && !emptyValue(e) {
 				keys = append(keys, k)
 			}
 		}
