@@ -1,0 +1,16 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "policyRule[2]/description",
+    "value": "new"
+  },
+  {
+    "modificationType": "add",
+    "path": "policyRule",
+    "value": [
+      {
+        "name": "t"
+      }
+    ]
+  }
+]

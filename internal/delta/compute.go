@@ -161,33 +161,20 @@ func (c *collector) compareItem(path, parent, name string, dv, av any) error {
 }
 
 // compareValues compares the values of a multi-valued item holding
-// container (or other structured) values. Values are paired by Key; unpaired
-// desired values are added and unpaired actual values deleted, each in one
-// delta; paired values that differ are compared item by item inside the
-// container value when its "@id" is known, else deleted and re-added whole.
+// container (or other structured) values. Values are paired by Key, then the
+// leftovers by pairLeftovers; unpaired desired values are added and unpaired
+// actual values deleted, each in one delta; paired values that differ are
+// compared item by item inside the container value when its "@id" is known,
+// else deleted and re-added whole.
 func (c *collector) compareValues(path, parent, name string, d, a []any) error {
-	if len(d) == 1 && len(a) == 1 {
-		id := idOf(a[0])
-		// One value on each side and no id to address it by: this is often
-		// a single-valued item that MultiValued wraps by name, so replace it.
-		if id == nil {
-			c.emit(modReplace, path, d)
-			return nil
-		}
-		// One value on each side, addressable by id, and no identity other
-		// than its whole content (outbound, inbound, mapping, ...): it is
-		// the same value modified, so change it in place.
-		dm, dIsMap := d[0].(map[string]any)
-		am, aIsMap := a[0].(map[string]any)
-		if dIsMap && aIsMap && strings.HasPrefix(Key(name, dm), fallbackKeyPrefix) && descendable(parent, name, dm, am) {
-			n, err := containerID(id)
-			if err != nil {
-				return fmt.Errorf("delta: %s: %w", path, err)
-			}
-			return c.compareMap(path+"["+n+"]", name, dm, am)
-		}
+	// One value on each side and no id to address it by: this is often a
+	// single-valued item that MultiValued wraps by name, so replace it.
+	if len(d) == 1 && len(a) == 1 && idOf(a[0]) == nil {
+		c.emit(modReplace, path, d)
+		return nil
 	}
 	pairs, unpaired := pair(name, d, a)
+	pairs, unpaired = pairLeftovers(parent, name, d, a, pairs, unpaired)
 	var deletes, adds []any
 	for i, j := range pairs {
 		if j < 0 {
@@ -204,7 +191,8 @@ func (c *collector) compareValues(path, parent, name string, d, a []any) error {
 			if err != nil {
 				return fmt.Errorf("delta: %s: %w", path, err)
 			}
-			if err := c.compareMap(path+"["+n+"]", name, dm, am); err != nil {
+			// A value pairLeftovers paired has not been aligned yet.
+			if err := c.compareMap(path+"["+n+"]", name, dm, alignMap(dm, am)); err != nil {
 				return err
 			}
 			continue
@@ -230,6 +218,71 @@ func (c *collector) compareValues(path, parent, name string, d, a []any) error {
 		c.emit(modAdd, path, adds)
 	}
 	return nil
+}
+
+// pairLeftovers pairs values that pair left over, so that an edit keeps the
+// value's "@id" and sends only what changed. Their contents differ, so this
+// is a choice of which id survives, not a claim that they are the same value:
+// the deltas make the paired value equal the desired one either way. Only
+// values with no identity other than their whole content qualify; a different
+// target or kind/intent is a different value. Values are paired by a name
+// unique on each side, then by elimination when one is left on each side. Any
+// others stay unpaired, to be deleted and added.
+func pairLeftovers(parent, name string, d, a []any, pairs, unpaired []int) ([]int, []int) {
+	free := func() (ds []int) {
+		for i, j := range pairs {
+			if j < 0 {
+				ds = append(ds, i)
+			}
+		}
+		return ds
+	}
+	take := func(i, j int) {
+		pairs[i] = j
+		unpaired = slices.DeleteFunc(unpaired, func(u int) bool { return u == j })
+	}
+	dNames, aNames := uniqueNames(d, free()), uniqueNames(a, unpaired)
+	for n, i := range dNames {
+		if j, ok := aNames[n]; ok && pairable(parent, name, d[i], a[j]) {
+			take(i, j)
+		}
+	}
+	if ds := free(); len(ds) == 1 && len(unpaired) == 1 && pairable(parent, name, d[ds[0]], a[unpaired[0]]) {
+		take(ds[0], unpaired[0])
+	}
+	return pairs, unpaired
+}
+
+// uniqueNames maps each "name" held by exactly one of the values at indexes
+// to that value's index.
+func uniqueNames(values []any, indexes []int) map[string]int {
+	out := map[string]int{}
+	seen := map[string]bool{}
+	for _, i := range indexes {
+		m, _ := values[i].(map[string]any)
+		n, ok := m["name"].(string)
+		if !ok {
+			continue
+		}
+		if seen[n] {
+			delete(out, n)
+			continue
+		}
+		seen[n] = true
+		out[n] = i
+	}
+	return out
+}
+
+// pairable reports whether desired value dv may take over actual value av:
+// both are container values identified only by their content, av has an id to
+// address it by, and a difference can be expressed inside it.
+func pairable(parent, name string, dv, av any) bool {
+	dm, dIsMap := dv.(map[string]any)
+	am, aIsMap := av.(map[string]any)
+	return dIsMap && aIsMap && idOf(av) != nil &&
+		strings.HasPrefix(Key(name, dm), fallbackKeyPrefix) && strings.HasPrefix(Key(name, am), fallbackKeyPrefix) &&
+		descendable(parent, name, dm, am)
 }
 
 // descendable reports whether a difference between two map values of item

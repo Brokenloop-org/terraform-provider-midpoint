@@ -245,6 +245,23 @@ func policyRuleOf(c *client.Client, st *terraform.State, addr string, i int) (ma
 	return rule, rules, nil
 }
 
+// accRuleID returns the container id of the policy rule called name of the
+// mark oid; it fails the test when there is no such rule.
+func accRuleID(t *testing.T, c *client.Client, oid, name string) string {
+	t.Helper()
+	body, err := accGet(c, "marks", oid)
+	if err != nil {
+		t.Fatalf("reading marks/%s: %v", oid, err)
+	}
+	for _, v := range asList(body["policyRule"]) {
+		if rule, _ := v.(map[string]any); rule["name"] == name {
+			return fmt.Sprint(rule["@id"])
+		}
+	}
+	t.Fatalf("mark %s has no policy rule %q: %v", oid, name, body["policyRule"])
+	return ""
+}
+
 // A mark's policyRule is multi-valued: midPoint answers HTTP 400 to a path
 // that does not address its value by id, and to one that does not address the
 // constraint inside it the same way.
@@ -282,7 +299,7 @@ resource "midpoint_mark" "m" {
 			return nil
 		}
 	}
-	var oid, version string
+	var oid, version, ruleID string
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -339,8 +356,10 @@ resource "midpoint_mark" "m" {
 				},
 			},
 			emptyPlanAfterRefresh(),
+			// The edited rule stays the same container value: it keeps its id.
 			{
-				Config: cfg("[" + rule("four", "c3") + `, { name = "s", description = "other" }]`),
+				PreConfig: func() { ruleID = accRuleID(t, c, oid, "r") },
+				Config:    cfg("[" + rule("four", "c3") + `, { name = "s", description = "other" }]`),
 				Check: func(st *terraform.State) error {
 					_, rules, err := policyRuleOf(c, st, addr, 1)
 					if err != nil {
@@ -348,6 +367,9 @@ resource "midpoint_mark" "m" {
 					}
 					if len(rules) != 2 {
 						return fmt.Errorf("policyRule = %v, want two rules", rules)
+					}
+					if got := accRuleID(t, c, oid, "r"); got != ruleID {
+						return fmt.Errorf("rule r has id %s after the edit, want %s", got, ruleID)
 					}
 					return nil
 				},

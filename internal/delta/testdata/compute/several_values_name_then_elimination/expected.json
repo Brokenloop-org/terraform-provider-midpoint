@@ -1,0 +1,12 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "policyRule[2]/description",
+    "value": "r2"
+  },
+  {
+    "modificationType": "replace",
+    "path": "policyRule[5]/name",
+    "value": "t"
+  }
+]

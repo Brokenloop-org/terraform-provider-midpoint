@@ -1,0 +1,13 @@
+{
+  "name": "m",
+  "policyRule": [
+    {
+      "name": "r",
+      "description": "a2"
+    },
+    {
+      "name": "r",
+      "description": "b2"
+    }
+  ]
+}

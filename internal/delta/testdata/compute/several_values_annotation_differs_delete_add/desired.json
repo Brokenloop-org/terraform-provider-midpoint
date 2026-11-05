@@ -1,0 +1,12 @@
+{
+  "name": "m",
+  "policyRule": [
+    {
+      "@type": "A",
+      "name": "r"
+    },
+    {
+      "name": "s"
+    }
+  ]
+}

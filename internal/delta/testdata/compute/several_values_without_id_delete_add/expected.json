@@ -1,0 +1,20 @@
+[
+  {
+    "modificationType": "delete",
+    "path": "source",
+    "value": [
+      {
+        "path": "old"
+      }
+    ]
+  },
+  {
+    "modificationType": "add",
+    "path": "source",
+    "value": [
+      {
+        "path": "new"
+      }
+    ]
+  }
+]

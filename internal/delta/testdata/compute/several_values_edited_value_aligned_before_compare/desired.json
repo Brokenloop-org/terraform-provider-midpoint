@@ -1,0 +1,22 @@
+{
+  "name": "m",
+  "policyRule": [
+    {
+      "name": "r",
+      "description": "new",
+      "ownerRef": {
+        "oid": "o"
+      },
+      "policyConstraints": {
+        "modification": [
+          {
+            "name": "c"
+          }
+        ]
+      }
+    },
+    {
+      "name": "s"
+    }
+  ]
+}
