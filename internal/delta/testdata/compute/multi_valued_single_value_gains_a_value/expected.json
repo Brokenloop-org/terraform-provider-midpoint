@@ -1,0 +1,11 @@
+[
+  {
+    "modificationType": "add",
+    "path": "policyRule",
+    "value": [
+      {
+        "name": "s"
+      }
+    ]
+  }
+]

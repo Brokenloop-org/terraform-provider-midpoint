@@ -1,0 +1,11 @@
+{
+  "name": "a",
+  "assignment": [
+    {
+      "policyRule": {
+        "name": "p",
+        "description": "new"
+      }
+    }
+  ]
+}

@@ -102,6 +102,50 @@ func importIDOf(addr string) resource.ImportStateIdFunc {
 	}
 }
 
+// DashboardType.widget is multi-valued, like a mark's policyRule: an edit
+// inside a single widget addresses it by the id midPoint returned.
+func TestAccObject_dashboardWidget(t *testing.T) {
+	testAccPreCheck(t)
+	c := accClient(t)
+	name := acctest.RandomWithPrefix("tf-acc-dash")
+	const addr = "midpoint_object.dash"
+	cfg := func(description string) string {
+		return fmt.Sprintf(`
+resource "midpoint_object" "dash" {
+  type = "dashboards"
+  body = {
+    name   = %q
+    widget = { identifier = "w", description = %q }
+  }
+}
+`, name, description)
+	}
+	wantWidget := func(description string) resource.TestCheckFunc {
+		return func(st *terraform.State) error {
+			body, err := accGet(c, "dashboards", st.RootModule().Resources[addr].Primary.Attributes["oid"])
+			if err != nil {
+				return err
+			}
+			widget, _ := body["widget"].(map[string]any)
+			if widget["description"] != description {
+				return fmt.Errorf("widget = %v, want description %q", body["widget"], description)
+			}
+			return nil
+		}
+	}
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             accCheckGone(c),
+		Steps: []resource.TestStep{
+			{Config: cfg("one"), Check: wantWidget("one")},
+			emptyPlanAfterRefresh(),
+			{Config: cfg("two"), Check: wantWidget("two")},
+			emptyPlanAfterRefresh(),
+		},
+	})
+}
+
 func TestAccObject_functionLibrary(t *testing.T) {
 	testAccPreCheck(t)
 	c := accClient(t)

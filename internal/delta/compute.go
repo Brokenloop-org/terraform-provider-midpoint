@@ -143,6 +143,17 @@ func (c *collector) compareItem(path, parent, name string, dv, av any) error {
 	dm, dIsMap := dv.(map[string]any)
 	am, aIsMap := av.(map[string]any)
 	if dIsMap && aIsMap && descendable(parent, name, dm, am) {
+		// midPoint reads a single value of a multi-valued container as a bare
+		// object, and rejects a path that does not address it by id. An id it
+		// returned always resolves, whatever the item's multiplicity; it only
+		// generates ids for multi-valued containers, so no table is needed.
+		if id := idOf(am); id != nil {
+			n, err := containerID(id)
+			if err != nil {
+				return fmt.Errorf("delta: %s: %w", path, err)
+			}
+			path += "[" + n + "]"
+		}
 		return c.compareMap(path, name, dm, am)
 	}
 	c.emit(modReplace, path, itemValue(name, dv))

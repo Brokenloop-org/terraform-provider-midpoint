@@ -65,7 +65,9 @@ var partialContainersByType = map[string][]string{
 //     value has no relation;
 //   - the values of a multi-valued item are paired by Key and the actual
 //     list is reordered to the desired order (unpaired actual values last),
-//     because the values of a multi-valued item are a set;
+//     because the values of a multi-valued item are a set, and a bare actual
+//     object with an "@id" becomes a one-element list where the desired value
+//     is a list;
 //   - root items in compareOnlyWhenConfigured are dropped from the actual
 //     body when the desired body does not set them.
 //
@@ -156,6 +158,12 @@ func alignValue(name string, d, a any) any {
 	}
 	switch at := a.(type) {
 	case map[string]any:
+		// midPoint reads a single value of a multi-valued container as a bare
+		// object with an "@id"; against a configured list it is that list's
+		// only actual value.
+		if dl, ok := d.([]any); ok && at["@id"] != nil {
+			return alignList(name, dl, []any{at})
+		}
 		dm, ok := d.(map[string]any)
 		if !ok {
 			return deepCopy(a)
