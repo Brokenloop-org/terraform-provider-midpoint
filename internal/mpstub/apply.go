@@ -21,7 +21,13 @@ var containerItems = map[string]bool{
 	"objectType": true, "attribute": true, "association": true, "inbound": true,
 	"outbound": true, "reaction": true, "mapping": true, "item": true,
 	"objectClass": true, "assignmentRelation": true, "trigger": true, "panel": true,
+	"widget": true, "modification": true,
 }
+
+// rootContainerItems are multi-valued containers only at the object root: the
+// same name is single-valued, and carries no id, below it. MarkType.policyRule
+// is multi-valued, AssignmentType.policyRule single-valued.
+var rootContainerItems = map[string]bool{"policyRule": true}
 
 // segment is one step of an item path: an item name, optionally with the id
 // of one of its container values.
@@ -31,8 +37,8 @@ var segment = regexp.MustCompile(`^([^\[\]/]+)(?:\[(\d+)\])?$`)
 // the object, in a deterministic order (map keys sorted, list order).
 func assignIDs(body map[string]any) {
 	next := maxID(body)
-	var walk func(v any)
-	walk = func(v any) {
+	var walk func(v any, root bool)
+	walk = func(v any, root bool) {
 		switch t := v.(type) {
 		case map[string]any:
 			keys := make([]string, 0, len(t))
@@ -41,7 +47,7 @@ func assignIDs(body map[string]any) {
 			}
 			slices.Sort(keys)
 			for _, k := range keys {
-				if containerItems[k] {
+				if containerItems[k] || (root && rootContainerItems[k]) {
 					for _, e := range toList(t[k]) {
 						if m, ok := e.(map[string]any); ok && m["@id"] == nil {
 							next++
@@ -49,15 +55,15 @@ func assignIDs(body map[string]any) {
 						}
 					}
 				}
-				walk(t[k])
+				walk(t[k], false)
 			}
 		case []any:
 			for _, e := range t {
-				walk(e)
+				walk(e, false)
 			}
 		}
 	}
-	walk(body)
+	walk(body, true)
 }
 
 func maxID(body map[string]any) int {
@@ -106,10 +112,14 @@ func applyDelta(obj map[string]any, mod, path string, value any) error {
 			}
 			continue
 		}
+		if isMultiValued(parent[name]) {
+			// The message of midPoint's PrismContainerImpl.findValue.
+			return fmt.Errorf("Attempt to get segment without an ID from a multi-valued container %s", name)
+		}
 		next, ok := parent[name].(map[string]any)
 		if !ok {
 			if parent[name] != nil {
-				return fmt.Errorf("%s is not a single container value", name)
+				return fmt.Errorf("%s is not a container", name)
 			}
 			if mod == "delete" {
 				return nil // deleting below a missing item changes nothing
@@ -146,6 +156,16 @@ func applyDelta(obj map[string]any, mod, path string, value any) error {
 		return fmt.Errorf("unknown modification type %q", mod)
 	}
 	return nil
+}
+
+// isMultiValued reports whether the stored item holds the values of a
+// multi-valued container: several values, or one that assignIDs gave an id.
+func isMultiValued(item any) bool {
+	if _, isList := item.([]any); isList {
+		return true
+	}
+	m, ok := item.(map[string]any)
+	return ok && m["@id"] != nil
 }
 
 func parseSegment(step string) (name, id string, err error) {

@@ -589,3 +589,85 @@ func TestStubResolvesFilters(t *testing.T) {
 		t.Errorf("reference added without reevaluateSearchFilters has oid %v", got)
 	}
 }
+
+// midPoint resolves a path step without an id only on a single-valued
+// container, and fails the whole modification otherwise. Whether a value is
+// read back bare or in a list does not matter, only the item's multiplicity.
+func TestStubPatch_rejectsPathWithoutContainerID(t *testing.T) {
+	tests := []struct {
+		name, restType string
+		body           map[string]any
+		path           string
+		wantErr        string
+	}{
+		{
+			name:     "single value of a multi-valued container",
+			restType: "marks",
+			body:     map[string]any{"name": "m", "policyRule": map[string]any{"name": "r"}},
+			path:     "policyRule/description",
+			wantErr:  "Attempt to get segment without an ID from a multi-valued container policyRule",
+		},
+		{
+			name:     "several values of a multi-valued container",
+			restType: "marks",
+			body:     map[string]any{"name": "m", "policyRule": []any{map[string]any{"name": "r"}, map[string]any{"name": "s"}}},
+			path:     "policyRule/description",
+			wantErr:  "Attempt to get segment without an ID from a multi-valued container policyRule",
+		},
+		{
+			name:     "multi-valued container nested in a single-valued one",
+			restType: "marks",
+			body:     map[string]any{"name": "m", "policyRule": map[string]any{"@id": json.Number("1"), "policyConstraints": map[string]any{"modification": map[string]any{"name": "c"}}}},
+			path:     "policyRule[1]/policyConstraints/modification/name",
+			wantErr:  "Attempt to get segment without an ID from a multi-valued container modification",
+		},
+		{
+			name:     "widget of a dashboard",
+			restType: "dashboards",
+			body:     map[string]any{"name": "d", "widget": map[string]any{"identifier": "w"}},
+			path:     "widget/description",
+			wantErr:  "Attempt to get segment without an ID from a multi-valued container widget",
+		},
+		{
+			name:     "single-valued container",
+			restType: "marks",
+			body:     map[string]any{"name": "m", "display": map[string]any{"label": "l"}},
+			path:     "display/label",
+		},
+		{
+			name:     "policyRule of an assignment is single-valued",
+			restType: "roles",
+			body:     map[string]any{"name": "r", "assignment": map[string]any{"@id": json.Number("1"), "policyRule": map[string]any{"name": "p"}}},
+			path:     "assignment[1]/policyRule/description",
+		},
+		{
+			name:     "multi-valued container addressed by id",
+			restType: "marks",
+			body:     map[string]any{"name": "m", "policyRule": map[string]any{"@id": json.Number("1"), "name": "r"}},
+			path:     "policyRule[1]/description",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, c := newStub(t)
+			oid := s.Put(tt.restType, tt.body)
+			before := s.Get(tt.restType, oid)
+			err := c.Modify(context.Background(), tt.restType, oid,
+				[]client.ItemDelta{{ModificationType: "replace", Path: tt.path, Value: "new"}}, nil)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Modify: %v", err)
+				}
+				return
+			}
+			var apiErr *client.APIError
+			if !errors.As(err, &apiErr) || apiErr.Status != http.StatusBadRequest {
+				t.Fatalf("Modify error = %v, want HTTP 400", err)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("Modify error = %v, want it to contain %q", err, tt.wantErr)
+			}
+			assertJSONEqual(t, s.Get(tt.restType, oid), before)
+		})
+	}
+}
