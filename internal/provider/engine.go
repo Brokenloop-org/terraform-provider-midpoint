@@ -206,7 +206,7 @@ func (e *engine) reconcile(_ context.Context, desired, actual map[string]any) (e
 // the resource attribute, nil when unset) plus reevaluateSearchFilters when a
 // delta adds a filter-only reference. Nothing is sent when they are equal;
 // when they differ but no item delta expresses the difference, nothing is
-// sent either and a warning names the differing items.
+// sent either and the update fails, naming the differing items.
 func (e *engine) update(ctx context.Context, oid string, desired map[string]any, options []string) diag.Diagnostics {
 	actual, found, diags := e.read(ctx, oid)
 	if diags.HasError() {
@@ -225,15 +225,7 @@ func (e *engine) update(ctx context.Context, oid string, desired map[string]any,
 		return diags
 	}
 	if len(deltas) == 0 {
-		// Unequal, yet no item delta expresses the difference: nothing is
-		// sent, and the next plan shows the same change again.
-		items := "the object"
-		if names := e.differingItems(desired, actual); len(names) > 0 {
-			items = strings.Join(names, ", ")
-		}
-		diags.AddWarning("Change not sent to midPoint",
-			fmt.Sprintf("%s: the configuration differs from midPoint in %s but no item delta can express the change; "+
-				"nothing was sent, and the plan will keep showing it", e.ref(oid), items))
+		diags.Append(e.noDeltaError(oid, desired, actual))
 		return diags
 	}
 
@@ -250,6 +242,20 @@ func (e *engine) update(ctx context.Context, oid string, desired map[string]any,
 		diags.AddError("Cannot update object", fmt.Sprintf("updating %s: %s", e.ref(oid), err))
 	}
 	return diags
+}
+
+// noDeltaError reports a difference between desired and actual that no item
+// delta expresses. It is an error so that an apply never succeeds with nothing
+// sent. No body is known to get here: the one case found, an empty list stored
+// in midPoint, is not a difference (normalize.Canonical drops it).
+func (e *engine) noDeltaError(oid string, desired, actual map[string]any) diag.Diagnostic {
+	items := "the object"
+	if names := e.differingItems(desired, actual); len(names) > 0 {
+		items = strings.Join(names, ", ")
+	}
+	return diag.NewErrorDiagnostic("Change not sent to midPoint",
+		fmt.Sprintf("%s: the configuration differs from midPoint in %s but no item delta can express the change; "+
+			"nothing was sent. This is a bug in the provider; please report it.", e.ref(oid), items))
 }
 
 // delete removes the object oid. Unless force is set, a spec with a

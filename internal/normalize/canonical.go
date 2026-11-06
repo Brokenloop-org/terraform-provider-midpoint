@@ -44,8 +44,11 @@ const defaultRelation = "org:default"
 // one-element lists, drops the "#" or "c:" prefix of type QName string
 // values ("#UserType" is "UserType"), gives references without a relation
 // "org:default" and an unqualified relation the org: prefix,
-// prunes maps and lists that only became empty through stripping, and keeps
-// container "@id"s.
+// prunes maps that only became empty through stripping and every empty list,
+// and keeps container "@id"s. midPoint stores an explicit empty list it was
+// sent and returns it on every read, but it holds no value and no delta
+// removes it (a replace or delete answers 204 and leaves it), so it is the
+// same as a missing item.
 func Canonical(restType string, body map[string]any) map[string]any {
 	if body == nil {
 		return nil
@@ -107,19 +110,14 @@ func canonicalValue(restType string, path []string, name string, v any) (any, bo
 		return canonicalMap(restType, path, t)
 	case []any:
 		out := make([]any, 0, len(t))
-		removed := false
 		for _, e := range t {
 			ce, prune := canonicalValue(restType, path, name, e)
 			if prune {
-				removed = true
 				continue
 			}
 			out = append(out, ce)
 		}
-		if removed && len(out) == 0 {
-			return nil, true
-		}
-		return out, false
+		return out, len(out) == 0
 	case string:
 		if name == "@type" {
 			t = strings.TrimPrefix(t, "c:")
