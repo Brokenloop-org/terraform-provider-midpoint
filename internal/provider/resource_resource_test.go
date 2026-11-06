@@ -9,9 +9,12 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
@@ -33,7 +36,7 @@ func resourceConfig(schemaHandling, attrs string) string {
 resource "midpoint_resource" "csv" {
   oid  = %q
   name = "csv"
-  connector = {
+  connector {
     type    = %q
     version = "2.8"
   }
@@ -79,7 +82,7 @@ func TestResource_connectorRefFilter(t *testing.T) {
 	const addr = "midpoint_resource.csv"
 	cfg := resourceConfig(loginOnly, `
   capabilities = { create = { enabled = false } }
-  schema = {
+  schema {
     generation_constraints = { generateObjectClass = ["ri:AccountObjectClass"] }
     definition             = <<-EOT
       <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
@@ -88,7 +91,9 @@ func TestResource_connectorRefFilter(t *testing.T) {
 `) + `
 resource "midpoint_resource" "any_version" {
   name      = "any version"
-  connector = { type = "com.evolveum.polygon.connector.ldap.LdapConnector" }
+  connector {
+    type = "com.evolveum.polygon.connector.ldap.LdapConnector"
+  }
 }
 `
 	var oid string
@@ -220,7 +225,7 @@ func TestResource_importRecordsStaticSchemaDefinition(t *testing.T) {
 		attrs  string
 	}{
 		// The converter's form: chomp drops the heredoc's final newline.
-		"static": {attrs: "  schema = {\n    definition = chomp(<<-EOT\n      " + xsd + "\n    EOT\n    )\n  }"},
+		"static": {attrs: "  schema {\n    definition = chomp(<<-EOT\n      " + xsd + "\n    EOT\n    )\n  }"},
 		"cached": {cached: true},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -637,7 +642,9 @@ func TestResource_capabilitiesAndGenerationConstraintsAreNarrow(t *testing.T) {
 	plain := resourceConfig(loginOnly, "")
 	configured := resourceConfig(loginOnly, `
   capabilities = { create = { enabled = false } }
-  schema       = { generation_constraints = { generateObjectClass = ["ri:AccountObjectClass"] } }
+  schema {
+    generation_constraints = { generateObjectClass = ["ri:AccountObjectClass"] }
+  }
 `)
 	native := map[string]any{"create": map[string]any{}, "read": map[string]any{"returnDefaultAttributesOption": false}}
 	cached := map[string]any{"@ns": xsdNamespace, "schema": "<xsd:schema/>"}
@@ -773,5 +780,112 @@ func TestResource_clearValueInConnectorConfigurationWarns(t *testing.T) {
 	diags = validateResourceConfig(t, props(map[string]any{"expression": map[string]any{"const": "ldapBindPassword"}}))
 	if diags.HasError() || warned(diags) {
 		t.Errorf("expression.const: diagnostics %v, want none", diags)
+	}
+}
+
+// blockConfig is a bare midpoint_resource whose connector and schema blocks
+// are given as written.
+func blockConfig(blocks string) string {
+	return `
+resource "midpoint_resource" "csv" {
+  name = "csv"
+` + blocks + `
+}
+`
+}
+
+// planFails plans cfg against the stub and expects an error matching re.
+func planFails(t *testing.T, cfg string, re string) {
+	t.Helper()
+	s := newTestStub(t)
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{{
+			Config:      cfg,
+			PlanOnly:    true,
+			ExpectError: regexp.MustCompile(re),
+		}},
+	})
+}
+
+func TestResource_connectorUnknownKeyFails(t *testing.T) {
+	planFails(t, blockConfig("  connector {\n    type    = \"x\"\n    verison = \"1\"\n  }"), `verison`)
+}
+
+func TestResource_schemaUnknownKeyFails(t *testing.T) {
+	planFails(t, blockConfig("  connector {\n    type = \"x\"\n  }\n  schema {\n    generation_constrains = {}\n  }"), `generation_constrains`)
+}
+
+func TestResource_connectorMissingFails(t *testing.T) {
+	planFails(t, blockConfig(""), `connector`)
+}
+
+func TestResource_connectorTypeRequired(t *testing.T) {
+	planFails(t, blockConfig("  connector {}"), `type`)
+}
+
+func TestResource_schemaAbsentIsNull(t *testing.T) {
+	s := newTestStub(t)
+	cfg := blockConfig("  connector {\n    type = \"" + csvConnectorType + "\"\n  }")
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg,
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("midpoint_resource.csv", tfjsonpath.New("schema"), knownvalue.Null()),
+				},
+			},
+			{Config: cfg, PlanOnly: true},
+		},
+	})
+}
+
+// State written by v0.2.0, when connector and schema were attributes, loads
+// unchanged: attribute and block nesting share one state shape.
+func TestResource_stateFromAttributeFormLoads(t *testing.T) {
+	ctx := context.Background()
+	srv, err := providerserver.NewProtocol6WithError(New("test")())()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sr fwresource.SchemaResponse
+	NewResourceResource().Schema(ctx, fwresource.SchemaRequest{}, &sr)
+	raw := `{"oid":"` + stubResourceOID + `","name":"csv","connector":{"type":"x","version":null},"schema":null}`
+	resp, err := srv.UpgradeResourceState(ctx, &tfprotov6.UpgradeResourceStateRequest{
+		TypeName: "midpoint_resource",
+		Version:  sr.Schema.Version,
+		RawState: &tfprotov6.RawState{JSON: []byte(raw)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range resp.Diagnostics {
+		t.Errorf("diagnostic: %s: %s", d.Summary, d.Detail)
+	}
+	if resp.UpgradedState == nil {
+		t.Fatal("no upgraded state")
+	}
+	v, err := resp.UpgradedState.Unmarshal(sr.Schema.Type().TerraformType(ctx))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var attrs map[string]tftypes.Value
+	if err := v.As(&attrs); err != nil {
+		t.Fatal(err)
+	}
+	var conn map[string]tftypes.Value
+	if err := attrs["connector"].As(&conn); err != nil {
+		t.Fatal(err)
+	}
+	var typ string
+	if err := conn["type"].As(&typ); err != nil || typ != "x" {
+		t.Errorf("connector.type = %q, %v; want x", typ, err)
+	}
+	if !conn["version"].IsNull() {
+		t.Errorf("connector.version = %v, want null", conn["version"])
+	}
+	if !attrs["schema"].IsNull() {
+		t.Errorf("schema = %v, want null", attrs["schema"])
 	}
 }

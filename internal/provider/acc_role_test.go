@@ -269,8 +269,10 @@ resource "midpoint_role" "r" {
 		CheckDestroy:             accFocusGone(c),
 		Steps: []resource.TestStep{
 			{
-				Config:      cfg(`  options = ["isImport"]` + "\n"),
-				ExpectError: regexp.MustCompile(`(?s)Cannot create object.*No\s+definition\s+in\s+PP\(costCenter\)`),
+				Config: cfg(`  options = ["isImport"]` + "\n"),
+				// 4.11 fails the same write differently: HTTP 500, "An attempt to
+				// modify an immutable".
+				ExpectError: regexp.MustCompile(`(?s)Cannot create object.*(No\s+definition\s+in\s+PP\(costCenter\)|attempt\s+to\s+modify\s+an\s+immutable)`),
 			},
 			{
 				PreConfig: func() {

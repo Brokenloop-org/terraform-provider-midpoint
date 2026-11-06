@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="urn:t" xmlns:tns="urn:t" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:a="http://prism.evolveum.com/xml/ns/public/annotation-3">
+  <xsd:complexType name="Owner">
+    <xsd:sequence>
+      <xsd:element name="inner" maxOccurs="unbounded">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="leaf" type="xsd:string"/>
+            <xsd:element name="deep"><xsd:complexType><xsd:sequence><xsd:element name="x" type="xsd:string"/></xsd:sequence></xsd:complexType></xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="mode">
+        <xsd:simpleType><xsd:restriction base="xsd:string"><xsd:enumeration value="on"/><xsd:enumeration value="off"/></xsd:restriction></xsd:simpleType>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:element name="globalAnon"><xsd:complexType><xsd:sequence><xsd:element name="y" type="xsd:string"/></xsd:sequence></xsd:complexType></xsd:element>
+</xsd:schema>

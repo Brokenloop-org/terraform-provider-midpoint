@@ -27,11 +27,11 @@ import (
 const restPath = "/midpoint/ws/rest"
 
 const (
-	typesNS     = "http://prism.evolveum.com/xml/ns/public/types-3"
-	commonNS    = "http://midpoint.evolveum.com/xml/ns/public/common/common-3"
-	apiTypesNS  = "http://midpoint.evolveum.com/xml/ns/public/common/api-types-3"
-	stampTime   = "2026-10-22T12:00:00.000Z"
-	nodeVersion = "4.9.9"
+	typesNS            = "http://prism.evolveum.com/xml/ns/public/types-3"
+	commonNS           = "http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+	apiTypesNS         = "http://midpoint.evolveum.com/xml/ns/public/common/api-types-3"
+	stampTime          = "2026-10-22T12:00:00.000Z"
+	defaultNodeVersion = "4.9.9"
 )
 
 // focusTypes get a computed root activation, like FocusType objects do.
@@ -84,18 +84,27 @@ type Server struct {
 	seq          int
 	fault        func(Recorded) int
 	partial      func(Recorded) string
+	nodeVersion  string
 }
 
 // New starts a stub. Point a client.Config.URL at URL() and Close it when
 // done.
 func New() *Server {
-	s := &Server{objects: map[key]*entry{}}
+	s := &Server{objects: map[key]*entry{}, nodeVersion: defaultNodeVersion}
 	s.ts = httptest.NewServer(http.HandlerFunc(s.serve))
 	return s
 }
 
 // URL is the server URL (without the REST base path).
 func (s *Server) URL() string { return s.ts.URL }
+
+// SetNodeVersion sets the build version the stub reports for its node; an
+// empty string makes the node report none.
+func (s *Server) SetNodeVersion(v string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nodeVersion = v
+}
 
 // Close shuts the server down.
 func (s *Server) Close() { s.ts.Close() }
@@ -262,7 +271,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case r.Method == http.MethodGet && len(seg) == 2 && seg[0] == "nodes" && seg[1] == "current":
-		writeJSON(w, http.StatusOK, map[string]any{"node": map[string]any{"build": map[string]any{"version": nodeVersion}}})
+		writeJSON(w, http.StatusOK, map[string]any{"node": map[string]any{"build": map[string]any{"version": s.nodeVersion}}})
 	case r.Method == http.MethodGet && len(seg) == 2:
 		s.get(w, seg[0], seg[1])
 	case r.Method == http.MethodPost && len(seg) == 1:

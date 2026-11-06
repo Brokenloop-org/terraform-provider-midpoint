@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -378,8 +379,9 @@ func (connectorOIDPlanModifier) PlanModifyString(ctx context.Context, req planmo
 // NewResourceResource returns the midpoint_resource resource.
 func NewResourceResource() resource.Resource {
 	return &typedResource[resourceState]{
-		name: resourceSpec.ShortName,
-		spec: resourceSpec,
+		name:   resourceSpec.ShortName,
+		spec:   resourceSpec,
+		checks: resourceSchemaChecks,
 		schema: typedSchema(resourceSpec,
 			"A midPoint resource (ResourceType): a connector, its configuration, schema handling and "+
 				"synchronization. The connector is found by type (and version) with a search filter, so the "+
@@ -391,27 +393,6 @@ func NewResourceResource() resource.Resource {
 				"name":            nameAttribute(),
 				"description":     optionalString("Description."),
 				"lifecycle_state": optionalString("Lifecycle state (lifecycleState), e.g. active, proposed."),
-				"connector": schema.SingleNestedAttribute{
-					Description: "The connector, found by a search filter on connectorType (and connectorVersion when " +
-						"version is set). midPoint resolves the filter when it creates or updates the resource; the " +
-						"OID it finds is connector_oid. An import records the connector from the connectorRef filter " +
-						"when it is the one this attribute writes; a resource that references its connector by OID " +
-						"alone imports without it, and the config then sets it with one update.",
-					Required: true,
-					Attributes: map[string]schema.Attribute{
-						"type": schema.StringAttribute{
-							Description: "Connector type (connectorType), e.g. com.evolveum.polygon.connector.csv.CsvConnector.",
-							Required:    true,
-							Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
-						},
-						"version": schema.StringAttribute{
-							Description: "Connector version (connectorVersion), e.g. 2.8. When unset any version " +
-								"matches, which fails while several versions of the connector are installed.",
-							Optional:   true,
-							Validators: []validator.String{stringvalidator.LengthAtLeast(1)},
-						},
-					},
-				},
 				"connector_oid": schema.StringAttribute{
 					Description: "OID of the connector midPoint resolved from connector. It differs per " +
 						"environment and is never compared.",
@@ -438,13 +419,35 @@ func NewResourceResource() resource.Resource {
 				"capabilities": optionalDynamic("Configured capabilities (capabilities/configured) in midPoint naming, " +
 					"e.g. { create = { enabled = false } }. The native capabilities the connector reports are " +
 					"server-managed and never compared."),
-				"schema": schema.SingleNestedAttribute{
+				"extra": extraAttribute(),
+			}, map[string]schema.Block{
+				"connector": schema.SingleNestedBlock{
+					Description: "Required. The connector, found by a search filter on connectorType (and connectorVersion when " +
+						"version is set). midPoint resolves the filter when it creates or updates the resource; the " +
+						"OID it finds is connector_oid. An import records the connector from the connectorRef filter " +
+						"when it is the one this attribute writes; a resource that references its connector by OID " +
+						"alone imports without it, and the config then sets it with one update.",
+					Validators: []validator.Object{objectvalidator.IsRequired()},
+					Attributes: map[string]schema.Attribute{
+						"type": schema.StringAttribute{
+							Description: "Connector type (connectorType), e.g. com.evolveum.polygon.connector.csv.CsvConnector.",
+							Required:    true,
+							Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
+						},
+						"version": schema.StringAttribute{
+							Description: "Connector version (connectorVersion), e.g. 2.8. When unset any version " +
+								"matches, which fails while several versions of the connector are installed.",
+							Optional:   true,
+							Validators: []validator.String{stringvalidator.LengthAtLeast(1)},
+						},
+					},
+				},
+				"schema": schema.SingleNestedBlock{
 					Description: "Resource schema settings (schema). midPoint caches the schema it fetches from the " +
 						"connector in schema/definition; that cached definition is compared only when definition is " +
 						"configured. So removing definition from the configuration leaves the schema in midPoint as it " +
 						"is (it is no longer compared); it is not deleted. Configuring or removing generation_constraints " +
 						"changes only schema/generationConstraints.",
-					Optional: true,
 					Attributes: map[string]schema.Attribute{
 						"generation_constraints": optionalDynamic("Schema generation constraints " +
 							"(generationConstraints) in midPoint naming, e.g. { generateObjectClass = " +
@@ -455,8 +458,7 @@ func NewResourceResource() resource.Resource {
 							"indented schema, which then always differs from the configured text."),
 					},
 				},
-				"extra": extraAttribute(),
-			}, nil),
+			}),
 		toBody: func(ctx context.Context, s *resourceState, _, _ bool) (map[string]any, diag.Diagnostics) {
 			return resourceToBody(ctx, s)
 		},

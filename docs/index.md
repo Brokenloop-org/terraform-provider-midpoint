@@ -70,8 +70,8 @@ provider "midpoint" {
 
 ## Environment variables
 
-Every attribute except `ca_bundle`, `default_options`, `fail_on_unapplied_write`
-and `on_partial_error` can come from the environment. An attribute set in the
+Every attribute except `ca_bundle`, `default_options`, `fail_on_unapplied_write`,
+`on_partial_error` and `on_invalid_item` can come from the environment. An attribute set in the
 configuration takes precedence. `url`, `username` and `password` are required,
 from either source.
 
@@ -81,6 +81,17 @@ from either source.
 | `username` | `MIDPOINT_USERNAME` | HTTP basic authentication. |
 | `password` | `MIDPOINT_PASSWORD` | HTTP basic authentication. |
 | `insecure` | `MIDPOINT_INSECURE` | `true` skips TLS verification (development only). |
+
+## Invalid items
+
+At plan time the provider checks free-form attributes against the schema of the
+server's midPoint version. An unknown key or an impossible value fails the plan,
+with its path. `on_invalid_item = "warning"` downgrades this to a warning. See
+[midPoint compatibility](https://github.com/Brokenloop-org/terraform-provider-midpoint/blob/main/docs/compatibility.md#invalid-item-checks)
+for what is checked and what is not.
+
+Upgrading from v0.2? See the
+[upgrade guide](https://github.com/Brokenloop-org/terraform-provider-midpoint/blob/main/docs/upgrading.md).
 
 ## Partial errors
 
@@ -139,6 +150,7 @@ before using it for this.
 - `default_options` (Map of List of String) Default midPoint execution options per resource type, keyed by resource short name (service, role, org, archetype, object_template, mark, task, resource, object). A resource's own options attribute takes precedence.
 - `fail_on_unapplied_write` (Boolean) Fail an update when the object read back differs from the configuration, and a delete when the object still exists. Both are warnings by default. A write held for approval looks like this, but so does a value midPoint normalized, which also fails.
 - `insecure` (Boolean) Skip TLS certificate verification (development only). May also be set with MIDPOINT_INSECURE. Defaults to false.
+- `on_invalid_item` (String) What to do when the configuration of a resource holds a key or a value that midPoint's schema does not accept, such as a misspelled item name or an enum value that does not exist. It is checked at plan time against the schema of the server's midPoint version (4.9, 4.10 and 4.11 are known). "error" (the default) fails the plan; "warning" reports it and carries on, for an item your midPoint accepts although its schema does not list it. Other versions are not checked.
 - `on_partial_error` (String) What to do when midPoint answers a create or update with a partial error (HTTP 250): the object is saved, but part of the operation failed, such as provisioning an account to a resource. "error" (the default) fails the apply; an object just created is kept in state and marked tainted, so the next apply replaces it. "warning" reports it and carries on, leaving midPoint to complete what failed. A partial error on a delete is always an error.
 - `password` (String, Sensitive) Password for HTTP basic authentication. May also be set with MIDPOINT_PASSWORD.
 - `url` (String) Base URL of the midPoint server, e.g. https://midpoint.example.com; the provider appends /midpoint/ws/rest. May also be set with MIDPOINT_URL.

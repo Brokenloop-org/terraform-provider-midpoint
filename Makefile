@@ -4,7 +4,7 @@ export MIDPOINT_URL ?= http://localhost:8080
 export MIDPOINT_USERNAME ?= administrator
 export MIDPOINT_PASSWORD ?= Test5ecr3t
 
-.PHONY: build test testacc lint docs validate-examples env-up env-down
+.PHONY: build test testacc lint docs validate-examples env-up env-down schema-gen
 
 build:
 	go build ./...
@@ -12,8 +12,10 @@ build:
 test:
 	go test ./...
 
+# -count=1: go test would otherwise replay a cached pass, even from a server on
+# another midPoint version, since the URL stays the same.
 testacc:
-	TF_ACC=1 go test ./internal/provider/ $(TESTARGS) -timeout 60m -v
+	TF_ACC=1 go test ./internal/provider/ $(TESTARGS) -count=1 -timeout 60m -v
 
 lint:
 	@out=$$(gofmt -l .); if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
@@ -50,3 +52,18 @@ env-up:
 
 env-down:
 	docker compose -f testacc/docker-compose.yml down -v
+
+# schema-gen regenerates internal/mpschema/tables from the XSDs in the images
+# listed in internal/mpschema/images.txt, one "<line> <image@digest>" per line.
+schema-gen:
+	@set -e; mkdir -p internal/mpschema/tables; while read -r line image <&3; do \
+		[ -n "$$line" ] || continue; \
+		tmp=$$(mktemp -d); container=$$(docker create "$$image"); \
+		trap 'docker rm "$$container" >/dev/null; rm -rf "$$tmp"' EXIT; \
+		docker cp -q "$$container:/opt/midpoint/lib/midpoint.jar" "$$tmp/midpoint.jar"; \
+		unzip -q -j "$$tmp/midpoint.jar" 'BOOT-INF/lib/schema-*.jar' 'BOOT-INF/lib/prism-impl-*.jar' -d "$$tmp/jars"; \
+		for jar in "$$tmp"/jars/*.jar; do unzip -q -o "$$jar" '*.xsd' -d "$$tmp/xsd"; done; \
+		go run ./internal/mpschema/gen -line "$$line" -source "$$image" -xsd "$$tmp/xsd" -out "internal/mpschema/tables/$$line.json.gz"; \
+		echo "ok   $$line $$image"; \
+		docker rm "$$container" >/dev/null; rm -rf "$$tmp"; trap - EXIT; \
+	done 3< internal/mpschema/images.txt

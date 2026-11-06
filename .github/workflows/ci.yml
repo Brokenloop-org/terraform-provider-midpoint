@@ -48,7 +48,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        MIDPOINT_VERSION: ["4.9", "4.10"]
+        MIDPOINT_VERSION: ["4.9", "4.10", "4.11.0"]
     env:
       MIDPOINT_VERSION: ${{ matrix.MIDPOINT_VERSION }}
     steps:

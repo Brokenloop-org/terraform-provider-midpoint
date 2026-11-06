@@ -45,5 +45,5 @@ func NewMarkResource() resource.Resource {
 				"{ enabledByDefault = true }."),
 			"extra": extraAttribute(),
 		}, nil),
-		(*markState).fields)
+		markSchemaChecks, (*markState).fields)
 }

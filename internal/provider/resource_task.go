@@ -232,8 +232,9 @@ func replaceUnlessPreexisting(ctx context.Context, req planmodifier.StringReques
 // NewTaskResource returns the midpoint_task resource.
 func NewTaskResource() resource.Resource {
 	return &typedResource[taskState]{
-		name: taskSpec.ShortName,
-		spec: taskSpec,
+		name:   taskSpec.ShortName,
+		spec:   taskSpec,
+		checks: taskSchemaChecks,
 		schema: typedSchema(taskSpec,
 			"A midPoint task (TaskType). The provider sets the execution state only when it creates the task; "+
 				"suspending or resuming it in midPoint is an operation, not a change of configuration, and is never drift. "+
