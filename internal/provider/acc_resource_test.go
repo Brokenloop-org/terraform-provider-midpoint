@@ -77,7 +77,7 @@ func accCSVResourceConfig(fixtures accCSV, name, schemaHandling, attrs string) s
 resource "midpoint_resource" "csv" {
   name        = %q
   description = "Acceptance CSV resource"
-  connector = {
+  connector {
     type    = %q
     version = %q
   }
@@ -180,7 +180,9 @@ func fullNameAttribute(body map[string]any) (map[string]any, error) {
 // constraints on the CSV resource.
 const accCSVConfiguredParts = `
   capabilities = { create = { enabled = false } }
-  schema       = { generation_constraints = { generateObjectClass = ["ri:AccountObjectClass"] } }
+  schema {
+    generation_constraints = { generateObjectClass = ["ri:AccountObjectClass"] }
+  }
 `
 
 // accServerManagedKept checks, on a raw read of the resource at addr, that

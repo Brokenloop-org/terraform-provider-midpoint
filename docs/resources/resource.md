@@ -21,7 +21,7 @@ resource "midpoint_resource" "hr" {
   name        = "HR"
   description = "Employees exported nightly from the HR system."
 
-  connector = {
+  connector {
     type    = "com.evolveum.polygon.connector.csv.CsvConnector"
     version = "2.8"
   }
@@ -37,7 +37,7 @@ resource "midpoint_resource" "hr" {
   }
 
   # Only the account object class is generated into the cached schema.
-  schema = {
+  schema {
     generation_constraints = { generateObjectClass = ["ri:AccountObjectClass"] }
   }
 }
@@ -48,13 +48,13 @@ resource "midpoint_resource" "hr" {
 
 ### Required
 
-- `connector` (Attributes) The connector, found by a search filter on connectorType (and connectorVersion when version is set). midPoint resolves the filter when it creates or updates the resource; the OID it finds is connector_oid. An import records the connector from the connectorRef filter when it is the one this attribute writes; a resource that references its connector by OID alone imports without it, and the config then sets it with one update. (see [below for nested schema](#nestedatt--connector))
 - `name` (String) Object name.
 
 ### Optional
 
 - `adopt_existing` (Boolean) When an object with the configured oid already exists, adopt it into state and apply the configuration to it as an update instead of failing. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warns that the object will be adopted and lists the changes the update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an object whose oid already exists fails and nothing is written. While it is true, destroying the object fails unless force_destroy is set: an adopted object is not Terraform's to delete. Remove it from state with a removed block (lifecycle { destroy = false }) to stop managing it. Importing a midPoint built-in (oid 00000000-0000-0000-0000-*) records it as adopted (true); any other import records false. Defaults to false.
 - `capabilities` (Dynamic) Configured capabilities (capabilities/configured) in midPoint naming, e.g. { create = { enabled = false } }. The native capabilities the connector reports are server-managed and never compared.
+- `connector` (Block, Optional) The connector, found by a search filter on connectorType (and connectorVersion when version is set). midPoint resolves the filter when it creates or updates the resource; the OID it finds is connector_oid. An import records the connector from the connectorRef filter when it is the one this attribute writes; a resource that references its connector by OID alone imports without it, and the config then sets it with one update. (see [below for nested schema](#nestedblock--connector))
 - `connector_configuration` (Dynamic) Connector configuration (connectorConfiguration) in midPoint naming, e.g. yamldecode(file("connector.yaml")). The configurationProperties must carry the connector's namespace as "@ns" (e.g. "@ns" = "http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon.connector.csv.CsvConnector"), or midPoint stores them unqualified and the connector finds none. "@ns" is an annotation, never compared: a change to "@ns" alone is not detected, and the changes the provider sends are built from the compared form, without "@ns". Changes to single properties are not affected, but an update that adds connectorConfiguration or configurationProperties whole (adopting or importing a resource that has none, or restoring them after they were removed in midPoint) writes the properties without their namespace, and the connector then finds no configuration; set them in midPoint first in that case. The value is stored in Terraform state in plain text: a password given as a clearValue is there too (a warning says so); prefer expression const references or midPoint secret providers.
 - `description` (String) Description.
 - `extra` (Dynamic) Other midPoint items, merged at the object root, in midPoint naming (camelCase, as in the REST API), e.g. yamldecode(file("extra.yaml")). An item must not also be set by a typed attribute.
@@ -62,7 +62,7 @@ resource "midpoint_resource" "hr" {
 - `lifecycle_state` (String) Lifecycle state (lifecycleState), e.g. active, proposed.
 - `oid` (String) Object OID. When unset midPoint generates one. Changing it replaces the object. Creating an object whose oid already exists fails unless adopt_existing is set.
 - `options` (List of String) midPoint execution options sent on create and update, e.g. raw, isImport, reevaluateSearchFilters. When unset, the provider default_options entry for resource applies, else the built-in defaults: isImport, reevaluateSearchFilters on create and reevaluateSearchFilters on update. An empty list sends no options. overwrite is sent only when listed here; reevaluateSearchFilters is added to any write that sends a reference with a filter and no oid.
-- `schema` (Attributes) Resource schema settings (schema). midPoint caches the schema it fetches from the connector in schema/definition; that cached definition is compared only when definition is configured. So removing definition from the configuration leaves the schema in midPoint as it is (it is no longer compared); it is not deleted. Configuring or removing generation_constraints changes only schema/generationConstraints. (see [below for nested schema](#nestedatt--schema))
+- `schema` (Block, Optional) Resource schema settings (schema). midPoint caches the schema it fetches from the connector in schema/definition; that cached definition is compared only when definition is configured. So removing definition from the configuration leaves the schema in midPoint as it is (it is no longer compared); it is not deleted. Configuring or removing generation_constraints changes only schema/generationConstraints. (see [below for nested schema](#nestedblock--schema))
 - `schema_handling` (Dynamic) Schema handling (schemaHandling) in midPoint naming: object types with their attributes and mappings, e.g. yamldecode(file("schema-handling.yaml")). A change is applied as narrow item deltas (an added mapping is one add).
 - `synchronization` (Dynamic) Synchronization (synchronization) in midPoint naming.
 
@@ -71,7 +71,7 @@ resource "midpoint_resource" "hr" {
 - `connector_oid` (String) OID of the connector midPoint resolved from connector. It differs per environment and is never compared.
 - `id` (String) The object OID.
 
-<a id="nestedatt--connector"></a>
+<a id="nestedblock--connector"></a>
 ### Nested Schema for `connector`
 
 Required:
@@ -83,7 +83,7 @@ Optional:
 - `version` (String) Connector version (connectorVersion), e.g. 2.8. When unset any version matches, which fails while several versions of the connector are installed.
 
 
-<a id="nestedatt--schema"></a>
+<a id="nestedblock--schema"></a>
 ### Nested Schema for `schema`
 
 Optional:

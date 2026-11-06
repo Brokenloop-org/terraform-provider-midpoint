@@ -6,7 +6,7 @@ resource "midpoint_resource" "hr" {
   name        = "HR"
   description = "Employees exported nightly from the HR system."
 
-  connector = {
+  connector {
     type    = "com.evolveum.polygon.connector.csv.CsvConnector"
     version = "2.8"
   }
@@ -22,7 +22,7 @@ resource "midpoint_resource" "hr" {
   }
 
   # Only the account object class is generated into the cached schema.
-  schema = {
+  schema {
     generation_constraints = { generateObjectClass = ["ri:AccountObjectClass"] }
   }
 }
