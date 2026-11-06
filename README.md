@@ -17,8 +17,8 @@ and any other type) in HCL through the midPoint REST API.
   attribute fails `terraform plan`, using the schema of your midPoint version.
 
 Tested against midPoint 4.9, 4.10 and 4.11 (acceptance suite on a dockerized
-server); [`docs/compatibility.md`](docs/compatibility.md) has the results, and a
-known issue on 4.11. Requires Terraform 1.5 or later.
+server); [`docs/compatibility.md`](docs/compatibility.md) has the results.
+Requires Terraform 1.5 or later.
 
 Upgrading from v0.2.0 or earlier? v0.3.0 has breaking changes: see
 [`docs/upgrading.md`](docs/upgrading.md).
@@ -232,6 +232,7 @@ list sends no options.
   | task `binding` | midPoint defaults it to `loose`. |
   | task `assignment` | midPoint assigns a task its activity's archetype on the first run. A hand-added task assignment is not drift unless the task configures assignments. |
   | resource `schema.definition` | midPoint caches the connector schema there on a connection test. Removing `definition` from the configuration leaves the server's schema in place; it is not deleted. |
+  | resource `cacheInvalidationTimestamp` | midPoint 4.11 stamps it on a connection test or an import task, and it can be set by hand. See [`docs/compatibility.md`](docs/compatibility.md#411-differences-found). |
 
 - **Task execution state** (`executionState`, `schedulingState`) is
   server-managed. Suspending or resuming a task in midPoint is not drift, and
@@ -393,7 +394,6 @@ source of truth:
 | Task import | `owner` and `binding` read back as null until configured, so a config that sets them plans one no-op update after an import. |
 | `archetype` with raw writes | Service, role and archetype write with `raw` by default, which skips midPoint's recompute. A create writes `archetypeRef` and `roleMembershipRef` with the archetype assignment; changing `archetype` later only changes the assignment, so `archetypeRef` and `roleMembershipRef` keep the old archetype until midPoint recomputes the object. Both are server-managed and never compared. |
 | `extension` needs a schema extension | Extension items must be defined by a midPoint schema extension. Without one, midPoint rejects the item on a write that is not raw ("No definition in PP(costCenter)"; the provider reports it and creates nothing). A raw write (the default for service, role and archetype; org writes are not raw) stores it without a definition, and midPoint returns it as `#costCenter`, which never matches the configuration: the plan keeps showing it. Verified on midPoint 4.9 by `TestAccRole_extension`. |
-| Resources on midPoint 4.11 | After a connection test or an import task, midPoint sets `cacheInvalidationTimestamp` on the resource. The next plan shows it being removed from `extra`, and applying that plan removes it from midPoint. See [`docs/compatibility.md`](docs/compatibility.md#411-differences-found). |
 | Delete checks on midPoint 4.9 | midPoint 4.9 never returns `X-Total-Count`, so a refused delete reports "at least N" members or shadows. Members are searched in `assignmentHolders` and shadows in `shadows`, both with `raw` (a `noFetch` shadow search fails on 4.9). |
 | Test password | midPoint 4.9's default password policy rejects `5ecr3t`; the acceptance environment uses `Test5ecr3t`. |
 

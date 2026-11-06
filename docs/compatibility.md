@@ -14,12 +14,9 @@ make testacc
 is `${MIDPOINT_VERSION}-alpine`. There is no `4.11-alpine` tag, so use
 `MIDPOINT_VERSION=4.11.0`.
 
-**Known issue on 4.11:** a resource can show one change in `extra` after a
-connection test. See [4.11 differences found](#411-differences-found).
-
 | midPoint | Image tag | Date | Result | Notes |
 |---|---|---|---|---|
-| 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-06 | 30/32 | Both failures are the `cacheInvalidationTimestamp` issue below. Two existing tests assumed older versions and were adjusted. |
+| 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-06 | 30/32 | Two existing tests assumed older versions and were adjusted. `cacheInvalidationTimestamp` needed a provider change. See below. |
 | 4.10.5 | `evolveum/midpoint:4.10.5-alpine` | 2026-11-06 | pass, 32/32 | |
 | 4.10 | `evolveum/midpoint:4.10-alpine` | 2026-11-06 | pass, 32/32 | |
 | 4.9.9 | `evolveum/midpoint:4.9.9-alpine` | 2026-11-06 | pass, 32/32 | |
@@ -45,24 +42,20 @@ the administrator password and `testacc/wait.sh` authenticated within 15 s.
 
 ## 4.11 differences found
 
-### Open: `cacheInvalidationTimestamp` shows as drift
+### Fixed: `cacheInvalidationTimestamp` showed as drift
 
 After a connection test or an import task, midPoint 4.11 sets
-`cacheInvalidationTimestamp` on the resource. The provider does not treat this
-item as server-managed, so the next plan shows it being removed from `extra`:
+`cacheInvalidationTimestamp` on the resource. Per its schema, "if specified, all
+shadows cached on or before this time are considered expired". The provider used
+to plan removing it, and an apply deleted it from midPoint.
 
-```
-~ resource "midpoint_resource" "csv" {
-    - extra = {
-        - cacheInvalidationTimestamp = "2026-11-06T13:32:42.040Z"
-      } -> null
-```
+It is now compared only when the configuration sets it:
 
-Applying that plan removes the item from midPoint. The next plan is clean, and a
-second connection test did not set the item again. `TestAccResource_csv` and
-`TestAccResource_forceDestroyWithShadows` fail on 4.11.0 because of this, and CI
-will show them failing until it is resolved. All three schema tables list the
-item, but the suite did not see 4.9 or 4.10 return it.
+- A value midPoint stamped or someone set by hand is not drift when the
+  configuration does not set the item. An apply leaves it in place.
+- A configured value is compared and written. On 4.11, a resource that configures
+  this item shows a write-back in the plan after each connection test, because the
+  test stamps a new time, and applying that plan writes the configured time back.
 
 ### Test assumptions, adjusted
 

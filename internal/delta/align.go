@@ -34,7 +34,12 @@ var compareOnlyWhenConfiguredByType = map[string][]string{
 	// operation) and caches it here, next to schema/cachingMetadata. A
 	// configured (static) schema is compared; a cached one is not
 	// configuration (recorded in normalize/testdata/real/resource-csv.json).
-	"resources": {"schema/definition"},
+	//
+	// ResourceType.cacheInvalidationTimestamp: per the XSD, "if specified, all
+	// shadows cached on or before this time are considered expired". Nothing
+	// in midPoint 4.9 or 4.10 writes it, so it can be set by hand; midPoint 4.11
+	// also stamps it on a schema update. An apply must not delete either value.
+	"resources": {"schema/definition", "cacheInvalidationTimestamp"},
 }
 
 // partialContainersByType are root single-valued containers, per REST type,
