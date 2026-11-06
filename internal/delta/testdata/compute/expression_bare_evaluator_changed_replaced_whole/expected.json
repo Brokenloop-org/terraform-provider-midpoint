@@ -1,0 +1,1 @@
+[{"modificationType":"replace","path":"mapping[1]/expression","value":{"assignmentTargetSearch":{"targetType":"RoleType","filter":{"text":"name = \"new\""}}}}]

@@ -335,6 +335,7 @@ source of truth:
   | `name = "x"` | `{orig = "x", norm = "x"}` | `"x"` |
   | one value of a multi-valued item | an object | a one-element list |
   | `costCenter = ["a"]` (one-element list of a scalar, any item) | `"a"` | equal |
+  | one object where midPoint reads a list (expression evaluators, `limit`, ...) | a one-element list | equal when the contents match |
 
   QName folding applies to every string value of the form `#` or `c:`
   followed by a capitalized name ending in `Type`, wherever it appears. A

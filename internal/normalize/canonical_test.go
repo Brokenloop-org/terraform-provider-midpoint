@@ -209,6 +209,8 @@ func TestIsServerManaged(t *testing.T) {
 		{"resource object type behavior is configuration", "resources", []string{"schemaHandling", "objectType", "behavior"}, false},
 		{"saml2 idp metadata is configuration", "securityPolicies", []string{"authentication", "modules", "saml2", "serviceProvider", "identityProvider", "metadata"}, false},
 		{"function parameter @type", "functionLibraries", []string{"function", "parameter", "@type"}, true},
+		{"projection discriminator @type", "objectTemplates", []string{"mapping", "expression", "associationFromLink", "projectionDiscriminator", "@type"}, true},
+		{"projection discriminator kind is configuration", "objectTemplates", []string{"mapping", "expression", "associationFromLink", "projectionDiscriminator", "kind"}, false},
 		{"function parameter is configuration", "functionLibraries", []string{"function", "parameter", "type"}, false},
 		{"saml2 idp metadata children are configuration", "securityPolicies", []string{"authentication", "modules", "saml2", "serviceProvider", "identityProvider", "metadata", "metadataUrl"}, false},
 	}
