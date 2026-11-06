@@ -237,6 +237,17 @@ func TestCreate_missingLocation(t *testing.T) {
 	}
 }
 
+func TestCreate_acceptedWithoutLocationSuggestsApproval(t *testing.T) {
+	c, _ := stub(t, reply{Status: 202})
+	_, err := c.Create(context.Background(), Object{Type: "orgs", Body: map[string]any{"name": "o"}}, nil)
+	if err == nil {
+		t.Fatal("Create without Location header must fail")
+	}
+	if !strings.Contains(err.Error(), "approval") {
+		t.Errorf("error does not mention approval: %v", err)
+	}
+}
+
 func TestCreate_conflictIsAPIError(t *testing.T) {
 	body := `{"@ns":"http://prism.evolveum.com/xml/ns/public/types-3","status":"fatal_error","message":"Object already exists"}`
 	c, _ := stub(t, reply{Status: 409, Body: body})

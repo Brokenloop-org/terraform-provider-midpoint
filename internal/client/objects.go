@@ -75,6 +75,12 @@ func (c *Client) Create(ctx context.Context, obj Object, options []string) (stri
 	}
 	loc := resp.Header.Get("Location")
 	if loc == "" {
+		// midPoint answers a create without an OID with 202 and no Location;
+		// its source names workflow approval as the example.
+		if resp.StatusCode == http.StatusAccepted {
+			return "", errors.New("midPoint accepted the create (HTTP 202) but returned no object ID, so nothing can be recorded in state. " +
+				"A possible cause is that the create is waiting on approval; check midPoint before applying again")
+		}
 		return "", fmt.Errorf("creating %s: midPoint returned HTTP %d without a Location header", obj.Type, resp.StatusCode)
 	}
 	u, err := url.Parse(loc)

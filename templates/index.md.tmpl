@@ -34,7 +34,7 @@ Safety rules that apply to every resource:
 
 ## Environment variables
 
-Every attribute except `ca_bundle` and `default_options` can come from the
+Every attribute except `ca_bundle`, `default_options` and `fail_on_unapplied_write` can come from the
 environment. An attribute set in the configuration takes precedence.
 `url`, `username` and `password` are required, from either source.
 
@@ -61,5 +61,20 @@ list sends no options.
 
 `reevaluateSearchFilters` is added to any write that sends a reference with
 a filter and no oid.
+
+## Writes held for approval
+
+midPoint's REST API does not say when an approval policy holds a write, so the
+provider reports what it observes and names approval as a possible cause. An
+update warns if the object read back differs from the configuration, and a
+delete warns if the object still exists and stops tracking it. A create that
+returns no object ID fails. `fail_on_unapplied_write` fails the update or delete
+instead, which also catches values midPoint normalized.
+
+The `raw` execution option skips approval, but also skips the rest of midPoint's
+processing, such as updating `parentOrgRef`, and does not cancel approvals
+already pending. See the
+[README](https://github.com/Brokenloop-org/terraform-provider-midpoint#writes-held-for-approval)
+before using it for this.
 
 {{ .SchemaMarkdown | trimspace }}

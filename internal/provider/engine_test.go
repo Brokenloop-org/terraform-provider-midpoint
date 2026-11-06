@@ -532,8 +532,10 @@ func TestEngineReadInto(t *testing.T) {
 		{name: "drift on refresh surfaces the server copy", seed: true, edit: func(d map[string]any) { d["description"] = "configured" }, wantFound: true, wantCallback: true},
 		{
 			name: "difference after write warns", seed: true, afterWrite: true, wantFound: true,
-			edit:        func(d map[string]any) { d["description"] = "configured"; d["riskLevel"] = "high" },
-			wantWarning: "midPoint normalized description, riskLevel; the next plan will show this difference",
+			edit: func(d map[string]any) { d["description"] = "configured"; d["riskLevel"] = "high" },
+			wantWarning: "midPoint accepted the write to roles/" + engRoleOID + ", but the object read back differs from the configuration in description, riskLevel. " +
+				"Possible causes: the change is waiting on approval, or midPoint normalized the value; check midPoint. " +
+				"The next plan will show this difference; applying it again while an approval is pending can open another approval request.",
 		},
 		{name: "missing object", edit: func(map[string]any) {}},
 	}

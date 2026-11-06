@@ -76,6 +76,7 @@ provider "midpoint" {
 | `insecure` | `MIDPOINT_INSECURE` | no | `true` skips TLS verification (development only). Default `false`. |
 | `ca_bundle` | none | no | PEM CA certificates, e.g. `file("ca.pem")`. When set they replace the system trust store. |
 | `default_options` | none | no | Execution options per resource type, keyed by `service`, `role`, `org`, `archetype`, `object_template`, `mark`, `task`, `resource`, `object`. See [Execution options](#execution-options). |
+| `fail_on_unapplied_write` | none | no | `true` fails an update when the object read back differs from the configuration, and a delete when the object still exists. Default `false` (warnings). See [Writes held for approval](#writes-held-for-approval). |
 
 A value set in the configuration wins over the environment variable. At
 configure time the provider reads the server version for its logs; a failure
@@ -227,12 +228,12 @@ list sends no options.
 - **Task execution state** (`executionState`, `schedulingState`) is
   server-managed. Suspending or resuming a task in midPoint is not drift, and
   an apply never restarts a task.
-- **After a write**, the provider reads the object back. If midPoint
-  normalized the written value differently from the configuration, a warning
-  names the differing items, state keeps the configured values, and the next
-  plan shows the difference. When the configuration and midPoint differ but
-  no item delta can express the difference, the apply sends nothing and warns,
-  naming the items; the plan keeps showing them.
+- **After a write**, the provider reads the object back. If the object differs
+  from the configuration, a warning names the differing items, state keeps the
+  configured values, and the next plan shows the difference. When the
+  configuration and midPoint differ but no item delta can express the
+  difference, the apply sends nothing and warns, naming the items; the plan
+  keeps showing them. See [Writes held for approval](#writes-held-for-approval).
 - **Multi-valued containers** (assignments, inducements, schema handling
   object types, attributes, mappings) are matched by content, not by
   position: assignments by target, construction (`resource`, `kind`, `intent`)
@@ -243,6 +244,54 @@ list sends no options.
   construction `resource`, `kind` or `intent`, or `order`) is a different
   value: it is applied as a delete of the old value and an add of the new
   one, so the container id changes.
+
+### Writes held for approval
+
+midPoint's REST API does not say when an approval policy holds a write, so the
+provider reports what it observes and names approval as a possible cause:
+
+| Write | midPoint answers | The provider |
+|---|---|---|
+| Update | `204`, as for a completed update | Warns if the object read back differs from the configuration. The cause can also be a value midPoint normalized. |
+| Delete | `204`, as for a completed delete | Warns if the object still exists, and stops tracking it. If midPoint keeps the object, it stays there unmanaged. |
+| Create | `202` with no `Location` | Fails, because there is no object ID to record. |
+
+Check midPoint to find out which it is. While a change waits on approval, the
+next plan shows it again, and applying it again can open another approval
+request.
+
+`fail_on_unapplied_write = true` in the provider block fails the update or
+delete instead of warning, and keeps the prior state. It compares what was
+written with what was read back, so it also fails on a value midPoint
+normalized, and a read-back difference right after a create or adoption stays
+a warning.
+
+#### Bypassing approval with `raw`
+
+To skip approval for a resource type, set `raw` in its options:
+
+```hcl
+provider "midpoint" {
+  default_options = {
+    org = ["isImport", "raw"]
+  }
+}
+```
+
+`raw` skips approval and the rest of midPoint's processing, and needs the
+`rawOperation` authorization. It does not make the configuration the only
+source of truth:
+
+- **Computed items are not updated.** Verified on midPoint 4.9: assigning an org
+  to a parent with `raw` leaves `parentOrgRef` and `roleMembershipRef` unset, so
+  the org is not in the tree until midPoint recomputes it.
+- **Pending approvals still apply.** Verified on midPoint 4.9: approving a request
+  opened before a `raw` write overwrites the value that write set. Close open
+  approval cases for the object first.
+- **Policies, object templates and mappings do not run**, and a change may not
+  reach connected resources until something recomputes the object.
+- **Approvers never see the change.** Check that your audit requirements allow
+  this, and scope the account's `rawOperation` authorization narrowly.
 
 ## HCL conventions
 

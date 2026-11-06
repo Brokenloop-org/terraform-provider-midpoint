@@ -46,6 +46,12 @@ type objectState struct {
 	Body map[string]any
 }
 
+// Summaries of what the provider observes after a write midPoint accepted.
+const (
+	unappliedWriteSummary    = "Write not reflected in midPoint"
+	objectStillExistsSummary = "Object still exists after delete"
+)
+
 // engine runs create, read, update and delete for one object type and
 // enforces the safety rules: no overwrite of an existing object (unless
 // adopted), narrow item deltas only, and no delete of a still-referenced
@@ -57,6 +63,9 @@ type engine struct {
 	c        *client.Client
 	defaults map[string][]string
 	spec     engineSpec
+	// failOnUnappliedWrite turns the warnings about an update or a delete
+	// midPoint accepted but did not visibly apply into errors.
+	failOnUnappliedWrite bool
 	// observe, when set, receives the canonical body of every successful
 	// readInto (refresh, import and the read-back after a write), whether
 	// or not it differs from the desired body. Resources use it for
@@ -70,7 +79,7 @@ type engine struct {
 
 // newEngine returns the engine for spec using the configured provider.
 func newEngine(data *providerData, spec engineSpec) *engine {
-	return &engine{c: data.Client, defaults: data.DefaultOptions, spec: spec}
+	return &engine{c: data.Client, defaults: data.DefaultOptions, failOnUnappliedWrite: data.FailOnUnappliedWrite, spec: spec}
 }
 
 // roleMembersCheck finds the objects assigned to oid or holding it in
@@ -262,8 +271,23 @@ func (e *engine) delete(ctx context.Context, oid string, force bool) diag.Diagno
 			return diags
 		}
 	}
-	if err := e.c.Delete(ctx, e.spec.RestType, oid, nil); err != nil && !errors.Is(err, client.ErrNotFound) {
-		diags.AddError("Cannot delete object", fmt.Sprintf("deleting %s: %s", e.ref(oid), err))
+	if err := e.c.Delete(ctx, e.spec.RestType, oid, nil); err != nil {
+		if !errors.Is(err, client.ErrNotFound) {
+			diags.AddError("Cannot delete object", fmt.Sprintf("deleting %s: %s", e.ref(oid), err))
+		}
+		return diags
+	}
+	// midPoint answers a delete held for approval like a completed one. The
+	// delete itself succeeded, so a failed check is not a failed delete.
+	_, found, readDiags := e.read(ctx, oid)
+	if readDiags.HasError() || !found {
+		return diags
+	}
+	detail := fmt.Sprintf("midPoint accepted the delete of %s, but the object still exists. A possible cause is that the delete is waiting on approval; check midPoint.", e.ref(oid))
+	if e.failOnUnappliedWrite {
+		diags.AddError(objectStillExistsSummary, detail+" The object stays in state.")
+	} else {
+		diags.AddWarning(objectStillExistsSummary, detail+" Terraform no longer tracks it: if midPoint keeps it, it stays there unmanaged.")
 	}
 	return diags
 }
@@ -319,9 +343,10 @@ func objectName(o client.Object) string {
 // nothing else happens. When they differ:
 //
 //   - afterWrite (right after create or update): a warning names the
-//     differing top-level items, which midPoint normalized differently from
-//     the configuration; setFromActual is not called, so the state keeps
-//     the configured values and the next plan shows the difference;
+//     differing top-level items; midPoint's response cannot say why they
+//     differ (an update held for approval answers like a completed one).
+//     setFromActual is not called, so the state keeps the configured values
+//     and the next plan shows the difference;
 //   - otherwise (refresh, import): setFromActual receives the canonical
 //     actual body so the resource can surface the drift.
 func (e *engine) readInto(ctx context.Context, oid string, desired map[string]any, afterWrite bool, setFromActual func(actual map[string]any)) (found bool, diags diag.Diagnostics) {
@@ -342,8 +367,9 @@ func (e *engine) readInto(ctx context.Context, oid string, desired map[string]an
 		if names := differingItems(d, a); len(names) > 0 {
 			items = strings.Join(names, ", ")
 		}
-		diags.AddWarning("midPoint changed the applied configuration",
-			fmt.Sprintf("midPoint normalized %s; the next plan will show this difference", items))
+		diags.AddWarning(unappliedWriteSummary, fmt.Sprintf("midPoint accepted the write to %s, but the object read back differs from the configuration in %s. "+
+			"Possible causes: the change is waiting on approval, or midPoint normalized the value; check midPoint. "+
+			"The next plan will show this difference; applying it again while an approval is pending can open another approval request.", e.ref(oid), items))
 		return true, diags
 	}
 	setFromActual(actual)
@@ -367,6 +393,9 @@ func (e *engine) readAfterWrite(ctx context.Context, oid string, desired map[str
 		diags.AddError("Object not found after write",
 			fmt.Sprintf("%s was written but cannot be read back", e.ref(oid)))
 	}
+	if !created && e.failOnUnappliedWrite {
+		diags = unappliedWriteAsError(diags)
+	}
 	if !created || !diags.HasError() {
 		return diags
 	}
@@ -380,6 +409,32 @@ func (e *engine) readAfterWrite(ctx context.Context, oid string, desired map[str
 			strings.TrimSuffix(d.Detail(), "."), e.ref(oid)))
 	}
 	return out
+}
+
+// unappliedWriteAsError returns diags with the unapplied-write warning as an
+// error.
+func unappliedWriteAsError(diags diag.Diagnostics) diag.Diagnostics {
+	var out diag.Diagnostics
+	for _, d := range diags {
+		if d.Severity() == diag.SeverityWarning && d.Summary() == unappliedWriteSummary {
+			out.AddError(d.Summary(), d.Detail())
+			continue
+		}
+		out.Append(d)
+	}
+	return out
+}
+
+// hasUnappliedWriteError reports whether fail_on_unapplied_write turned an
+// update's read-back difference into an error. The write did not visibly
+// apply, so the resource keeps the prior state.
+func hasUnappliedWriteError(diags diag.Diagnostics) bool {
+	for _, d := range diags.Errors() {
+		if d.Summary() == unappliedWriteSummary {
+			return true
+		}
+	}
+	return false
 }
 
 // differingItems lists the top-level items in which desired and actual

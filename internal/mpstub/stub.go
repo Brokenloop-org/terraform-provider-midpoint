@@ -80,6 +80,7 @@ type Server struct {
 	order        []key // insertion order, for deterministic search results
 	requests     []Recorded
 	reportTotals bool
+	holdWrites   bool
 	seq          int
 	fault        func(Recorded) int
 }
@@ -133,6 +134,15 @@ func (s *Server) ReportTotals(on bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.reportTotals = on
+}
+
+// HoldWrites makes creates, updates and deletes answer as midPoint 4.9 does
+// when an approval policy holds them, without changing anything: a create
+// answers 202 with no Location, the others 204.
+func (s *Server) HoldWrites(on bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.holdWrites = on
 }
 
 // SetFault installs fn, which sees every request after it is recorded and
@@ -199,6 +209,16 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	seg := strings.Split(strings.Trim(rel, "/"), "/")
+	if s.holdWrites {
+		switch {
+		case r.Method == http.MethodPost && len(seg) == 1:
+			w.WriteHeader(http.StatusAccepted)
+			return
+		case (r.Method == http.MethodPatch || r.Method == http.MethodDelete) && len(seg) == 2:
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+	}
 	switch {
 	case r.Method == http.MethodGet && len(seg) == 2 && seg[0] == "nodes" && seg[1] == "current":
 		writeJSON(w, http.StatusOK, map[string]any{"node": map[string]any{"build": map[string]any{"version": nodeVersion}}})
