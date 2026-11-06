@@ -333,6 +333,38 @@ resource "terraform_data" "d" {
 	})
 }
 
+// A whole attribute that is unknown at plan cannot be judged.
+func TestSchemaCheck_wholeAttributeUnknown(t *testing.T) {
+	s := newTestStub(t)
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{{
+			Config: `
+resource "terraform_data" "d" {
+  input = { descripton = "x" }
+}
+` + roleHead + `  extra = terraform_data.d.output
+}`,
+			PlanOnly:           true,
+			ExpectNonEmptyPlan: true,
+		}},
+	})
+}
+
+// A key set to null is absent: the provider never sends it.
+func TestSchemaCheck_nullKeyNotFlagged(t *testing.T) {
+	s := newTestStub(t)
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{{
+			Config: roleHead + `  extra = { notInThisLine = null }
+}`,
+			PlanOnly:           true,
+			ExpectNonEmptyPlan: true,
+		}},
+	})
+}
+
 // extension and connector_configuration hold what each deployment defines,
 // so they are never checked.
 func TestSchemaCheck_extensionAndConnectorConfigurationUnchecked(t *testing.T) {

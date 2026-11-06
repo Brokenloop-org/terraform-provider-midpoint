@@ -365,10 +365,6 @@ func TestAlignForType(t *testing.T) {
 	}
 }
 
-// capabilities and schema of a resource hold server-managed parts (native
-// capabilities, the cached schema) that Canonical strips or that are
-// compared only when configured: configuring or removing the configured
-// part is a delta inside the container, never one of the whole container.
 // The stamp midPoint 4.11 leaves on a resource sends no delta, so an apply does
 // not delete it. A configured value is compared and written.
 func TestAlignForType_cacheInvalidationDeltas(t *testing.T) {
@@ -394,6 +390,10 @@ func TestAlignForType_cacheInvalidationDeltas(t *testing.T) {
 	}
 }
 
+// capabilities and schema of a resource hold server-managed parts (native
+// capabilities, the cached schema) that Canonical strips or that are
+// compared only when configured: configuring or removing the configured
+// part is a delta inside the container, never one of the whole container.
 func TestAlignForType_resourcePartialContainersNarrowDeltas(t *testing.T) {
 	const cached = `{"@ns":"http://www.w3.org/2001/XMLSchema","schema":"<xsd:schema/>"}`
 	const caps = `{"create":{"enabled":false}}`

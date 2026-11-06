@@ -176,6 +176,18 @@ func TestCheck_severalForSingle(t *testing.T) {
 	wantKeys(t, find(t, map[string]any{"one": []any{map[string]any{}, map[string]any{}}}), "one")
 }
 
+// The provider treats null as absent and never sends it, so it is never checked.
+func TestCheck_nullValueNeverFlagged(t *testing.T) {
+	wantKeys(t, find(t, map[string]any{"notInThisLine": nil}))
+	wantKeys(t, find(t, map[string]any{"one": map[string]any{"notInThisLine": nil}}))
+	wantKeys(t, find(t, map[string]any{"description": nil}))
+	wantKeys(t, find(t, map[string]any{"#Hash": nil}))
+	wantKeys(t, find(t, map[string]any{"text": []any{nil, "a"}}))
+	wantKeys(t, find(t, map[string]any{"text": []any{"a", nil}}))
+	// Two real values are still too many.
+	wantKeys(t, find(t, map[string]any{"text": []any{nil, "a", "b"}}), "text")
+}
+
 func TestCheck_scalarForComplex(t *testing.T) {
 	wantKeys(t, find(t, map[string]any{"one": "x"}))
 }

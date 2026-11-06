@@ -37,7 +37,13 @@ func (t *Table) walk(out *[]Finding, path string, it Item, v any) {
 	case nil, unknownValue:
 		return
 	case []any:
-		if len(x) > 1 && !it.Multi && it.Kind != KindOpen {
+		n := 0
+		for _, e := range x {
+			if e != nil {
+				n++
+			}
+		}
+		if n > 1 && !it.Multi && it.Kind != KindOpen {
 			*out = append(*out, Finding{Path: path, Key: lastKey(path), Type: it.Type,
 				Problem: "takes a single value, but a list of several was given"})
 		}
@@ -93,6 +99,10 @@ func (t *Table) walkObject(out *[]Finding, path string, it Item, m map[string]an
 	}
 	for _, key := range sortedKeys(m) {
 		if strings.HasPrefix(key, "@") {
+			continue
+		}
+		// The provider treats null as absent and never sends it.
+		if m[key] == nil {
 			continue
 		}
 		child := key

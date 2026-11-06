@@ -237,6 +237,9 @@ func TestCorpus_noFalseAlarms(t *testing.T) {
 			}
 			roots := jsonRoots(tb, doc)
 			if len(roots) == 0 {
+				if strings.Contains(filepath.ToSlash(f), "/real/") {
+					t.Errorf("%s: a file taken from a real server resolves to no root", f)
+				}
 				skipped++
 				continue
 			}
