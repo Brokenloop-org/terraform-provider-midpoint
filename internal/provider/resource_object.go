@@ -323,7 +323,11 @@ func (r *objectResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	plan.Name = canonicalName(plan.Type.ValueString(), desired)
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-	resp.Diagnostics.Append(eng.readAfterWrite(ctx, state.OID.ValueString(), desired, false)...)
+	readBack := eng.readAfterWrite(ctx, state.OID.ValueString(), desired, false)
+	resp.Diagnostics.Append(readBack...)
+	if hasUnappliedWriteError(readBack) {
+		resp.State.Raw = req.State.Raw
+	}
 }
 
 func (r *objectResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {

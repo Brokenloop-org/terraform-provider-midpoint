@@ -35,12 +35,13 @@ type midpointProvider struct {
 
 // providerModel maps the provider configuration block.
 type providerModel struct {
-	URL            types.String `tfsdk:"url"`
-	Username       types.String `tfsdk:"username"`
-	Password       types.String `tfsdk:"password"`
-	Insecure       types.Bool   `tfsdk:"insecure"`
-	CABundle       types.String `tfsdk:"ca_bundle"`
-	DefaultOptions types.Map    `tfsdk:"default_options"`
+	URL                  types.String `tfsdk:"url"`
+	Username             types.String `tfsdk:"username"`
+	Password             types.String `tfsdk:"password"`
+	Insecure             types.Bool   `tfsdk:"insecure"`
+	CABundle             types.String `tfsdk:"ca_bundle"`
+	DefaultOptions       types.Map    `tfsdk:"default_options"`
+	FailOnUnappliedWrite types.Bool   `tfsdk:"fail_on_unapplied_write"`
 }
 
 // providerConfig is the provider configuration after environment fallbacks.
@@ -57,6 +58,8 @@ type providerData struct {
 	Client         *client.Client
 	Config         providerConfig
 	DefaultOptions map[string][]string
+	// FailOnUnappliedWrite is the provider's fail_on_unapplied_write.
+	FailOnUnappliedWrite bool
 }
 
 // New returns a constructor for the midPoint provider.
@@ -96,6 +99,12 @@ func (p *midpointProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 			"ca_bundle": schema.StringAttribute{
 				Description: "PEM-encoded CA certificates used to verify the midPoint server certificate, e.g. " +
 					"file(\"ca.pem\"). When set they replace the system trust store.",
+				Optional: true,
+			},
+			"fail_on_unapplied_write": schema.BoolAttribute{
+				Description: "Fail an update when the object read back differs from the configuration, and a delete " +
+					"when the object still exists. Both are warnings by default. A write held for approval looks like " +
+					"this, but so does a value midPoint normalized, which also fails.",
 				Optional: true,
 			},
 			"default_options": schema.MapAttribute{
@@ -160,7 +169,7 @@ func (p *midpointProvider) Configure(ctx context.Context, req provider.Configure
 		tflog.Info(ctx, "connected to midPoint", map[string]any{"url": redactURL(cfg.URL), "version": version})
 	}
 
-	data := &providerData{Client: c, Config: cfg, DefaultOptions: defaults}
+	data := &providerData{Client: c, Config: cfg, DefaultOptions: defaults, FailOnUnappliedWrite: model.FailOnUnappliedWrite.ValueBool()}
 	resp.ResourceData = data
 	resp.DataSourceData = data
 }

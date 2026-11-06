@@ -61,7 +61,7 @@ func TestProviderSchema(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatal(resp.Diagnostics)
 	}
-	for _, name := range []string{"url", "username", "password", "insecure", "ca_bundle", "default_options"} {
+	for _, name := range []string{"url", "username", "password", "insecure", "ca_bundle", "default_options", "fail_on_unapplied_write"} {
 		if _, ok := resp.Schema.Attributes[name]; !ok {
 			t.Errorf("missing attribute %q", name)
 		}
@@ -114,6 +114,35 @@ func versionServer(t *testing.T, status int) (string, *atomic.Int32) {
 	}))
 	t.Cleanup(srv.Close)
 	return srv.URL, &hits
+}
+
+func TestProviderConfigure_failOnUnappliedWrite(t *testing.T) {
+	url, _ := versionServer(t, http.StatusOK)
+	str := func(v string) tftypes.Value { return tftypes.NewValue(tftypes.String, v) }
+	tests := []struct {
+		name string
+		set  *bool
+		want bool
+	}{
+		{name: "off by default", want: false},
+		{name: "true", set: func() *bool { b := true; return &b }(), want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vals := map[string]tftypes.Value{"url": str(url), "username": str("u"), "password": str("p")}
+			if tt.set != nil {
+				vals["fail_on_unapplied_write"] = tftypes.NewValue(tftypes.Bool, *tt.set)
+			}
+			resp := configure(t, vals)
+			if resp.Diagnostics.HasError() {
+				t.Fatal(resp.Diagnostics)
+			}
+			e := newEngine(resp.ResourceData.(*providerData), engineSpec{})
+			if e.failOnUnappliedWrite != tt.want {
+				t.Errorf("failOnUnappliedWrite = %v, want %v", e.failOnUnappliedWrite, tt.want)
+			}
+		})
+	}
 }
 
 func TestProviderConfigure(t *testing.T) {

@@ -325,7 +325,12 @@ func (r *typedResource[S]) Update(ctx context.Context, req resource.UpdateReques
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &s)...)
 	resp.Diagnostics.Append(setOID(ctx, &resp.State, oid.ValueString())...)
-	resp.Diagnostics.Append(eng.readAfterWrite(ctx, oid.ValueString(), desired, false)...)
+	readBack := eng.readAfterWrite(ctx, oid.ValueString(), desired, false)
+	resp.Diagnostics.Append(readBack...)
+	if hasUnappliedWriteError(readBack) {
+		resp.State.Raw = req.State.Raw
+		return
+	}
 	r.recordObserved(ctx, &s, &resp.State, oid.ValueString(), &resp.Diagnostics)
 }
 
