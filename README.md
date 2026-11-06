@@ -445,4 +445,4 @@ must then plan clean. Its design and implementation plan are in
 
 ## License
 
-[Apache License 2.0](LICENSE).
+[European Union Public Licence v. 1.2 (EUPL-1.2)](LICENSE).
