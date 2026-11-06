@@ -34,9 +34,10 @@ Safety rules that apply to every resource:
 
 ## Environment variables
 
-Every attribute except `ca_bundle`, `default_options` and `fail_on_unapplied_write` can come from the
-environment. An attribute set in the configuration takes precedence.
-`url`, `username` and `password` are required, from either source.
+Every attribute except `ca_bundle`, `default_options`, `fail_on_unapplied_write`
+and `on_partial_error` can come from the environment. An attribute set in the
+configuration takes precedence. `url`, `username` and `password` are required,
+from either source.
 
 | Attribute | Environment variable | Notes |
 |---|---|---|
@@ -44,6 +45,22 @@ environment. An attribute set in the configuration takes precedence.
 | `username` | `MIDPOINT_USERNAME` | HTTP basic authentication. |
 | `password` | `MIDPOINT_PASSWORD` | HTTP basic authentication. |
 | `insecure` | `MIDPOINT_INSECURE` | `true` skips TLS verification (development only). |
+
+## Partial errors
+
+midPoint answers a write with HTTP 250 when the object is saved but part of the
+operation failed, typically provisioning an account to a resource. By default,
+`on_partial_error = "error"`, that fails the apply. A failed create keeps the
+object in state and marks it tainted, so the next apply replaces it, which also
+removes any accounts it already has on other resources. Run `terraform untaint`
+to keep it instead. A failed update does not taint, but its change is saved: a
+later apply does not send it again, so it succeeds while nothing retries what
+failed.
+
+With `on_partial_error = "warning"` a create or update reports a warning and the
+apply carries on, leaving midPoint to complete what failed, for example by a
+reconciliation. A partial error on a delete is always an error, because a
+warning would drop the object from state whether or not it is gone.
 
 ## Execution options
 

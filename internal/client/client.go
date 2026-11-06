@@ -53,7 +53,14 @@ type Client struct {
 // ErrNotFound reports that midPoint answered 404 for an object.
 var ErrNotFound = errors.New("object not found")
 
-// APIError is a non-2xx midPoint response.
+// statusPartialError is midPoint's HTTP status for a write that was carried
+// out with a failed sub-operation: the object is saved, but provisioning it to
+// a resource failed, say. midPoint's status 240 (a handled error) is documented
+// as equivalent to success and is not an error here.
+const statusPartialError = 250
+
+// APIError is a non-2xx midPoint response, or a partial error (see
+// IsPartialError).
 type APIError struct {
 	Status int
 	// Message is the message of midPoint's OperationResult, if any.
@@ -76,6 +83,22 @@ func (e *APIError) Error() string {
 // Is makes errors.Is(err, ErrNotFound) true for 404 responses.
 func (e *APIError) Is(target error) bool {
 	return target == ErrNotFound && e.Status == http.StatusNotFound
+}
+
+// IsPartialError reports whether err is midPoint's partial error on a write:
+// the write went through, but part of the operation failed.
+func IsPartialError(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && apiErr.Status == statusPartialError
+}
+
+// partialError returns the *APIError of a write answered with a partial error,
+// or nil.
+func partialError(resp *http.Response, body []byte) error {
+	if resp.StatusCode != statusPartialError {
+		return nil
+	}
+	return &APIError{Status: resp.StatusCode, Message: resultMessage(body), Body: string(body)}
 }
 
 // New validates cfg and returns a Client.
@@ -180,7 +203,8 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 }
 
 // resultMessage extracts the message of a midPoint OperationResult body,
-// which is either the top-level object or nested under "operationResult".
+// which is either the top-level object or nested under "operationResult" or
+// "object" (midPoint 4.9).
 func resultMessage(body []byte) string {
 	var doc map[string]any
 	if decode(body, &doc) != nil {
@@ -189,9 +213,11 @@ func resultMessage(body []byte) string {
 	if msg, ok := doc["message"].(string); ok {
 		return msg
 	}
-	if nested, ok := doc["operationResult"].(map[string]any); ok {
-		if msg, ok := nested["message"].(string); ok {
-			return msg
+	for _, key := range []string{"operationResult", "object"} {
+		if nested, ok := doc[key].(map[string]any); ok {
+			if msg, ok := nested["message"].(string); ok {
+				return msg
+			}
 		}
 	}
 	return ""

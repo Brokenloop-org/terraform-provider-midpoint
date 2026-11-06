@@ -270,7 +270,7 @@ resource "midpoint_role" "r" {
 		Steps: []resource.TestStep{
 			{
 				Config:      cfg(`  options = ["isImport"]` + "\n"),
-				ExpectError: regexp.MustCompile(`(?s)Cannot create object.*No definition in PP\(costCenter\)`),
+				ExpectError: regexp.MustCompile(`(?s)Cannot create object.*No\s+definition\s+in\s+PP\(costCenter\)`),
 			},
 			{
 				PreConfig: func() {

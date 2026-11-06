@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -541,6 +542,43 @@ func TestStubSetFault(t *testing.T) {
 	s.SetFault(nil)
 	if _, err := c.Get(ctx, "roles", roleOID, client.GetOptions{}); err != nil {
 		t.Fatalf("GET after clearing the fault: %v", err)
+	}
+}
+
+// TestStubSetPartialError: a selected write is processed and answers 250 with
+// midPoint's OperationResult; a create keeps its Location.
+func TestStubSetPartialError(t *testing.T) {
+	s, _ := newStub(t)
+	s.SetPartialError(func(r Recorded) string {
+		if r.Method == http.MethodPost {
+			return "provisioning failed"
+		}
+		return ""
+	})
+	req, err := http.NewRequest(http.MethodPost, s.URL()+restPath+"/roles", strings.NewReader(`{"role":{"oid":"`+roleOID+`","name":"r1"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 250 {
+		t.Errorf("status = %d, want 250", resp.StatusCode)
+	}
+	if !strings.HasSuffix(resp.Header.Get("Location"), "/roles/"+roleOID) {
+		t.Errorf("Location = %q, want the object's URL", resp.Header.Get("Location"))
+	}
+	if !strings.Contains(string(body), "provisioning failed") {
+		t.Errorf("body = %s, want the message", body)
+	}
+	if s.Get("roles", roleOID) == nil {
+		t.Error("the object was not saved")
 	}
 }
 

@@ -28,4 +28,8 @@ provider "midpoint" {
   # default_options = {
   #   role = []
   # }
+
+  # Optional: report a partial error (HTTP 250) as a warning instead of failing
+  # the apply and tainting a newly created object.
+  # on_partial_error = "warning"
 }

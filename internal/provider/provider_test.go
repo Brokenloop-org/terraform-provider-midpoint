@@ -61,7 +61,7 @@ func TestProviderSchema(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatal(resp.Diagnostics)
 	}
-	for _, name := range []string{"url", "username", "password", "insecure", "ca_bundle", "default_options", "fail_on_unapplied_write"} {
+	for _, name := range []string{"url", "username", "password", "insecure", "ca_bundle", "default_options", "fail_on_unapplied_write", "on_partial_error"} {
 		if _, ok := resp.Schema.Attributes[name]; !ok {
 			t.Errorf("missing attribute %q", name)
 		}

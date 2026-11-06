@@ -66,6 +66,8 @@ type engine struct {
 	// failOnUnappliedWrite turns the warnings about an update or a delete
 	// midPoint accepted but did not visibly apply into errors.
 	failOnUnappliedWrite bool
+	// partialWarning makes a partial error on a create or update a warning.
+	partialWarning bool
 	// observe, when set, receives the canonical body of every successful
 	// readInto (refresh, import and the read-back after a write), whether
 	// or not it differs from the desired body. Resources use it for
@@ -79,7 +81,7 @@ type engine struct {
 
 // newEngine returns the engine for spec using the configured provider.
 func newEngine(data *providerData, spec engineSpec) *engine {
-	return &engine{c: data.Client, defaults: data.DefaultOptions, failOnUnappliedWrite: data.FailOnUnappliedWrite, spec: spec}
+	return &engine{c: data.Client, defaults: data.DefaultOptions, failOnUnappliedWrite: data.FailOnUnappliedWrite, partialWarning: data.PartialWarning, spec: spec}
 }
 
 // roleMembersCheck finds the objects assigned to oid or holding it in
@@ -117,6 +119,11 @@ func (e *engine) getOptions() client.GetOptions {
 // with empty items pruned and the oid in the body, using the effective
 // create options plus reevaluateSearchFilters when the body holds a
 // filter-only reference, and returns the oid midPoint kept or assigned.
+//
+// A partial error means the object was saved although part of the operation
+// failed. The oid then comes back with an error diagnostic (or a warning, with
+// on_partial_error = "warning"), and the caller must still record the object:
+// otherwise it would be orphaned. A recorded object with an error is tainted.
 func (e *engine) create(ctx context.Context, st objectState) (oid string, adopted bool, diags diag.Diagnostics) {
 	body := pruneEmpty(st.Body)
 	oid = st.OID
@@ -146,9 +153,17 @@ func (e *engine) create(ctx context.Context, st objectState) (oid string, adopte
 	}
 	tflog.Debug(ctx, "creating midPoint object", map[string]any{"type": e.spec.RestType, "oid": oid, "options": options})
 	created, err := e.c.Create(ctx, client.Object{Type: e.spec.RestType, Body: body}, options)
-	if err != nil {
+	switch {
+	case err == nil:
+	case !client.IsPartialError(err) || created == "":
 		diags.AddError("Cannot create object", fmt.Sprintf("creating %s: %s", e.spec.RestType, err))
 		return "", false, diags
+	case e.partialWarning:
+		diags.AddWarning("Object created with a partial error",
+			fmt.Sprintf("%s was created, but part of the operation failed: %s. It is kept in state; midPoint has to complete what failed, for example by a reconciliation.", e.ref(created), err))
+	default:
+		diags.AddError("Object created with a partial error",
+			fmt.Sprintf("%s was created, but part of the operation failed: %s. It is kept in state and marked tainted, so the next apply replaces it, which also removes any accounts it already has on other resources. Run `terraform untaint` to keep it, or set on_partial_error = \"warning\" on the provider.", e.ref(created), err))
 	}
 	return created, false, diags
 }
@@ -239,6 +254,11 @@ func (e *engine) update(ctx context.Context, oid string, desired map[string]any,
 	}
 	tflog.Debug(ctx, "modifying midPoint object", map[string]any{"type": e.spec.RestType, "oid": oid, "deltas": paths, "options": opts})
 	if err := e.c.Modify(ctx, e.spec.RestType, oid, deltas, opts); err != nil {
+		if e.partialWarning && client.IsPartialError(err) {
+			diags.AddWarning("Object updated with a partial error",
+				fmt.Sprintf("updating %s: part of the operation failed: %s. midPoint has to complete what failed, for example by a reconciliation.", e.ref(oid), err))
+			return diags
+		}
 		diags.AddError("Cannot update object", fmt.Sprintf("updating %s: %s", e.ref(oid), err))
 	}
 	return diags

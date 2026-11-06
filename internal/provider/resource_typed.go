@@ -266,7 +266,8 @@ func (r *typedResource[S]) Create(ctx context.Context, req resource.CreateReques
 	st.Body = created
 	oid, adopted, diags := eng.create(ctx, st)
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	// With an oid the object exists despite an error: it still gets recorded.
+	if resp.Diagnostics.HasError() && oid == "" {
 		return
 	}
 	if adopted {
