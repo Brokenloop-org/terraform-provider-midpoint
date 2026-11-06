@@ -232,8 +232,12 @@ list sends no options.
   from the configuration, a warning names the differing items, state keeps the
   configured values, and the next plan shows the difference. When the
   configuration and midPoint differ but no item delta can express the
-  difference, the apply sends nothing and warns, naming the items; the plan
-  keeps showing them. See [Writes held for approval](#writes-held-for-approval).
+  difference, the apply sends nothing and fails, naming the items. See
+  [Writes held for approval](#writes-held-for-approval).
+- **Empty lists** in midPoint are the same as a missing item. An object written
+  with an explicit `subtype: []`, say by a script or a JSON import, keeps it and
+  returns it on every read, and no delta removes it. The provider does not show
+  it as drift and leaves it in place.
 - **Multi-valued containers** (assignments, inducements, schema handling
   object types, attributes, mappings) are matched by content, not by
   position: assignments by target, construction (`resource`, `kind`, `intent`)

@@ -92,6 +92,58 @@ func accCheckItem(c *client.Client, addr, item string, want any) resource.TestCh
 	}
 }
 
+// TestAccObject_storedEmptyList: a role created outside Terraform with an
+// explicit empty list keeps it, and it comes back on every read. Adopting the
+// role and changing an unrelated attribute both plan clean and apply, and the
+// list stays in midPoint: no delta can remove it.
+func TestAccObject_storedEmptyList(t *testing.T) {
+	testAccPreCheck(t)
+	ctx := context.Background()
+	c := accClient(t)
+	name := acctest.RandomWithPrefix("tf-acc-empty-list")
+	oid, err := c.Create(ctx, client.Object{Type: "roles", Body: map[string]any{"name": name, "subtype": []any{}}}, []string{"raw"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := c.Delete(ctx, "roles", oid, nil); err != nil && !errors.Is(err, client.ErrNotFound) {
+			t.Errorf("removing %s: %s", oid, err)
+		}
+	})
+	// Read raw: Canonical drops the list.
+	holdsEmptyList := func(*terraform.State) error {
+		obj, err := c.Get(ctx, "roles", oid, client.GetOptions{Exclude: readExcludes})
+		if err != nil {
+			return err
+		}
+		if l, ok := obj.Body["subtype"].([]any); !ok || len(l) != 0 {
+			return fmt.Errorf("midPoint holds subtype = %#v, want []", obj.Body["subtype"])
+		}
+		return nil
+	}
+	cfg := func(force bool) string {
+		return fmt.Sprintf(`
+resource "midpoint_object" "r" {
+  type           = "roles"
+  oid            = %q
+  adopt_existing = true
+  force_destroy  = %t
+  body           = { name = %q }
+}
+`, oid, force, name)
+	}
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: cfg(false), Check: holdsEmptyList},
+			{Config: cfg(false), PlanOnly: true},
+			{Config: cfg(true), Check: holdsEmptyList},
+			{Config: cfg(true), PlanOnly: true},
+		},
+	})
+}
+
 func importIDOf(addr string) resource.ImportStateIdFunc {
 	return func(st *terraform.State) (string, error) {
 		rs, ok := st.RootModule().Resources[addr]

@@ -143,6 +143,32 @@ func TestCanonical_rootIsNeverPruned(t *testing.T) {
 	}
 }
 
+// midPoint stores an explicit empty list it was sent and returns it on every
+// read. No delta removes it, and it holds no value, so it is not an item.
+func TestCanonical_emptyListIsNoValue(t *testing.T) {
+	in := map[string]any{
+		"name":    "r",
+		"subtype": []any{},
+		"authorization": []any{
+			map[string]any{"@id": 1, "action": "a", "object": []any{}},
+			map[string]any{"@id": 2, "object": []any{}},
+		},
+		"adminGuiConfiguration": map[string]any{"objectCollectionViews": map[string]any{"objectCollectionView": []any{}}},
+	}
+	want := map[string]any{
+		"name": "r",
+		"authorization": []any{
+			map[string]any{"@id": 1, "action": []any{"a"}},
+		},
+	}
+	if got := Canonical("roles", in); !reflect.DeepEqual(got, want) {
+		t.Errorf("Canonical = %#v, want %#v", got, want)
+	}
+	if _, kept := in["subtype"]; !kept {
+		t.Error("Canonical modified its input")
+	}
+}
+
 func TestIsServerManaged(t *testing.T) {
 	cases := []struct {
 		name     string
