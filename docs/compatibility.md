@@ -16,7 +16,7 @@ is `${MIDPOINT_VERSION}-alpine`. There is no `4.11-alpine` tag, so use
 
 | midPoint | Image tag | Date | Result | Notes |
 |---|---|---|---|---|
-| 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-06 | 30/32 | Two existing tests assumed older versions and were adjusted. `cacheInvalidationTimestamp` needed a provider change. See below. |
+| 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-06 | pass, 32/32 | First run 27/32: two existing tests assumed older versions and were adjusted, the new mistyped-key test recorded a difference, and `cacheInvalidationTimestamp` needed a provider change. See below. |
 | 4.10.5 | `evolveum/midpoint:4.10.5-alpine` | 2026-11-06 | pass, 32/32 | |
 | 4.10 | `evolveum/midpoint:4.10-alpine` | 2026-11-06 | pass, 32/32 | |
 | 4.9.9 | `evolveum/midpoint:4.9.9-alpine` | 2026-11-06 | pass, 32/32 | |
