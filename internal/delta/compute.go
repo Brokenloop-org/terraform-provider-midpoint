@@ -25,12 +25,13 @@ const (
 // property would emit a path midPoint rejects, so the table errs toward
 // listing.
 var structuredProperties = map[string]bool{
-	"expression": true, // ExpressionType: mapping and condition expressions
-	"condition":  true, // MappingType.condition (ExpressionType); see containerUnder for AssignmentType.condition
-	"filter":     true, // SearchFilterType: object selectors, references, queries
-	"query":      true, // QueryType: activity object sets, collection queries
-	"target":     true, // VariableBindingDefinitionType: mapping target
-	"definition": true, // ResourceType.schema.definition (SchemaDefinitionType): an XML schema; midPoint cannot address the xsd:schema inside it and parses it only with its "@ns", which a whole-value replace carries
+	"expression":  true, // ExpressionType: mapping and condition expressions
+	"condition":   true, // MappingType.condition (ExpressionType); see containerUnder for AssignmentType.condition
+	"filter":      true, // SearchFilterType: object selectors, references, queries
+	"query":       true, // QueryType: activity object sets, collection queries
+	"target":      true, // VariableBindingDefinitionType: mapping target
+	"definition":  true, // ResourceType.schema.definition (SchemaDefinitionType): an XML schema; midPoint cannot address the xsd:schema inside it and parses it only with its "@ns", which a whole-value replace carries
+	"limitations": true, // StringPolicyType.limitations (LimitationsType): midPoint 4.9 rejects a path inside it with HTTP 400
 }
 
 // containerUnder names items that structuredProperties lists but that are

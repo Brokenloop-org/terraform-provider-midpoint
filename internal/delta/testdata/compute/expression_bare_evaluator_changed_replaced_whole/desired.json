@@ -1,0 +1,1 @@
+{"mapping":[{"name":"m","expression":{"assignmentTargetSearch":{"targetType":"RoleType","filter":{"text":"name = \"new\""}}}}]}

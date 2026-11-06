@@ -68,6 +68,8 @@ var partialContainersByType = map[string][]string{
 //     because the values of a multi-valued item are a set, and a bare actual
 //     object with an "@id" becomes a one-element list where the desired value
 //     is a list;
+//   - a one-element actual list becomes its only value where the desired value
+//     is that same object (alignBareValue);
 //   - root items in compareOnlyWhenConfigured are dropped from the actual
 //     body when the desired body does not set them.
 //
@@ -175,12 +177,33 @@ func alignValue(name string, d, a any) any {
 	case []any:
 		dl, ok := d.([]any)
 		if !ok {
-			return deepCopy(a)
+			return alignBareValue(name, d, at)
 		}
 		return alignList(name, dl, at)
 	default:
 		return deepCopy(a)
 	}
+}
+
+// alignBareValue returns a, the actual list of item name, in the shape of d
+// when d is a map and a holds only that same value. midPoint reads some items
+// as lists however they were written (the evaluators of an expression, the
+// filter inside a search evaluator, stringPolicy/limitations/limit), and one
+// value is the same as a list of that value. Any other list stays as read, so
+// a real difference inside it still compares unequal and replaces the item.
+func alignBareValue(name string, d any, a []any) any {
+	dm, ok := d.(map[string]any)
+	if !ok || len(a) != 1 {
+		return deepCopy(a)
+	}
+	am, ok := a[0].(map[string]any)
+	if !ok {
+		return deepCopy(a)
+	}
+	if v := alignValue(name, dm, am); normalize.Equal(dm, v) {
+		return v
+	}
+	return deepCopy(a)
 }
 
 // alignSingleValue returns a in the shape of d when one of them is a
