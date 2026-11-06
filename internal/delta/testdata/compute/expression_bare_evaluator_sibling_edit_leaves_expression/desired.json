@@ -1,0 +1,1 @@
+{"mapping":[{"name":"m","strength":"strong","expression":{"assignmentTargetSearch":{"targetType":"RoleType","filter":{"text":"name = \"x\""}}}}]}

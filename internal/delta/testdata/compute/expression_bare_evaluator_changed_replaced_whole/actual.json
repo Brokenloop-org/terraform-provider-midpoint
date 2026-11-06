@@ -1,0 +1,1 @@
+{"mapping":[{"@id":1,"name":"m","expression":{"assignmentTargetSearch":[{"targetType":"RoleType","filter":[{"text":"name = \"old\""}]}]}}]}

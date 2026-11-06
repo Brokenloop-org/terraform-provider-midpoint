@@ -194,6 +194,52 @@ func TestAlign(t *testing.T) {
 			wantActual: `{"extension":{"costCenter":"b","tags":"x","obj":{"k":"a"}}}`,
 		},
 		{
+			// midPoint 4.9 reads evaluators, and the filter inside a search
+			// evaluator, as lists however they were written.
+			name:       "one_element_map_list_matches_bare_map",
+			desired:    `{"expression":{"generate":{"mode":"uuid"}}}`,
+			actual:     `{"expression":{"generate":[{"mode":"uuid"}]}}`,
+			wantActual: `{"expression":{"generate":{"mode":"uuid"}}}`,
+		},
+		{
+			name:       "one_element_map_list_matches_bare_map_nested",
+			desired:    `{"expression":{"assignmentTargetSearch":{"targetType":"RoleType","filter":{"text":"t"}}}}`,
+			actual:     `{"expression":{"assignmentTargetSearch":[{"targetType":"RoleType","filter":[{"text":"t"}]}]}}`,
+			wantActual: `{"expression":{"assignmentTargetSearch":{"targetType":"RoleType","filter":{"text":"t"}}}}`,
+		},
+		{
+			name:       "desired_list_with_bare_nested_map",
+			desired:    `{"expression":{"assignmentTargetSearch":[{"filter":{"text":"t"}}]}}`,
+			actual:     `{"expression":{"assignmentTargetSearch":[{"filter":[{"text":"t"}]}]}}`,
+			wantActual: `{"expression":{"assignmentTargetSearch":[{"filter":{"text":"t"}}]}}`,
+		},
+		{
+			// A real difference anywhere inside keeps the list as read, so the
+			// comparison sees it and the item is replaced whole.
+			name:       "one_element_map_list_other_contents_untouched",
+			desired:    `{"expression":{"assignmentTargetSearch":{"targetType":"RoleType","filter":{"text":"new"}}}}`,
+			actual:     `{"expression":{"assignmentTargetSearch":[{"targetType":"RoleType","filter":[{"text":"old"}]}]}}`,
+			wantActual: `{"expression":{"assignmentTargetSearch":[{"targetType":"RoleType","filter":[{"text":"old"}]}]}}`,
+		},
+		{
+			name:       "several_values_against_bare_map_untouched",
+			desired:    `{"limit":{"k":"a"}}`,
+			actual:     `{"limit":[{"k":"a"},{"k":"b"}]}`,
+			wantActual: `{"limit":[{"k":"a"},{"k":"b"}]}`,
+		},
+		{
+			name:       "one_element_map_list_keeps_its_id",
+			desired:    `{"x":{"k":"a"}}`,
+			actual:     `{"x":[{"@id":3,"k":"a"}]}`,
+			wantActual: `{"x":{"@id":3,"k":"a"}}`,
+		},
+		{
+			name:       "one_element_map_list_matches_bare_reference",
+			desired:    `{"targetRef":{"oid":"r1"}}`,
+			actual:     `{"targetRef":[{"oid":"r1","type":"RoleType","relation":"org:default"}]}`,
+			wantActual: `{"targetRef":{"oid":"r1"}}`,
+		},
+		{
 			name:       "unmatched_reference_untouched",
 			desired:    `{"assignment":[{"targetRef":{"oid":"r1"}}]}`,
 			actual:     `{"assignment":[{"@id":1,"targetRef":{"oid":"r2","type":"RoleType","relation":"org:default"}}]}`,

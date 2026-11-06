@@ -106,6 +106,9 @@ var ServerManaged = []Rule{
 
 	// Function libraries.
 	{Path: "function/parameter/@type", Types: []string{"functionLibraries"}, Reason: "midPoint 4.9 annotates every function parameter value with its type c:ExpressionParameterType, which is the only type a parameter has; a serialization annotation, never configuration (recorded in testdata/real/function-library.json)"},
+
+	// Expressions.
+	{Path: "**/projectionDiscriminator/@type", Reason: "midPoint 4.9 annotates a projection discriminator with its type c:ShadowDiscriminatorType, however it was written; a serialization annotation, never configuration"},
 }
 
 // configurationOverrides are configuration items whose path a broader
