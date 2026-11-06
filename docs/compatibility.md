@@ -19,7 +19,7 @@ connection test. See [4.11 differences found](#411-differences-found).
 
 | midPoint | Image tag | Date | Result | Notes |
 |---|---|---|---|---|
-| 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-06 | 30/32 | Both failures are the `cacheInvalidationTimestamp` issue below. Three other tests assumed older versions and were adjusted. |
+| 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-06 | 30/32 | Both failures are the `cacheInvalidationTimestamp` issue below. Two existing tests assumed older versions and were adjusted. |
 | 4.10.5 | `evolveum/midpoint:4.10.5-alpine` | 2026-11-06 | pass, 32/32 | |
 | 4.10 | `evolveum/midpoint:4.10-alpine` | 2026-11-06 | pass, 32/32 | |
 | 4.9.9 | `evolveum/midpoint:4.9.9-alpine` | 2026-11-06 | pass, 32/32 | |
@@ -66,7 +66,7 @@ item, but the suite did not see 4.9 or 4.10 return it.
 
 ### Test assumptions, adjusted
 
-The provider's behaviour was right in each case.
+The provider's behaviour was right in both cases.
 
 1. **CSV connector name.** The name is now `ConnId CSV Connector v2.10`, without
    `CsvConnector`. `TestAccDataConnector_csv` matches it in either form.
@@ -74,8 +74,12 @@ The provider's behaviour was right in each case.
    refused and creates nothing, but with HTTP 500, "An attempt to modify an
    immutable", from an `IllegalStateException` in midPoint's projector.
    `TestAccRole_extension` accepts this message as well as the older one.
-3. **A mistyped key on a non-raw update fails** with the same HTTP 500, where
-   older lines lose the key. See [Mistyped keys at apply](#mistyped-keys-at-apply).
+
+### Other differences
+
+A mistyped key on a non-raw update fails with the same HTTP 500, where older lines
+lose the key. `TestAccValueForms_mistypedExtraKey` records this. See
+[Mistyped keys at apply](#mistyped-keys-at-apply).
 
 ## 4.10 differences found
 
@@ -168,7 +172,8 @@ The whole tree is checked, for:
   moved: they are not in its schema.
 - **Enumerations:** the listed value or its Java constant name (`dryRun` or
   `DRY_RUN`).
-- **Booleans:** `true`, `false`, `True`, `False`, `TRUE`, `FALSE`, `1` and `0`.
+- **Booleans:** the plan passes `true`, `false`, `True`, `False`, `TRUE`, `FALSE`,
+  `1` and `0`. midPoint 4.9.9 refuses `1` and `0` as strings at apply.
 - **Integers:** a whole number, or a string holding one.
 - **An object where a plain value belongs.**
 - **Several values on a single-valued item.**
@@ -200,10 +205,12 @@ images in the results table.
 | Integer | `"first"` | HTTP 400 | Flagged |
 | Object for a plain value | `riskLevel = { x = "y" }` | **Takes it and stores nothing** | Flagged |
 | Several values on a single-valued item | `riskLevel = ["a", "b"]` | HTTP 400 | Flagged |
+| Fractional number | `displayOrder = 3.5` | Stored as `3` (seen by hand, on 4.9.9 only) | Flagged |
 
 A value midPoint stores in another form, like `STRONG`, keeps showing as a change
-in every plan, so write the listed form. An object for a plain value stays flagged
-although midPoint does not refuse it, because the setting has no effect.
+in every plan, so write the listed form. An object for a plain value and a
+fractional number stay flagged although midPoint does not refuse them, because what
+it keeps is not what was configured.
 
 ### Mistyped keys at apply
 

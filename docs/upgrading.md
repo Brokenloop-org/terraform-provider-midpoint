@@ -77,6 +77,11 @@ Two things to know:
 
 [What is checked and what is not](compatibility.md#invalid-item-checks).
 
+### midPoint 4.11
+
+If you run midPoint 4.11, see
+[4.11 differences found](compatibility.md#411-differences-found).
+
 ### Licence
 
 Releases up to v0.2.0 were released under the Apache License 2.0. From v0.3.0 on,

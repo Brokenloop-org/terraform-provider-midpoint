@@ -13,7 +13,6 @@ and any other type) in HCL through the midPoint REST API.
   the object is never resent whole.
 - Safe by default: no silent overwrite on create, no delete of an object that
   still has members or shadows.
-
 - Checked at plan: a misspelled key or an impossible value in a free-form
   attribute fails `terraform plan`, using the schema of your midPoint version.
 
