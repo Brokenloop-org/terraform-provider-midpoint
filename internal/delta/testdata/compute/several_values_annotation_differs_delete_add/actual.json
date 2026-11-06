@@ -1,0 +1,14 @@
+{
+  "name": "m",
+  "policyRule": [
+    {
+      "@id": 2,
+      "@type": "B",
+      "name": "r"
+    },
+    {
+      "@id": 5,
+      "name": "s"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+[
+  {
+    "modificationType": "add",
+    "path": "policyRule[2]/policyConstraints",
+    "value": {
+      "modification": {
+        "name": "c"
+      }
+    }
+  }
+]

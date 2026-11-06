@@ -1,0 +1,12 @@
+{
+  "name": "a",
+  "assignment": [
+    {
+      "@id": 1,
+      "policyRule": {
+        "name": "p",
+        "description": "old"
+      }
+    }
+  ]
+}

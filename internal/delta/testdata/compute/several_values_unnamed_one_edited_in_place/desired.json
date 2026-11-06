@@ -1,0 +1,11 @@
+{
+  "name": "m",
+  "policyRule": [
+    {
+      "description": "new"
+    },
+    {
+      "description": "same"
+    }
+  ]
+}

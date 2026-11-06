@@ -1,0 +1,24 @@
+[
+  {
+    "modificationType": "delete",
+    "path": "inducement",
+    "value": [
+      {
+        "@id": 2
+      }
+    ]
+  },
+  {
+    "modificationType": "add",
+    "path": "inducement",
+    "value": [
+      {
+        "targetRef": {
+          "oid": "new",
+          "type": "RoleType",
+          "relation": "org:default"
+        }
+      }
+    ]
+  }
+]

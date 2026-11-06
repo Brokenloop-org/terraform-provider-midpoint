@@ -1,0 +1,11 @@
+{
+  "name": "m",
+  "policyRule": {
+    "name": "r",
+    "policyConstraints": {
+      "modification": {
+        "name": "new"
+      }
+    }
+  }
+}

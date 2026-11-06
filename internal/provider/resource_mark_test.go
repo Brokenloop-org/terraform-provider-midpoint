@@ -137,3 +137,53 @@ resource "midpoint_mark" "m" {
 		},
 	})
 }
+
+// midPoint reads a single value of a multi-valued container as a bare object
+// with an "@id" and answers a path that does not address that id with HTTP
+// 400. An edit inside a mark's policy rule therefore addresses the rule, and
+// the modification constraint nested in it, by id.
+func TestMark_policyRuleEditAddressesValuesByID(t *testing.T) {
+	s := newTestStub(t)
+	const addr = "midpoint_mark.m"
+	cfg := func(description, constraint string) string {
+		return fmt.Sprintf(`
+resource "midpoint_mark" "m" {
+  name  = "m"
+  extra = {
+    policyRule = {
+      name        = "r"
+      description = %q
+      policyConstraints = { modification = { name = %q } }
+    }
+  }
+}
+`, description, constraint)
+	}
+	var oid string
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: stubProviderFactories(t, s),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg("old", "c1"),
+				Check:  captureOID(addr, &oid),
+			},
+			refreshIsClean(),
+			{
+				Config: cfg("new", "c2"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)},
+				},
+				Check: checkStub(func() error {
+					rule, _ := stubBody(s, "marks", oid)["policyRule"].(map[string]any)
+					constraints, _ := rule["policyConstraints"].(map[string]any)
+					modification, _ := constraints["modification"].(map[string]any)
+					if rule["description"] != "new" || modification["name"] != "c2" {
+						return fmt.Errorf("stored policyRule = %v", rule)
+					}
+					return nil
+				}),
+			},
+			refreshIsClean(),
+		},
+	})
+}

@@ -123,7 +123,10 @@ var configurationOverrides = []Rule{
 
 // MultiValued holds the local names of multi-valued items. Canonical wraps a
 // single value of these items into a one-element list so that the JSON
-// shape of one value and of several values compare alike.
+// shape of one value and of several values compare alike. Names are global,
+// so an item that is multi-valued under one parent only (policyRule, of a mark
+// but not of an assignment) does not belong here: package delta addresses its
+// values by the "@id" midPoint returns.
 var MultiValued = map[string]bool{
 	"assignment":                 true, // AssignmentHolderType.assignment (AssignmentType)
 	"inducement":                 true, // AbstractRoleType.inducement (AssignmentType)

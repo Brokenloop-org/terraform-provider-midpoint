@@ -1,0 +1,21 @@
+[
+  {
+    "modificationType": "delete",
+    "path": "policyRule",
+    "value": [
+      {
+        "@id": 2
+      }
+    ]
+  },
+  {
+    "modificationType": "add",
+    "path": "policyRule",
+    "value": [
+      {
+        "@type": "A",
+        "name": "r"
+      }
+    ]
+  }
+]

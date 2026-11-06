@@ -230,6 +230,161 @@ resource "midpoint_mark" "m" {
 	})
 }
 
+// policyRuleOf returns the policy rule at index i of the mark at addr, read
+// back from midPoint, whichever shape midPoint returns it in.
+func policyRuleOf(c *client.Client, st *terraform.State, addr string, i int) (map[string]any, []any, error) {
+	body, err := accGet(c, "marks", st.RootModule().Resources[addr].Primary.Attributes["oid"])
+	if err != nil {
+		return nil, nil, err
+	}
+	rules := asList(body["policyRule"])
+	if i >= len(rules) {
+		return nil, rules, fmt.Errorf("policyRule = %v, want a value at index %d", body["policyRule"], i)
+	}
+	rule, _ := rules[i].(map[string]any)
+	return rule, rules, nil
+}
+
+// accRuleID returns the container id of the policy rule called name of the
+// mark oid; it fails the test when there is no such rule.
+func accRuleID(t *testing.T, c *client.Client, oid, name string) string {
+	t.Helper()
+	body, err := accGet(c, "marks", oid)
+	if err != nil {
+		t.Fatalf("reading marks/%s: %v", oid, err)
+	}
+	for _, v := range asList(body["policyRule"]) {
+		if rule, _ := v.(map[string]any); rule["name"] == name {
+			return fmt.Sprint(rule["@id"])
+		}
+	}
+	t.Fatalf("mark %s has no policy rule %q: %v", oid, name, body["policyRule"])
+	return ""
+}
+
+// A mark's policyRule is multi-valued: midPoint answers HTTP 400 to a path
+// that does not address its value by id, and to one that does not address the
+// constraint inside it the same way.
+func TestAccMark_policyRule(t *testing.T) {
+	testAccPreCheck(t)
+	c := accClient(t)
+	name := acctest.RandomWithPrefix("tf-acc-mark")
+	const addr = "midpoint_mark.m"
+	cfg := func(rule string) string {
+		return fmt.Sprintf(`
+resource "midpoint_mark" "m" {
+  name  = %q
+  extra = { policyRule = %s }
+}
+`, name, rule)
+	}
+	rule := func(description, constraint string) string {
+		return fmt.Sprintf(`{
+      name              = "r"
+      description       = %q
+      policyConstraints = { modification = { name = %q } }
+    }`, description, constraint)
+	}
+	wantRule := func(description, constraint string) resource.TestCheckFunc {
+		return func(st *terraform.State) error {
+			got, rules, err := policyRuleOf(c, st, addr, 0)
+			if err != nil {
+				return err
+			}
+			constraints, _ := got["policyConstraints"].(map[string]any)
+			modification, _ := constraints["modification"].(map[string]any)
+			if len(rules) != 1 || got["description"] != description || modification["name"] != constraint {
+				return fmt.Errorf("policyRule = %v, want one rule %q with constraint %q", rules, description, constraint)
+			}
+			return nil
+		}
+	}
+	var oid, version, ruleID string
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             accSimpleGone(c),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg(rule("one", "c1")),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					captureOID(addr, &oid),
+					wantRule("one", "c1"),
+				),
+			},
+			emptyPlanAfterRefresh(),
+			// An edit inside the rule and inside the constraint it holds.
+			{
+				Config: cfg(rule("two", "c2")),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)},
+				},
+				Check: wantRule("two", "c2"),
+			},
+			emptyPlanAfterRefresh(),
+			{ResourceName: addr, ImportState: true, ImportStateVerify: true},
+			// The list form is the same rule: nothing is sent.
+			{
+				PreConfig: func() { version = accVersion(t, c, "marks", oid) },
+				Config:    cfg("[" + rule("two", "c2") + "]"),
+				Check: func(*terraform.State) error {
+					if v := accVersion(t, c, "marks", oid); v != version {
+						return fmt.Errorf("version = %s after the list-form apply, want %s (no write)", v, version)
+					}
+					return nil
+				},
+			},
+			emptyPlanAfterRefresh(),
+			// An edit in the list form.
+			{
+				Config: cfg("[" + rule("three", "c3") + "]"),
+				Check:  wantRule("three", "c3"),
+			},
+			emptyPlanAfterRefresh(),
+			// A second rule, then an edit of one of the two.
+			{
+				Config: cfg("[" + rule("three", "c3") + `, { name = "s", description = "other" }]`),
+				Check: func(st *terraform.State) error {
+					_, rules, err := policyRuleOf(c, st, addr, 1)
+					if err != nil {
+						return err
+					}
+					if len(rules) != 2 {
+						return fmt.Errorf("policyRule = %v, want two rules", rules)
+					}
+					return nil
+				},
+			},
+			emptyPlanAfterRefresh(),
+			// The edited rule stays the same container value: it keeps its id.
+			{
+				PreConfig: func() { ruleID = accRuleID(t, c, oid, "r") },
+				Config:    cfg("[" + rule("four", "c3") + `, { name = "s", description = "other" }]`),
+				Check: func(st *terraform.State) error {
+					_, rules, err := policyRuleOf(c, st, addr, 1)
+					if err != nil {
+						return err
+					}
+					if len(rules) != 2 {
+						return fmt.Errorf("policyRule = %v, want two rules", rules)
+					}
+					if got := accRuleID(t, c, oid, "r"); got != ruleID {
+						return fmt.Errorf("rule r has id %s after the edit, want %s", got, ruleID)
+					}
+					return nil
+				},
+			},
+			emptyPlanAfterRefresh(),
+			// Back to one rule, written bare.
+			{
+				Config: cfg(rule("five", "c3")),
+				Check:  wantRule("five", "c3"),
+			},
+			emptyPlanAfterRefresh(),
+		},
+	})
+}
+
 // accVersion returns the version of restType/oid; it fails the test when
 // the object cannot be read.
 func accVersion(t *testing.T, c *client.Client, restType, oid string) string {

@@ -29,6 +29,12 @@ func TestAlign(t *testing.T) {
 		wantActual string
 	}{
 		{
+			name:       "bare_value_takes_the_desired_list_form",
+			desired:    `{"policyRule":[{"name":"r"}]}`,
+			actual:     `{"policyRule":{"@id":2,"name":"r"}}`,
+			wantActual: `{"policyRule":[{"@id":2,"name":"r"}]}`,
+		},
+		{
 			name:       "filter_drops_actual_oid",
 			desired:    `{"ownerRef":{"filter":{"filter":{"text":"name = \"admin\""}},"type":"UserType","relation":"org:default"}}`,
 			actual:     `{"ownerRef":{"oid":"u1","filter":{"filter":{"text":"name = \"admin\""}},"type":"UserType","relation":"org:default"}}`,

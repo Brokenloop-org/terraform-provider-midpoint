@@ -1,0 +1,26 @@
+[
+  {
+    "modificationType": "delete",
+    "path": "policyRule",
+    "value": [
+      {
+        "@id": 2
+      },
+      {
+        "@id": 5
+      }
+    ]
+  },
+  {
+    "modificationType": "add",
+    "path": "policyRule",
+    "value": [
+      {
+        "description": "a2"
+      },
+      {
+        "description": "b2"
+      }
+    ]
+  }
+]

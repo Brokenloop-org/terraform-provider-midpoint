@@ -1,0 +1,7 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "policyRule[2]/description",
+    "value": "new"
+  }
+]

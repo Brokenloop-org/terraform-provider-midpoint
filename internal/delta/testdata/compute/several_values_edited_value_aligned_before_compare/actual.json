@@ -1,0 +1,25 @@
+{
+  "name": "m",
+  "policyRule": [
+    {
+      "@id": 2,
+      "name": "r",
+      "description": "old",
+      "ownerRef": {
+        "oid": "o",
+        "type": "UserType",
+        "relation": "org:default"
+      },
+      "policyConstraints": {
+        "modification": {
+          "@id": 3,
+          "name": "c"
+        }
+      }
+    },
+    {
+      "@id": 5,
+      "name": "s"
+    }
+  ]
+}

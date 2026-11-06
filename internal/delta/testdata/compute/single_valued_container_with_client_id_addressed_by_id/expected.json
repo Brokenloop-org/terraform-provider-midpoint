@@ -1,0 +1,7 @@
+[
+  {
+    "modificationType": "replace",
+    "path": "display[77]/label",
+    "value": "new"
+  }
+]
