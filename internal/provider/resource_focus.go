@@ -11,6 +11,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+// focusRootTypes are the midPoint types of the role-like resources, by name.
+var focusRootTypes = map[string]string{
+	"role": "RoleType", "service": "ServiceType", "org": "OrgType", "archetype": "ArchetypeType",
+}
+
 // focusState is implemented by the pointer to each resource's state struct,
 // which embeds focusModel and maps the kind-specific attributes.
 type focusState interface {
@@ -29,6 +34,7 @@ func newFocusResource[S any, P interface {
 		name:   kind.Name,
 		spec:   kind.Spec,
 		schema: focusSchema(kind, attributes),
+		checks: focusSchemaChecks(kind, focusRootTypes[kind.Name]),
 		toBody: func(ctx context.Context, s *S, create, raw bool) (map[string]any, diag.Diagnostics) {
 			// Only the create body writes the computed archetype references.
 			return focusToBody(ctx, P(s).model(), kind, create && raw)

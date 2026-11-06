@@ -212,3 +212,17 @@ func TestCheck_elementAnnotationWithTypeUsesTheType(t *testing.T) {
 		"@element": "x", "@type": "FileAppender", "fileName": "f", "fileNme": "typo",
 	}}), "fileNme")
 }
+
+func TestCheck_namespaceURIKey(t *testing.T) {
+	const ns = "http://midpoint.evolveum.com/xml/ns/public/common/common-3#"
+	wantKeys(t, find(t, map[string]any{ns + "description": "x"}))
+	wantKeys(t, find(t, map[string]any{ns + "descripton": "x"}), ns+"descripton")
+}
+
+func TestCheck_namespaceURIAtType(t *testing.T) {
+	const ns = "http://midpoint.evolveum.com/xml/ns/public/common/common-3#"
+	ok := map[string]any{"appender": map[string]any{"@type": ns + "FileAppender", "fileName": "f"}}
+	wantKeys(t, find(t, ok))
+	bad := map[string]any{"appender": map[string]any{"@type": ns + "FileAppender", "nope": "f"}}
+	wantKeys(t, find(t, bad), "nope")
+}

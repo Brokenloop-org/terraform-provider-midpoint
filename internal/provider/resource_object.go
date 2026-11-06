@@ -200,6 +200,7 @@ func (r *objectResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 	if req.Plan.Raw.IsNull() {
 		return // destroy
 	}
+	checkObjectBody(ctx, r.data, req.Config, resp)
 	var plan objectModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {

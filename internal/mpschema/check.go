@@ -176,8 +176,12 @@ func bigIsInt(s string) bool {
 	return f.IsInt()
 }
 
-// stripPrefix drops a namespace prefix: the text after the last colon.
+// stripPrefix reduces a name to its local part. A namespace URI before a
+// non-leading "#" is dropped first, then a prefix up to the last colon.
 func stripPrefix(s string) string {
+	if i := strings.LastIndex(s, "#"); i > 0 {
+		s = s[i+1:]
+	}
 	if i := strings.LastIndex(s, ":"); i >= 0 {
 		return s[i+1:]
 	}
