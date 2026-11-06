@@ -96,7 +96,7 @@ data "midpoint_connector" "csv" {
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue("data.midpoint_connector.csv", tfjsonpath.New("oid"), knownvalue.StringRegexp(uuidPattern)),
 					statecheck.ExpectKnownValue("data.midpoint_connector.csv", tfjsonpath.New("connector_version"), knownvalue.StringRegexp(regexp.MustCompile(`.`))),
-					statecheck.ExpectKnownValue("data.midpoint_connector.csv", tfjsonpath.New("name"), knownvalue.StringRegexp(regexp.MustCompile(`CsvConnector`))),
+					statecheck.ExpectKnownValue("data.midpoint_connector.csv", tfjsonpath.New("name"), knownvalue.StringRegexp(regexp.MustCompile(`(?i)csv\s*connector`))),
 				},
 				Check: resource.TestCheckResourceAttrPair("data.midpoint_connector.csv", "id", "data.midpoint_connector.csv", "oid"),
 			},

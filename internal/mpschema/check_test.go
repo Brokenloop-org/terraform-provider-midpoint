@@ -127,11 +127,30 @@ func TestCheck_enum(t *testing.T) {
 	wantKeys(t, find(t, map[string]any{"strength": "strong"}))
 }
 
+// midPoint takes an enumeration value by its listed form or by the name of its
+// Java constant, seen on the real server by TestAccValueForms. DRYRUN is not
+// such a name, but the table does not hold the constants, so it is left to
+// midPoint to reject.
+func TestCheck_enumConstantName(t *testing.T) {
+	tbl := &Table{
+		Types: map[string]*Type{"Root": {Items: map[string]Item{"mode": {Type: "Mode", Kind: KindEnum}}}},
+		Enums: map[string][]string{"Mode": {"preview", "dryRun", "partial_error"}},
+	}
+	for _, v := range []string{"preview", "PREVIEW", "dryRun", "DRY_RUN", "partial_error", "PARTIAL_ERROR", "DRYRUN"} {
+		wantKeys(t, tbl.Check("Root", map[string]any{"mode": v}))
+	}
+	for _, v := range []string{"Preview", "dryrun", "DryRun", "PREVIEWS", "preview_"} {
+		wantKeys(t, tbl.Check("Root", map[string]any{"mode": v}), "mode")
+	}
+}
+
 func TestCheck_boolean(t *testing.T) {
-	for _, v := range []any{true, false, "true", "false", "1", "0"} {
+	for _, v := range []any{true, false, "true", "false", "True", "False", "TRUE", "FALSE", "1", "0"} {
 		wantKeys(t, find(t, map[string]any{"flag": v}))
 	}
-	wantKeys(t, find(t, map[string]any{"flag": "yes"}), "flag")
+	for _, v := range []string{"yes", "tRuE"} {
+		wantKeys(t, find(t, map[string]any{"flag": v}), "flag")
+	}
 }
 
 func TestCheck_integer(t *testing.T) {

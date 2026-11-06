@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 type unknownValue struct{}
@@ -128,7 +129,7 @@ func (t *Table) walkScalar(out *[]Finding, path string, it Item, v any) {
 			return
 		}
 		for _, a := range allowed {
-			if a == s {
+			if a == s || isConstantName(s, a) {
 				return
 			}
 		}
@@ -139,7 +140,7 @@ func (t *Table) walkScalar(out *[]Finding, path string, it Item, v any) {
 			return
 		}
 		switch strings.TrimSpace(s) {
-		case "true", "false", "1", "0":
+		case "true", "True", "TRUE", "false", "False", "FALSE", "1", "0":
 		default:
 			bad(fmt.Sprintf("has the value %q, which is not a boolean", s))
 		}
@@ -148,6 +149,23 @@ func (t *Table) walkScalar(out *[]Finding, path string, it Item, v any) {
 			bad(fmt.Sprintf("has the value %v, which is not an integer", v))
 		}
 	}
+}
+
+// isConstantName reports whether s can be the Java constant of the enumeration
+// value listed as value: midPoint takes DRY_RUN for dryRun. Only the letters and
+// digits are compared, because the exact constant is not in the table, so DRYRUN
+// passes too and is left to midPoint to reject.
+func isConstantName(s, value string) bool {
+	return s == strings.ToUpper(s) && alphanumeric(s) == strings.ToUpper(alphanumeric(value))
+}
+
+func alphanumeric(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return r
+		}
+		return -1
+	}, s)
 }
 
 // isInteger reports whether a scalar can be an integer. Kinds of scalar it

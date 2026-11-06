@@ -12,8 +12,10 @@ build:
 test:
 	go test ./...
 
+# -count=1: go test would otherwise replay a cached pass, even from a server on
+# another midPoint version, since the URL stays the same.
 testacc:
-	TF_ACC=1 go test ./internal/provider/ $(TESTARGS) -timeout 60m -v
+	TF_ACC=1 go test ./internal/provider/ $(TESTARGS) -count=1 -timeout 60m -v
 
 lint:
 	@out=$$(gofmt -l .); if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
