@@ -70,8 +70,8 @@ provider "midpoint" {
 
 ## Environment variables
 
-Every attribute except `ca_bundle`, `default_options`, `fail_on_unapplied_write`
-and `on_partial_error` can come from the environment. An attribute set in the
+Every attribute except `ca_bundle`, `default_options`, `fail_on_unapplied_write`,
+`on_partial_error` and `on_invalid_item` can come from the environment. An attribute set in the
 configuration takes precedence. `url`, `username` and `password` are required,
 from either source.
 
@@ -81,6 +81,14 @@ from either source.
 | `username` | `MIDPOINT_USERNAME` | HTTP basic authentication. |
 | `password` | `MIDPOINT_PASSWORD` | HTTP basic authentication. |
 | `insecure` | `MIDPOINT_INSECURE` | `true` skips TLS verification (development only). |
+
+## Invalid items
+
+At plan time the provider checks free-form attributes against the schema of the
+server's midPoint version. An unknown key or an impossible value fails the plan,
+with its path. `on_invalid_item = "warning"` downgrades this to a warning. See
+[midPoint compatibility](https://github.com/Brokenloop-org/terraform-provider-midpoint/blob/main/docs/compatibility.md#invalid-item-checks)
+for what is checked and what is not.
 
 ## Partial errors
 

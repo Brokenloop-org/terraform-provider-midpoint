@@ -1,5 +1,6 @@
-The tables in this directory are generated from the XSD schemas of Evolveum
-midPoint. They hold names, flags and enumeration values only.
+The schema tables in this provider (internal/mpschema/tables in its source) are
+generated from the XSD schemas of Evolveum midPoint. They hold names, flags and
+enumeration values only.
 
 MidPoint Identity Manager
 Copyright 2010-2026 Evolveum
@@ -12,4 +13,5 @@ Copyright 2010-2026 Evolveum
 4.11.json.gz   from midPoint 4.11.0, under the European Union Public Licence
                1.2 or later.
 
-The exact image each table came from is recorded in ../images.txt.
+The exact image each table came from is recorded in internal/mpschema/images.txt
+in the provider's source.
