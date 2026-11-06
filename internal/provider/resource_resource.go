@@ -422,7 +422,7 @@ func NewResourceResource() resource.Resource {
 				"extra": extraAttribute(),
 			}, map[string]schema.Block{
 				"connector": schema.SingleNestedBlock{
-					Description: "The connector, found by a search filter on connectorType (and connectorVersion when " +
+					Description: "Required. The connector, found by a search filter on connectorType (and connectorVersion when " +
 						"version is set). midPoint resolves the filter when it creates or updates the resource; the " +
 						"OID it finds is connector_oid. An import records the connector from the connectorRef filter " +
 						"when it is the one this attribute writes; a resource that references its connector by OID " +

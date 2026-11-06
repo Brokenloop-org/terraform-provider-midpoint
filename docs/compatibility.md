@@ -171,7 +171,8 @@ The whole tree is checked, for:
 - **An object where a plain value belongs.**
 - **Several values on a single-valued item.**
 
-Unknown values are skipped and checked on a later plan.
+Unknown values are skipped and checked on a later plan. A key set to null is
+not checked: the provider treats it as absent and does not send it.
 
 ### What is left unchecked
 

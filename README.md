@@ -87,8 +87,9 @@ provider "midpoint" {
 | `on_invalid_item` | none | no | `"error"` (the default) fails the plan on a key or value midPoint's schema does not accept; `"warning"` reports it and carries on. See [Invalid items](#invalid-items). |
 
 A value set in the configuration wins over the environment variable. At
-configure time the provider reads the server version for its logs; a failure
-there is a warning, not an error.
+configure time the provider reads the server version, for its logs and to pick the schema
+table of the invalid item checks. A failure there is a warning, not an error,
+and the checks are skipped.
 
 ## Resources and data sources
 

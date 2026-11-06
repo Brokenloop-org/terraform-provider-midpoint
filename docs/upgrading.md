@@ -37,6 +37,26 @@ resource "midpoint_resource" "csv" {
 }
 ```
 
+If the value comes from a variable, as in `connector = var.connector`, spell
+out the attributes it holds. If it can be null, as in `schema = var.schema`, use
+a `dynamic` block, which writes nothing when the list is empty:
+
+```hcl
+resource "midpoint_resource" "csv" {
+  name = "HR"
+  connector {
+    type    = var.connector.type
+    version = var.connector.version
+  }
+  dynamic "schema" {
+    for_each = var.schema == null ? [] : [var.schema]
+    content {
+      generation_constraints = schema.value.generation_constraints
+    }
+  }
+}
+```
+
 The old form fails with a Terraform error. An unknown key in these blocks now
 fails `terraform validate`; before, Terraform dropped it without a word. Existing
 state carries over: with the block form, a resource applied by v0.2.0 plans no
