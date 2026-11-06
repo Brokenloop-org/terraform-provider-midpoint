@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="urn:t" xmlns:tns="urn:t" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <xsd:complexType name="NoId"><xsd:sequence><xsd:element name="x" type="xsd:string"/></xsd:sequence></xsd:complexType>
+  <xsd:complexType name="ChildDeclaresId">
+    <xsd:complexContent><xsd:extension base="tns:NoId"><xsd:attribute name="id" type="xsd:long"/></xsd:extension></xsd:complexContent>
+  </xsd:complexType>
+  <xsd:complexType name="TextId"><xsd:sequence><xsd:element name="id" type="xsd:string"/></xsd:sequence></xsd:complexType>
+</xsd:schema>

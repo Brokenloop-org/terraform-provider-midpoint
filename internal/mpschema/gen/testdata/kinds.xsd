@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="urn:t" xmlns:tns="urn:t" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:a="http://prism.evolveum.com/xml/ns/public/annotation-3">
+  <xsd:simpleType name="Strength"><xsd:restriction base="xsd:string"><xsd:enumeration value="strong"/><xsd:enumeration value="weak"/></xsd:restriction></xsd:simpleType>
+  <xsd:simpleType name="AliasOfStrength"><xsd:restriction base="tns:Strength"/></xsd:simpleType>
+  <xsd:simpleType name="AliasOfAlias"><xsd:restriction base="tns:AliasOfStrength"/></xsd:simpleType>
+  <xsd:simpleType name="Weak"><xsd:restriction base="tns:Strength"><xsd:enumeration value="weak"/></xsd:restriction></xsd:simpleType>
+  <xsd:simpleType name="Port"><xsd:restriction base="xsd:int"><xsd:minInclusive value="0"/></xsd:restriction></xsd:simpleType>
+  <xsd:simpleType name="Flag"><xsd:restriction base="xsd:boolean"/></xsd:simpleType>
+  <xsd:simpleType name="Text"><xsd:restriction base="xsd:string"/></xsd:simpleType>
+  <xsd:simpleType name="Either"><xsd:union memberTypes="xsd:int tns:Strength"/></xsd:simpleType>
+  <xsd:simpleType name="Words"><xsd:list itemType="xsd:string"/></xsd:simpleType>
+  <xsd:complexType name="Kinds">
+    <xsd:sequence>
+      <xsd:element name="b" type="xsd:boolean"/>
+      <xsd:element name="i1" type="xsd:int"/>
+      <xsd:element name="i2" type="xsd:integer"/>
+      <xsd:element name="i3" type="xsd:long"/>
+      <xsd:element name="i4" type="xsd:short"/>
+      <xsd:element name="i5" type="xsd:byte"/>
+      <xsd:element name="i6" type="xsd:nonNegativeInteger"/>
+      <xsd:element name="i7" type="xsd:positiveInteger"/>
+      <xsd:element name="i8" type="xsd:unsignedInt"/>
+      <xsd:element name="dbl" type="xsd:double"/>
+      <xsd:element name="str" type="xsd:string"/>
+      <xsd:element name="when" type="xsd:dateTime"/>
+      <xsd:element name="qn" type="xsd:QName"/>
+      <xsd:element name="anything" type="xsd:anyType"/>
+      <xsd:element name="noType"/>
+      <xsd:element name="badRef" type="tns:Missing"/>
+      <xsd:element ref="tns:missingElement"/>
+      <xsd:element name="strength" type="tns:Strength"/>
+      <xsd:element name="alias" type="tns:AliasOfAlias"/>
+      <xsd:element name="weak" type="tns:Weak"/>
+      <xsd:element name="port" type="tns:Port"/>
+      <xsd:element name="flag" type="tns:Flag"/>
+      <xsd:element name="text" type="tns:Text"/>
+      <xsd:element name="either" type="tns:Either"/>
+      <xsd:element name="words" type="tns:Words"/>
+    </xsd:sequence>
+    <xsd:attribute name="attrFlag" type="xsd:boolean"/>
+    <xsd:attribute name="attrStrength" type="tns:Strength"/>
+  </xsd:complexType>
+</xsd:schema>

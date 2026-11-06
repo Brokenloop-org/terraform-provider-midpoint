@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="urn:t" xmlns:tns="urn:t" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:a="http://prism.evolveum.com/xml/ns/public/annotation-3">
+  <xsd:complexType name="Base">
+    <xsd:sequence><xsd:element name="baseItem" type="xsd:string"/></xsd:sequence>
+    <xsd:attribute name="oid" type="xsd:string"/>
+  </xsd:complexType>
+  <xsd:complexType name="Middle">
+    <xsd:complexContent><xsd:extension base="tns:Base">
+      <xsd:sequence><xsd:element name="middleItem" type="xsd:string"/></xsd:sequence>
+    </xsd:extension></xsd:complexContent>
+  </xsd:complexType>
+  <xsd:complexType name="Leaf">
+    <xsd:complexContent><xsd:extension base="tns:Middle">
+      <xsd:sequence><xsd:element name="leafItem" type="xsd:string"/></xsd:sequence>
+    </xsd:extension></xsd:complexContent>
+  </xsd:complexType>
+</xsd:schema>

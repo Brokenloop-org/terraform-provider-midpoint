@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="urn:core" xmlns:tns="urn:core" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:a="http://prism.evolveum.com/xml/ns/public/annotation-3">
+  <xsd:element name="evaluator" type="tns:EvaluatorBase"/>
+  <xsd:complexType name="EvaluatorBase"><xsd:sequence/></xsd:complexType>
+  <xsd:complexType name="ScriptEval"><xsd:sequence><xsd:element name="code" type="xsd:string"/></xsd:sequence></xsd:complexType>
+  <xsd:element name="script" type="tns:ScriptEval" substitutionGroup="tns:evaluator"/>
+  <xsd:element name="role" type="tns:ScriptEval"/>
+  <xsd:complexType name="Expression"><xsd:sequence><xsd:element ref="tns:evaluator" maxOccurs="unbounded"/></xsd:sequence></xsd:complexType>
+</xsd:schema>

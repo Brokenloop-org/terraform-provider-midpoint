@@ -42,12 +42,19 @@ type Table struct {
 	Elements map[string]string // global element local name -> complex type
 }
 
-// For returns the table for a server version. No tables are loaded yet.
+// For returns the table for a server version, chosen by its leading
+// major.minor. It reports false when that line has no table.
 func For(serverVersion string) (*Table, bool) {
-	if _, ok := line(serverVersion); !ok {
+	l, ok := line(serverVersion)
+	if !ok {
 		return nil, false
 	}
-	return nil, false
+	load, ok := tables[l]
+	if !ok {
+		return nil, false
+	}
+	t := load()
+	return t, t != nil
 }
 
 var lineRe = regexp.MustCompile(`^(\d+)\.(\d+)`)

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="http://midpoint.evolveum.com/xml/ns/public/common/common-3" xmlns:c="http://midpoint.evolveum.com/xml/ns/public/common/common-3" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <xsd:complexType name="ObjectType"><xsd:attribute name="oid" type="xsd:string"/></xsd:complexType>
+  <xsd:complexType name="OrgT"><xsd:complexContent><xsd:extension base="c:ObjectType"/></xsd:complexContent></xsd:complexType>
+  <xsd:complexType name="NestedT"><xsd:complexContent><xsd:extension base="c:OrgT"/></xsd:complexContent></xsd:complexType>
+  <xsd:complexType name="NotObjT"><xsd:sequence/></xsd:complexType>
+  <xsd:element name="object" type="c:ObjectType"/>
+  <xsd:element name="org" type="c:OrgT" substitutionGroup="c:object"/>
+  <!-- An object type's element need not be in the object substitution group. -->
+  <xsd:element name="nested" type="c:NestedT"/>
+  <xsd:element name="plain" type="c:NotObjT"/>
+</xsd:schema>

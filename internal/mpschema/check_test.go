@@ -197,8 +197,18 @@ func TestLine(t *testing.T) {
 	}
 }
 
-func TestFor_noTablesYet(t *testing.T) {
-	if tb, ok := For("4.9.3"); ok || tb != nil {
-		t.Errorf("For = %v, %v", tb, ok)
-	}
+func TestCheck_elementAnnotationEndsCheckWhenTypeUnknown(t *testing.T) {
+	// The value follows the element @element names, not the item's type.
+	wantKeys(t, find(t, map[string]any{"objectType": []any{
+		map[string]any{"@element": "s:search", "anyKeyOfThatElement": "x"},
+		map[string]any{"attibute": "still checked"},
+	}}), "attibute")
+	wantKeys(t, find(t, map[string]any{"strength": map[string]any{"@element": "x", "@value": "whatever"}}))
+	wantKeys(t, find(t, map[string]any{"flag": map[string]any{"@element": "x", "other": 1}}))
+}
+
+func TestCheck_elementAnnotationWithTypeUsesTheType(t *testing.T) {
+	wantKeys(t, find(t, map[string]any{"appender": map[string]any{
+		"@element": "x", "@type": "FileAppender", "fileName": "f", "fileNme": "typo",
+	}}), "fileNme")
 }

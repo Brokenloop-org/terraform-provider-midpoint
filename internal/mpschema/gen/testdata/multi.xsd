@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="urn:t" xmlns:tns="urn:t" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:a="http://prism.evolveum.com/xml/ns/public/annotation-3">
+  <xsd:element name="head" type="xsd:string"/>
+  <xsd:element name="member" type="xsd:string" substitutionGroup="tns:head"/>
+  <xsd:element name="annotatedMany" type="xsd:string">
+    <xsd:annotation><xsd:appinfo><a:maxOccurs>-1</a:maxOccurs></xsd:appinfo></xsd:annotation>
+  </xsd:element>
+  <xsd:element name="annotatedOne" type="xsd:string">
+    <xsd:annotation><xsd:appinfo><a:maxOccurs>1</a:maxOccurs></xsd:appinfo></xsd:annotation>
+  </xsd:element>
+  <xsd:complexType name="Occurs">
+    <xsd:sequence>
+      <xsd:element name="single" type="xsd:string"/>
+      <xsd:element name="explicitOne" type="xsd:string" maxOccurs="1"/>
+      <xsd:element name="two" type="xsd:string" maxOccurs="2"/>
+      <xsd:element name="many" type="xsd:string" maxOccurs="unbounded"/>
+      <xsd:sequence maxOccurs="unbounded"><xsd:element name="inSeq" type="xsd:string"/></xsd:sequence>
+      <xsd:choice maxOccurs="3">
+        <xsd:element name="inChoice" type="xsd:string"/>
+        <xsd:sequence><xsd:element name="deepInChoice" type="xsd:string"/></xsd:sequence>
+        <xsd:element ref="tns:head"/>
+      </xsd:choice>
+      <xsd:choice><xsd:element name="inPlainChoice" type="xsd:string"/></xsd:choice>
+      <xsd:element name="twice" type="xsd:string"/>
+      <xsd:element name="twice" type="xsd:string"/>
+      <xsd:element name="conflict" type="xsd:string"/>
+      <xsd:element name="conflict" type="xsd:int"/>
+      <xsd:element ref="tns:annotatedMany"/>
+      <xsd:element ref="tns:annotatedOne"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="SeqAround">
+    <xsd:sequence maxOccurs="unbounded"><xsd:element ref="tns:head"/></xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="ChildOfOccurs">
+    <xsd:complexContent><xsd:extension base="tns:Occurs"><xsd:sequence><xsd:element name="own" type="xsd:string"/></xsd:sequence></xsd:extension></xsd:complexContent>
+  </xsd:complexType>
+</xsd:schema>

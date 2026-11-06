@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schema targetNamespace="urn:p" xmlns="http://www.w3.org/2001/XMLSchema" xmlns:p="urn:p">
+  <complexType name="DefaultPrefix">
+    <sequence>
+      <element name="n" type="int"/>
+      <element name="scoped" xmlns:other="urn:p" type="other:DefaultPrefix"/>
+    </sequence>
+  </complexType>
+</schema>

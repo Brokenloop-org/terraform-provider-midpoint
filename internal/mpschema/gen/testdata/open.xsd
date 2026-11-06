@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="urn:t" xmlns:tns="urn:t" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:a="http://prism.evolveum.com/xml/ns/public/annotation-3">
+  <xsd:complexType name="WithAny"><xsd:sequence><xsd:element name="known" type="xsd:string"/><xsd:any minOccurs="0"/></xsd:sequence></xsd:complexType>
+  <xsd:complexType name="WithAnyAttribute"><xsd:anyAttribute/></xsd:complexType>
+  <xsd:complexType name="WithRawAnnotation">
+    <xsd:annotation><xsd:appinfo><a:rawType/></xsd:appinfo></xsd:annotation>
+    <xsd:sequence><xsd:element name="known" type="xsd:string"/></xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="ChildOfAny">
+    <xsd:complexContent><xsd:extension base="tns:WithAny"><xsd:sequence><xsd:element name="more" type="xsd:string"/></xsd:sequence></xsd:extension></xsd:complexContent>
+  </xsd:complexType>
+  <xsd:complexType name="SearchFilterType"><xsd:sequence><xsd:element name="description" type="xsd:string"/></xsd:sequence></xsd:complexType>
+  <xsd:complexType name="ConditionalFilter">
+    <xsd:complexContent><xsd:extension base="tns:SearchFilterType"><xsd:sequence><xsd:element name="condition" type="xsd:string"/></xsd:sequence></xsd:extension></xsd:complexContent>
+  </xsd:complexType>
+  <xsd:complexType name="RawType"><xsd:sequence/></xsd:complexType>
+  <xsd:complexType name="HasRawItem">
+    <xsd:sequence>
+      <xsd:element name="raw" type="xsd:string">
+        <xsd:annotation><xsd:appinfo><a:rawType/></xsd:appinfo></xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="SimpleContent"><xsd:simpleContent><xsd:extension base="xsd:string"/></xsd:simpleContent></xsd:complexType>
+  <xsd:complexType name="Restricted"><xsd:complexContent><xsd:restriction base="tns:WithRawAnnotation"/></xsd:complexContent></xsd:complexType>
+  <xsd:complexType name="UnknownBase"><xsd:complexContent><xsd:extension base="tns:Missing"/></xsd:complexContent></xsd:complexType>
+  <xsd:complexType name="Plain"><xsd:sequence><xsd:element name="known" type="xsd:string"/></xsd:sequence></xsd:complexType>
+</xsd:schema>

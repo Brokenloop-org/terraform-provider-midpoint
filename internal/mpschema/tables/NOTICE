@@ -1,0 +1,15 @@
+The tables in this directory are generated from the XSD schemas of Evolveum
+midPoint. They hold names, flags and enumeration values only.
+
+MidPoint Identity Manager
+Copyright 2010-2026 Evolveum
+
+4.9.json.gz    from midPoint 4.9.9, used under the European Union Public
+               Licence. midPoint 4.9 is dual-licensed under the Apache License
+               2.0 and the European Union Public Licence.
+4.10.json.gz   from midPoint 4.10.5, under the European Union Public Licence
+               1.2 or later.
+4.11.json.gz   from midPoint 4.11.0, under the European Union Public Licence
+               1.2 or later.
+
+The exact image each table came from is recorded in ../images.txt.

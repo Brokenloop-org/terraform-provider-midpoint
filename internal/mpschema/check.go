@@ -54,6 +54,15 @@ func (t *Table) walkObject(out *[]Finding, path string, it Item, m map[string]an
 	if len(m) == 0 {
 		return
 	}
+	// On a heterogeneous list, @element names what the value is, so the item's
+	// type does not apply. Only an @type on an object says what it holds instead.
+	if _, ok := m["@element"]; ok {
+		_, typed := m["@type"]
+		_, valued := m["@value"]
+		if !typed || valued {
+			return
+		}
+	}
 	if val, ok := m["@value"]; ok {
 		t.walk(out, path, it, val)
 		return

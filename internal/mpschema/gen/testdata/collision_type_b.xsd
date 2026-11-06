@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="urn:b" xmlns:tns="urn:b" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:a="http://prism.evolveum.com/xml/ns/public/annotation-3">
+  <xsd:complexType name="Shared"><xsd:sequence><xsd:element name="fromB" type="xsd:string"/></xsd:sequence></xsd:complexType>
+  <xsd:complexType name="Same"><xsd:sequence><xsd:element name="x" type="xsd:string"/></xsd:sequence></xsd:complexType>
+  <xsd:simpleType name="Color"><xsd:restriction base="xsd:string"><xsd:enumeration value="blue"/></xsd:restriction></xsd:simpleType>
+  <xsd:simpleType name="SameEnum"><xsd:restriction base="xsd:string"><xsd:enumeration value="b"/><xsd:enumeration value="a"/></xsd:restriction></xsd:simpleType>
+  <xsd:complexType name="Both"><xsd:sequence><xsd:element name="x" type="xsd:string"/></xsd:sequence></xsd:complexType>
+</xsd:schema>
