@@ -61,14 +61,19 @@ provider "midpoint" {
   # default_options = {
   #   role = []
   # }
+
+  # Optional: report a partial error (HTTP 250) as a warning instead of failing
+  # the apply and tainting a newly created object.
+  # on_partial_error = "warning"
 }
 ```
 
 ## Environment variables
 
-Every attribute except `ca_bundle`, `default_options` and `fail_on_unapplied_write` can come from the
-environment. An attribute set in the configuration takes precedence.
-`url`, `username` and `password` are required, from either source.
+Every attribute except `ca_bundle`, `default_options`, `fail_on_unapplied_write`
+and `on_partial_error` can come from the environment. An attribute set in the
+configuration takes precedence. `url`, `username` and `password` are required,
+from either source.
 
 | Attribute | Environment variable | Notes |
 |---|---|---|
@@ -76,6 +81,22 @@ environment. An attribute set in the configuration takes precedence.
 | `username` | `MIDPOINT_USERNAME` | HTTP basic authentication. |
 | `password` | `MIDPOINT_PASSWORD` | HTTP basic authentication. |
 | `insecure` | `MIDPOINT_INSECURE` | `true` skips TLS verification (development only). |
+
+## Partial errors
+
+midPoint answers a write with HTTP 250 when the object is saved but part of the
+operation failed, typically provisioning an account to a resource. By default,
+`on_partial_error = "error"`, that fails the apply. A failed create keeps the
+object in state and marks it tainted, so the next apply replaces it, which also
+removes any accounts it already has on other resources. Run `terraform untaint`
+to keep it instead. A failed update does not taint, but its change is saved: a
+later apply does not send it again, so it succeeds while nothing retries what
+failed.
+
+With `on_partial_error = "warning"` a create or update reports a warning and the
+apply carries on, leaving midPoint to complete what failed, for example by a
+reconciliation. A partial error on a delete is always an error, because a
+warning would drop the object from state whether or not it is gone.
 
 ## Execution options
 
@@ -118,6 +139,7 @@ before using it for this.
 - `default_options` (Map of List of String) Default midPoint execution options per resource type, keyed by resource short name (service, role, org, archetype, object_template, mark, task, resource, object). A resource's own options attribute takes precedence.
 - `fail_on_unapplied_write` (Boolean) Fail an update when the object read back differs from the configuration, and a delete when the object still exists. Both are warnings by default. A write held for approval looks like this, but so does a value midPoint normalized, which also fails.
 - `insecure` (Boolean) Skip TLS certificate verification (development only). May also be set with MIDPOINT_INSECURE. Defaults to false.
+- `on_partial_error` (String) What to do when midPoint answers a create or update with a partial error (HTTP 250): the object is saved, but part of the operation failed, such as provisioning an account to a resource. "error" (the default) fails the apply; an object just created is kept in state and marked tainted, so the next apply replaces it. "warning" reports it and carries on, leaving midPoint to complete what failed. A partial error on a delete is always an error.
 - `password` (String, Sensitive) Password for HTTP basic authentication. May also be set with MIDPOINT_PASSWORD.
 - `url` (String) Base URL of the midPoint server, e.g. https://midpoint.example.com; the provider appends /midpoint/ws/rest. May also be set with MIDPOINT_URL.
 - `username` (String) Username for HTTP basic authentication. May also be set with MIDPOINT_USERNAME.

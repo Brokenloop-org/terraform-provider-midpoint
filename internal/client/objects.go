@@ -67,12 +67,24 @@ func (c *Client) Get(ctx context.Context, typ, oid string, o GetOptions) (*Objec
 	return obj, nil
 }
 
-// Create adds obj and returns the OID midPoint assigned or kept.
+// Create adds obj and returns the OID midPoint assigned or kept. On a partial
+// error (see IsPartialError) the object exists: the OID, when midPoint sent
+// one, comes back together with the error.
 func (c *Client) Create(ctx context.Context, obj Object, options []string) (string, error) {
-	resp, _, err := c.do(ctx, http.MethodPost, "/"+url.PathEscape(obj.Type), withOptions(options), Wrap(obj))
+	resp, body, err := c.do(ctx, http.MethodPost, "/"+url.PathEscape(obj.Type), withOptions(options), Wrap(obj))
 	if err != nil {
 		return "", err
 	}
+	partial := partialError(resp, body)
+	oid, err := createdOID(obj.Type, resp)
+	if partial != nil {
+		return oid, partial
+	}
+	return oid, err
+}
+
+// createdOID reads the OID of a created object from the Location header.
+func createdOID(typ string, resp *http.Response) (string, error) {
 	loc := resp.Header.Get("Location")
 	if loc == "" {
 		// midPoint answers a create without an OID with 202 and no Location;
@@ -81,30 +93,38 @@ func (c *Client) Create(ctx context.Context, obj Object, options []string) (stri
 			return "", errors.New("midPoint accepted the create (HTTP 202) but returned no object ID, so nothing can be recorded in state. " +
 				"A possible cause is that the create is waiting on approval; check midPoint before applying again")
 		}
-		return "", fmt.Errorf("creating %s: midPoint returned HTTP %d without a Location header", obj.Type, resp.StatusCode)
+		return "", fmt.Errorf("creating %s: midPoint returned HTTP %d without a Location header", typ, resp.StatusCode)
 	}
 	u, err := url.Parse(loc)
 	if err != nil {
-		return "", fmt.Errorf("creating %s: invalid Location header %q: %w", obj.Type, loc, err)
+		return "", fmt.Errorf("creating %s: invalid Location header %q: %w", typ, loc, err)
 	}
 	oid := path.Base(strings.TrimRight(u.Path, "/"))
 	if oid == "" || oid == "." || oid == "/" {
-		return "", fmt.Errorf("creating %s: no OID in Location header %q", obj.Type, loc)
+		return "", fmt.Errorf("creating %s: no OID in Location header %q", typ, loc)
 	}
 	return oid, nil
 }
 
-// Modify applies deltas to typ/oid.
+// Modify applies deltas to typ/oid. On a partial error (see IsPartialError)
+// the object may have changed.
 func (c *Client) Modify(ctx context.Context, typ, oid string, deltas []ItemDelta, options []string) error {
 	body := map[string]any{"objectModification": map[string]any{"itemDelta": deltas}}
-	_, _, err := c.do(ctx, http.MethodPatch, objectPath(typ, oid), withOptions(options), body)
-	return err
+	resp, respBody, err := c.do(ctx, http.MethodPatch, objectPath(typ, oid), withOptions(options), body)
+	if err != nil {
+		return err
+	}
+	return partialError(resp, respBody)
 }
 
-// Delete removes typ/oid. A missing object yields an error matching ErrNotFound.
+// Delete removes typ/oid. A missing object yields an error matching
+// ErrNotFound. On a partial error (see IsPartialError) the object may be gone.
 func (c *Client) Delete(ctx context.Context, typ, oid string, options []string) error {
-	_, _, err := c.do(ctx, http.MethodDelete, objectPath(typ, oid), withOptions(options), nil)
-	return err
+	resp, body, err := c.do(ctx, http.MethodDelete, objectPath(typ, oid), withOptions(options), nil)
+	if err != nil {
+		return err
+	}
+	return partialError(resp, body)
 }
 
 // Search runs an Axiom query filter against typ. An empty filter matches all

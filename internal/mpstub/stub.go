@@ -83,6 +83,7 @@ type Server struct {
 	holdWrites   bool
 	seq          int
 	fault        func(Recorded) int
+	partial      func(Recorded) string
 }
 
 // New starts a stub. Point a client.Config.URL at URL() and Close it when
@@ -155,6 +156,41 @@ func (s *Server) SetFault(fn func(Recorded) int) {
 	s.fault = fn
 }
 
+// SetPartialError installs fn, which sees every request after any fault and
+// returns a message to answer a write with midPoint's partial error, or "" to
+// answer normally. Unlike a fault the write is processed, as on a real server:
+// the object is saved, and a create keeps its Location. The response is HTTP
+// 250 with an OperationResult body. fn runs with the stub locked, so it must
+// not call the stub, and it must select only creates, modifies and deletes.
+// nil removes it.
+func (s *Server) SetPartialError(fn func(Recorded) string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.partial = fn
+}
+
+// partialWriter turns a write handler's success status into a partial error.
+type partialWriter struct {
+	http.ResponseWriter
+	message string
+}
+
+func (w *partialWriter) WriteHeader(status int) {
+	if status < 200 || status > 299 {
+		w.ResponseWriter.WriteHeader(status)
+		return
+	}
+	writeJSON(w.ResponseWriter, 250, map[string]any{
+		"@ns": typesNS,
+		"object": map[string]any{
+			"@ns":     commonNS,
+			"@type":   "c:OperationResultType",
+			"status":  "partial_error",
+			"message": w.message,
+		},
+	})
+}
+
 func (s *Server) store(typ string, body map[string]any) string {
 	oid, _ := body["oid"].(string)
 	if oid == "" {
@@ -205,6 +241,11 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		if status := s.fault(rec); status != 0 {
 			writeError(w, status, fmt.Sprintf("injected fault: %s %s", r.Method, rel))
 			return
+		}
+	}
+	if s.partial != nil {
+		if message := s.partial(rec); message != "" {
+			w = &partialWriter{ResponseWriter: w, message: message}
 		}
 	}
 

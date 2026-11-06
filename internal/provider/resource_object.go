@@ -276,7 +276,8 @@ func (r *objectResource) Create(ctx context.Context, req resource.CreateRequest,
 		Body:          desired,
 	})
 	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	// With an oid the object exists despite an error: it still gets recorded.
+	if resp.Diagnostics.HasError() && oid == "" {
 		return
 	}
 	if adopted {

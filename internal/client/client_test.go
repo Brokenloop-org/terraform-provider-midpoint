@@ -175,6 +175,89 @@ func TestGet_operationResultInsteadOfObject(t *testing.T) {
 	}
 }
 
+// partialResult is the body of a midPoint 4.9 HTTP 250, as captured live.
+const partialResult = `{"@ns":"x","object":{"@ns":"y","@type":"c:OperationResultType","operation":"addObject","status":"partial_error","message":"File missing"}}`
+
+func wantPartial(t *testing.T, err error) {
+	t.Helper()
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.Status != 250 {
+		t.Fatalf("err = %#v, want *APIError with status 250", err)
+	}
+	if apiErr.Message != "File missing" {
+		t.Errorf("Message = %q, want midPoint's message", apiErr.Message)
+	}
+	if !IsPartialError(err) {
+		t.Error("IsPartialError = false, want true")
+	}
+}
+
+// A partial error on a create leaves the object saved, so the OID comes back
+// together with the error.
+func TestCreate_partialErrorReturnsOID(t *testing.T) {
+	c, _ := stub(t, reply{
+		Status: 250,
+		Header: map[string]string{"Location": "http://x/midpoint/ws/rest/users/u1"},
+		Body:   partialResult,
+	})
+	oid, err := c.Create(context.Background(), Object{Type: "users", Body: map[string]any{"name": "u"}}, nil)
+	wantPartial(t, err)
+	if oid != "u1" {
+		t.Errorf("oid = %q, want u1", oid)
+	}
+}
+
+// Without an OID (midPoint's path for a create awaiting approval) the partial
+// error is still what the caller sees, not a complaint about Location.
+func TestCreate_partialErrorWithoutLocation(t *testing.T) {
+	c, _ := stub(t, reply{Status: 250, Body: partialResult})
+	oid, err := c.Create(context.Background(), Object{Type: "users", Body: map[string]any{"name": "u"}}, nil)
+	wantPartial(t, err)
+	if oid != "" {
+		t.Errorf("oid = %q, want none", oid)
+	}
+}
+
+func TestModify_partialError(t *testing.T) {
+	c, _ := stub(t, reply{Status: 250, Body: partialResult})
+	wantPartial(t, c.Modify(context.Background(), "users", "u1", nil, nil))
+}
+
+func TestDelete_partialError(t *testing.T) {
+	c, _ := stub(t, reply{Status: 250, Body: partialResult})
+	wantPartial(t, c.Delete(context.Background(), "users", "u1", nil))
+}
+
+// HTTP 240 is a handled error, which midPoint documents as equivalent to
+// success.
+func TestWrites_handledErrorIsSuccess(t *testing.T) {
+	handled := reply{
+		Status: 240,
+		Header: map[string]string{"Location": "http://x/midpoint/ws/rest/users/u1"},
+		Body:   `{"@ns":"x","object":{"@type":"c:OperationResultType","status":"handled_error"}}`,
+	}
+	c, _ := stub(t, handled)
+	ctx := context.Background()
+	if oid, err := c.Create(ctx, Object{Type: "users", Body: map[string]any{"name": "u"}}, nil); err != nil || oid != "u1" {
+		t.Errorf("Create = %q, %v; want u1, no error", oid, err)
+	}
+	if err := c.Modify(ctx, "users", "u1", nil, nil); err != nil {
+		t.Errorf("Modify: %v", err)
+	}
+	if err := c.Delete(ctx, "users", "u1", nil); err != nil {
+		t.Errorf("Delete: %v", err)
+	}
+}
+
+// midPoint 4.9 nests the OperationResult of an error under "object" too.
+func TestAPIError_messageUnderObject(t *testing.T) {
+	c, _ := stub(t, reply{Status: 502, Body: `{"@ns":"x","object":{"@type":"c:OperationResultType","status":"fatal_error","message":"Bad gateway detail"}}`})
+	err := c.Delete(context.Background(), "users", "u1", nil)
+	if err == nil || err.Error() != "midPoint returned HTTP 502: Bad gateway detail" {
+		t.Errorf("err = %v, want midPoint's message only", err)
+	}
+}
+
 func TestCreate_readsLocationHeader(t *testing.T) {
 	tests := []struct {
 		name     string

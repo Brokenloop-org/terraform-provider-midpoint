@@ -29,6 +29,12 @@ var resourceShortNames = []string{
 
 var _ provider.Provider = (*midpointProvider)(nil)
 
+// The values of on_partial_error.
+const (
+	onPartialErrorError   = "error"
+	onPartialErrorWarning = "warning"
+)
+
 type midpointProvider struct {
 	version string
 }
@@ -42,6 +48,7 @@ type providerModel struct {
 	CABundle             types.String `tfsdk:"ca_bundle"`
 	DefaultOptions       types.Map    `tfsdk:"default_options"`
 	FailOnUnappliedWrite types.Bool   `tfsdk:"fail_on_unapplied_write"`
+	OnPartialError       types.String `tfsdk:"on_partial_error"`
 }
 
 // providerConfig is the provider configuration after environment fallbacks.
@@ -60,6 +67,9 @@ type providerData struct {
 	DefaultOptions map[string][]string
 	// FailOnUnappliedWrite is the provider's fail_on_unapplied_write.
 	FailOnUnappliedWrite bool
+	// PartialWarning makes a partial error on a create or update a warning
+	// instead of an error.
+	PartialWarning bool
 }
 
 // New returns a constructor for the midPoint provider.
@@ -117,6 +127,17 @@ func (p *midpointProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 					mapvalidator.KeysAre(stringvalidator.OneOf(resourceShortNames...)),
 				},
 			},
+			"on_partial_error": schema.StringAttribute{
+				Description: "What to do when midPoint answers a create or update with a partial error (HTTP 250): the " +
+					"object is saved, but part of the operation failed, such as provisioning an account to a resource. " +
+					"\"error\" (the default) fails the apply; an object just created is kept in state and marked tainted, " +
+					"so the next apply replaces it. \"warning\" reports it and carries on, leaving midPoint to complete " +
+					"what failed. A partial error on a delete is always an error.",
+				Optional: true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(onPartialErrorError, onPartialErrorWarning),
+				},
+			},
 		},
 	}
 }
@@ -169,7 +190,13 @@ func (p *midpointProvider) Configure(ctx context.Context, req provider.Configure
 		tflog.Info(ctx, "connected to midPoint", map[string]any{"url": redactURL(cfg.URL), "version": version})
 	}
 
-	data := &providerData{Client: c, Config: cfg, DefaultOptions: defaults, FailOnUnappliedWrite: model.FailOnUnappliedWrite.ValueBool()}
+	data := &providerData{
+		Client:               c,
+		Config:               cfg,
+		DefaultOptions:       defaults,
+		FailOnUnappliedWrite: model.FailOnUnappliedWrite.ValueBool(),
+		PartialWarning:       model.OnPartialError.ValueString() == onPartialErrorWarning,
+	}
 	resp.ResourceData = data
 	resp.DataSourceData = data
 }

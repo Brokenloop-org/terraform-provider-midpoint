@@ -77,6 +77,7 @@ provider "midpoint" {
 | `ca_bundle` | none | no | PEM CA certificates, e.g. `file("ca.pem")`. When set they replace the system trust store. |
 | `default_options` | none | no | Execution options per resource type, keyed by `service`, `role`, `org`, `archetype`, `object_template`, `mark`, `task`, `resource`, `object`. See [Execution options](#execution-options). |
 | `fail_on_unapplied_write` | none | no | `true` fails an update when the object read back differs from the configuration, and a delete when the object still exists. Default `false` (warnings). See [Writes held for approval](#writes-held-for-approval). |
+| `on_partial_error` | none | no | `"error"` (the default) fails the apply when midPoint answers a create or update with HTTP 250; `"warning"` reports it and carries on. See [Partial errors](#partial-errors). |
 
 A value set in the configuration wins over the environment variable. At
 configure time the provider reads the server version for its logs; a failure
@@ -248,6 +249,22 @@ list sends no options.
   construction `resource`, `kind` or `intent`, or `order`) is a different
   value: it is applied as a delete of the old value and an add of the new
   one, so the container id changes.
+
+### Partial errors
+
+midPoint answers a write with HTTP 250 when the object is saved but part of the
+operation failed, typically provisioning an account to a resource. By default,
+`on_partial_error = "error"`, that fails the apply. A failed create keeps the
+object in state and marks it tainted, so the next apply replaces it, which also
+removes any accounts it already has on other resources. Run `terraform untaint`
+to keep it instead. A failed update does not taint, but its change is saved: a
+later apply does not send it again, so it succeeds while nothing retries what
+failed.
+
+With `on_partial_error = "warning"` a create or update reports a warning and the
+apply carries on, leaving midPoint to complete what failed, for example by a
+reconciliation. A partial error on a delete is always an error, because a
+warning would drop the object from state whether or not it is gone.
 
 ### Writes held for approval
 
