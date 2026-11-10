@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -115,22 +116,25 @@ func (e *engine) getOptions() client.GetOptions {
 // in st.Body when st.OID is empty) it first reads that OID: when the object
 // exists and st.AdoptExisting is false it fails without writing anything;
 // when it exists and st.AdoptExisting is true it returns adopted == true
-// without writing (the caller then runs update). Otherwise it POSTs the body
-// with empty items pruned and the oid in the body, using the effective
-// create options plus reevaluateSearchFilters when the body holds a
-// filter-only reference, and returns the oid midPoint kept or assigned.
+// without writing (the caller then runs update). Without an OID it generates
+// a random one. It then POSTs the body with empty items pruned and the oid in
+// the body, using the effective create options plus reevaluateSearchFilters
+// when the body holds a filter-only reference, and returns the oid.
 //
-// A partial error means the object was saved although part of the operation
-// failed. The oid then comes back with an error diagnostic (or a warning, with
-// on_partial_error = "warning"), and the caller must still record the object:
-// otherwise it would be orphaned. A recorded object with an error is tainted.
+// A partial error (HTTP 250), or a server error after which the object exists
+// (see savedDespite), means the object was saved although part of the
+// operation failed. The oid then comes back with an error diagnostic (or a
+// warning, with on_partial_error = "warning"), and the caller must still
+// record the object: otherwise it would be orphaned. A recorded object with an
+// error is tainted.
 func (e *engine) create(ctx context.Context, st objectState) (oid string, adopted bool, diags diag.Diagnostics) {
 	body := pruneEmpty(st.Body)
 	oid = st.OID
 	if oid == "" {
 		oid, _ = body["oid"].(string)
 	}
-	if oid != "" {
+	switch {
+	case oid != "":
 		_, err := e.c.Get(ctx, e.spec.RestType, oid, e.getOptions())
 		switch {
 		case err == nil && !st.AdoptExisting:
@@ -144,8 +148,13 @@ func (e *engine) create(ctx context.Context, st objectState) (oid string, adopte
 				fmt.Sprintf("reading %s before creating it: %s", e.ref(oid), err))
 			return "", false, diags
 		}
-		body["oid"] = oid
+	default:
+		// The provider picks the oid, so that it can find the object when
+		// midPoint saves it but answers with an error and no Location (see
+		// savedDespite). A random UUID needs no check for an existing object.
+		oid = uuid.NewString()
 	}
+	body["oid"] = oid
 
 	options := effectiveOptions(e.defaults, e.spec.ShortName, st.Options, e.spec.CreateOptions)
 	if hasFilterOnlyReference(body) {
@@ -155,17 +164,61 @@ func (e *engine) create(ctx context.Context, st objectState) (oid string, adopte
 	created, err := e.c.Create(ctx, client.Object{Type: e.spec.RestType, Body: body}, options)
 	switch {
 	case err == nil:
-	case !client.IsPartialError(err) || created == "":
-		diags.AddError("Cannot create object", fmt.Sprintf("creating %s: %s", e.spec.RestType, err))
-		return "", false, diags
-	case e.partialWarning:
-		diags.AddWarning("Object created with a partial error",
-			fmt.Sprintf("%s was created, but part of the operation failed: %s. It is kept in state; midPoint has to complete what failed, for example by a reconciliation.", e.ref(created), err))
-	default:
-		diags.AddError("Object created with a partial error",
-			fmt.Sprintf("%s was created, but part of the operation failed: %s. It is kept in state and marked tainted, so the next apply replaces it, which also removes any accounts it already has on other resources. Run `terraform untaint` to keep it, or set on_partial_error = \"warning\" on the provider.", e.ref(created), err))
+		return created, false, diags
+	case client.IsPartialError(err):
+		// A partial error means the object was saved; it has the oid sent.
+		if created == "" {
+			created = oid
+		}
+		e.createdWithError(&diags, "Object created with a partial error", created, err)
+		return created, false, diags
 	}
-	return created, false, diags
+	saved, checkErr := e.savedDespite(ctx, oid, err)
+	switch {
+	case saved:
+		e.createdWithError(&diags, "Object created despite an error", oid, err)
+		return oid, false, diags
+	case checkErr != nil:
+		diags.AddError("Cannot create object", fmt.Sprintf("creating %s: %s. Whether midPoint saved it anyway cannot be checked (%s); if it did, import %s", e.spec.RestType, err, checkErr, e.ref(oid)))
+	default:
+		diags.AddError("Cannot create object", fmt.Sprintf("creating %s: %s", e.spec.RestType, err))
+	}
+	return "", false, diags
+}
+
+// createdWithError reports an object that midPoint saved although part of the
+// create failed: an error (the object is recorded and tainted), or a warning
+// with on_partial_error = "warning".
+func (e *engine) createdWithError(diags *diag.Diagnostics, summary, oid string, err error) {
+	if e.partialWarning {
+		diags.AddWarning(summary,
+			fmt.Sprintf("%s was created, but part of the operation failed: %s. It is kept in state; midPoint has to complete what failed, for example by a reconciliation.", e.ref(oid), err))
+		return
+	}
+	diags.AddError(summary,
+		fmt.Sprintf("%s was created, but part of the operation failed: %s. It is kept in state and marked tainted, so the next apply replaces it, which also removes any accounts it already has on other resources. Run `terraform untaint` to keep it, or set on_partial_error = \"warning\" on the provider.", e.ref(oid), err))
+}
+
+// savedDespite reports whether a create of oid that failed with err saved the
+// object anyway; checkErr is set when that cannot be read. midPoint 4.9 saves the focus before provisioning it, so a
+// fatal provisioning error answers 502 with no Location for an object that
+// exists. Only a server error (5xx) is followed up: a 4xx such as a conflict
+// may come from an object that existed before. The object did not exist before
+// the create: a configured oid was checked, and a generated one is random.
+func (e *engine) savedDespite(ctx context.Context, oid string, err error) (saved bool, checkErr error) {
+	var apiErr *client.APIError
+	if !errors.As(err, &apiErr) || apiErr.Status < 500 || apiErr.Status > 599 {
+		return false, nil
+	}
+	_, getErr := e.c.Get(ctx, e.spec.RestType, oid, e.getOptions())
+	switch {
+	case getErr == nil:
+		return true, nil
+	case errors.Is(getErr, client.ErrNotFound):
+		return false, nil
+	default:
+		return false, getErr
+	}
 }
 
 // hasFilterOnlyReference reports whether body holds a reference with a

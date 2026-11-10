@@ -151,10 +151,8 @@ func TestEngineCreate_newObjectSendsOptions(t *testing.T) {
 			if got := posts[0].Query["options"]; !reflect.DeepEqual(got, tt.wantOptions) {
 				t.Fatalf("options = %v, want %v", got, tt.wantOptions)
 			}
-			want := map[string]any{"role": map[string]any{"name": "r1"}}
-			if tt.oid != "" {
-				want["role"].(map[string]any)["oid"] = tt.oid
-			}
+			// Without a configured oid the provider generates one.
+			want := map[string]any{"role": map[string]any{"name": "r1", "oid": oid}}
 			if got := asJSON(t, posts[0].Body); !reflect.DeepEqual(got, asJSON(t, want)) {
 				t.Fatalf("POST body = %v, want %v (empty items pruned, oid in body)", got, want)
 			}

@@ -65,7 +65,7 @@ func TestEngineCreate_partialErrorIsAnErrorWithTheOID(t *testing.T) {
 	wantAll(t, errorDetail(t, diags), "roles/"+engRoleOID, partialMessage, "tainted", "terraform untaint")
 }
 
-// The object is not lost when midPoint generated its oid.
+// The object is not lost when the oid was not configured.
 func TestEngineCreate_partialErrorReturnsGeneratedOID(t *testing.T) {
 	e, s := testEngine(t, testRoleSpec, nil)
 	partialOn(s, http.MethodPost)

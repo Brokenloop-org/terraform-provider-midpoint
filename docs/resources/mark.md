@@ -47,7 +47,7 @@ resource "midpoint_mark" "protected" {
 - `event` (Dynamic) Event mark information (eventMark) in midPoint naming, e.g. { enabledByDefault = true }.
 - `extra` (Dynamic) Other midPoint items, merged at the object root, in midPoint naming (camelCase, as in the REST API), e.g. yamldecode(file("extra.yaml")). An item must not also be set by a typed attribute.
 - `force_destroy` (Boolean) Delete the object even when it was adopted with adopt_existing = true, which is refused otherwise. There is no reference check for this type. Defaults to false.
-- `oid` (String) Object OID. When unset midPoint generates one. Changing it replaces the object. Creating an object whose oid already exists fails unless adopt_existing is set.
+- `oid` (String) Object OID. When unset the provider generates a random one at apply time. Changing it replaces the object. Creating an object whose oid already exists fails unless adopt_existing is set.
 - `options` (List of String) midPoint execution options sent on create and update, e.g. raw, isImport, reevaluateSearchFilters. When unset, the provider default_options entry for mark applies, else the built-in defaults: isImport on create and none on update. An empty list sends no options. overwrite is sent only when listed here; reevaluateSearchFilters is added to any write that sends a reference with a filter and no oid.
 
 ### Read-Only

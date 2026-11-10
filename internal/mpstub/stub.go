@@ -84,6 +84,7 @@ type Server struct {
 	seq          int
 	fault        func(Recorded) int
 	partial      func(Recorded) string
+	failAfter    func(Recorded) int
 	nodeVersion  string
 }
 
@@ -178,6 +179,43 @@ func (s *Server) SetPartialError(fn func(Recorded) string) {
 	s.partial = fn
 }
 
+// SetFailAfterWrite installs fn, which sees every request after any fault and
+// returns an HTTP status (4xx or 5xx) to answer a write with after processing
+// it, or 0 to answer normally. The object is saved, but the response carries
+// a fatal_error OperationResult and no Location, as midPoint 4.9 answers a
+// create whose provisioning fails with a fatal criticality (HTTP 502). fn runs
+// with the stub locked, so it must not call the stub, and it must select only
+// creates, modifies and deletes. nil removes it.
+func (s *Server) SetFailAfterWrite(fn func(Recorded) int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.failAfter = fn
+}
+
+// failWriter turns a write handler's success status into a fatal error
+// without a Location.
+type failWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *failWriter) WriteHeader(status int) {
+	if status < 200 || status > 299 {
+		w.ResponseWriter.WriteHeader(status)
+		return
+	}
+	w.ResponseWriter.Header().Del("Location")
+	writeJSON(w.ResponseWriter, w.status, map[string]any{
+		"@ns": typesNS,
+		"object": map[string]any{
+			"@ns":     commonNS,
+			"@type":   "c:OperationResultType",
+			"status":  "fatal_error",
+			"message": "injected fatal error after the write",
+		},
+	})
+}
+
 // partialWriter turns a write handler's success status into a partial error.
 type partialWriter struct {
 	http.ResponseWriter
@@ -255,6 +293,11 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	if s.partial != nil {
 		if message := s.partial(rec); message != "" {
 			w = &partialWriter{ResponseWriter: w, message: message}
+		}
+	}
+	if s.failAfter != nil {
+		if status := s.failAfter(rec); status != 0 {
+			w = &failWriter{ResponseWriter: w, status: status}
 		}
 	}
 

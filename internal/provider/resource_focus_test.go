@@ -134,7 +134,7 @@ resource "midpoint_role" "admin" {
 							return err
 						}
 						want := asJSON(t, map[string]any{
-							"name": "dev-k8s / admin", "displayName": "Admin", "description": "v1", "identifier": "admin",
+							"oid": oid, "name": "dev-k8s / admin", "displayName": "Admin", "description": "v1", "identifier": "admin",
 							"assignment":        []any{map[string]any{"targetRef": archetypeRefValue(engArchetypeOID)}},
 							"archetypeRef":      archetypeRefValue(engArchetypeOID),
 							"roleMembershipRef": archetypeRefValue(engArchetypeOID),
@@ -294,7 +294,7 @@ resource "midpoint_archetype" "cluster" {
 							return err
 						}
 						want := asJSON(t, map[string]any{
-							"name": "Cluster",
+							"oid": oid, "name": "Cluster",
 							"assignment": []any{map[string]any{
 								"identifier": "holderType", "assignmentRelation": []any{map[string]any{"holderType": []any{"#RoleType"}}},
 							}},

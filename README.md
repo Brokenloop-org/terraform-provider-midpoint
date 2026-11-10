@@ -228,7 +228,7 @@ list sends no options.
 
   | Item | Why |
   |---|---|
-  | root `oid` | midPoint generates it. |
+  | root `oid` | The provider generates it when the configuration sets none. |
   | task `owner` (`ownerRef`) | midPoint makes the calling user the owner. |
   | task `binding` | midPoint defaults it to `loose`. |
   | task `assignment` | midPoint assigns a task its activity's archetype on the first run. A hand-added task assignment is not drift unless the task configures assignments. |
