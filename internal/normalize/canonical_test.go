@@ -169,6 +169,25 @@ func TestCanonical_emptyListIsNoValue(t *testing.T) {
 	}
 }
 
+// A task that has run on midPoint 4.10 holds taskRunRecord, the history of its
+// runs, which no configuration sets. It lives here rather than in a golden
+// fixture because the 4.9 schema has no such item, and every fixture is
+// checked against every schema version (mpschema's corpus test).
+func TestCanonical_taskRunRecordIsServerManaged(t *testing.T) {
+	in := map[string]any{
+		"name": "recompute",
+		"taskRunRecord": map[string]any{
+			"taskRunIdentifier": "ac039967-1453-4ae9-975e-8a438c6a7df1",
+			"runStartTimestamp": "2026-11-06T17:28:17.224Z",
+			"runEndTimestamp":   "2026-11-06T17:28:17.380Z",
+		},
+	}
+	want := map[string]any{"name": "recompute"}
+	if got := Canonical("tasks", in); !reflect.DeepEqual(got, want) {
+		t.Errorf("Canonical = %#v, want %#v", got, want)
+	}
+}
+
 func TestIsServerManaged(t *testing.T) {
 	cases := []struct {
 		name     string

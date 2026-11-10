@@ -103,6 +103,7 @@ var ServerManaged = []Rule{
 	{Path: "activityState", Types: []string{"tasks"}, Reason: "TaskActivityStateType: runtime activity state, buckets and statistics"},
 	{Path: "affectedObjects", Types: []string{"tasks"}, Reason: "TaskAffectedObjectsType: derived from the activity definition"},
 	{Path: "unpauseAction", Types: []string{"tasks"}, Reason: "set by the task manager when a task waits"},
+	{Path: "taskRunRecord", Types: []string{"tasks"}, Reason: "TaskRunRecordType: history of the task's runs; midPoint 4.10 records it, 4.9 has no such item"},
 
 	// Function libraries.
 	{Path: "function/parameter/@type", Types: []string{"functionLibraries"}, Reason: "midPoint 4.9 annotates every function parameter value with its type c:ExpressionParameterType, which is the only type a parameter has; a serialization annotation, never configuration (recorded in testdata/real/function-library.json)"},
