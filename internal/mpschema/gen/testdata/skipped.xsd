@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="urn:skipped" xmlns:tns="urn:skipped" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:a="http://prism.evolveum.com/xml/ns/public/annotation-3">
+  <xsd:complexType name="Skipped"><xsd:sequence><xsd:element name="x" type="xsd:string"/></xsd:sequence></xsd:complexType>
+</xsd:schema>

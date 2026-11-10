@@ -312,6 +312,27 @@ func TestAlignForType(t *testing.T) {
 			wantActual: `{"name":"r","schema":{"definition":` + cachedDefinition + `}}`,
 		},
 		{
+			name:       "resource_unconfigured_cache_invalidation_dropped",
+			restType:   "resources",
+			desired:    `{"name":"r"}`,
+			actual:     `{"name":"r","cacheInvalidationTimestamp":"2026-11-06T13:32:42.040Z"}`,
+			wantActual: `{"name":"r"}`,
+		},
+		{
+			name:       "resource_configured_cache_invalidation_compared",
+			restType:   "resources",
+			desired:    `{"name":"r","cacheInvalidationTimestamp":"2026-02-02T00:00:00.000Z"}`,
+			actual:     `{"name":"r","cacheInvalidationTimestamp":"2026-11-06T13:32:42.040Z"}`,
+			wantActual: `{"name":"r","cacheInvalidationTimestamp":"2026-11-06T13:32:42.040Z"}`,
+		},
+		{
+			name:       "task_cache_invalidation_kept",
+			restType:   "tasks",
+			desired:    `{"name":"t"}`,
+			actual:     `{"name":"t","cacheInvalidationTimestamp":"2026-11-06T13:32:42.040Z"}`,
+			wantActual: `{"name":"t","cacheInvalidationTimestamp":"2026-11-06T13:32:42.040Z"}`,
+		},
+		{
 			name:       "task_schema_definition_kept",
 			restType:   "tasks",
 			desired:    `{"name":"t"}`,
@@ -341,6 +362,31 @@ func TestAlignForType(t *testing.T) {
 				t.Errorf("AlignForType is not idempotent: second pass gave %s", dump(t, a2))
 			}
 		})
+	}
+}
+
+// The stamp midPoint 4.11 leaves on a resource sends no delta, so an apply does
+// not delete it. A configured value is compared and written.
+func TestAlignForType_cacheInvalidationDeltas(t *testing.T) {
+	const stamp = `"cacheInvalidationTimestamp":"2026-11-06T13:32:42.040Z"`
+	actual := mustJSON(t, `{"name":"r",`+stamp+`}`)
+
+	d, a := AlignForType("resources", mustJSON(t, `{"name":"r"}`), actual)
+	deltas, err := Compute(d, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deltas) != 0 {
+		t.Errorf("unconfigured: got deltas %+v, want none", deltas)
+	}
+
+	d, a = AlignForType("resources", mustJSON(t, `{"name":"r","cacheInvalidationTimestamp":"2026-02-02T00:00:00.000Z"}`), actual)
+	deltas, err = Compute(d, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deltas) != 1 || deltas[0].Path != "cacheInvalidationTimestamp" {
+		t.Errorf("configured: got deltas %+v, want one on cacheInvalidationTimestamp", deltas)
 	}
 }
 

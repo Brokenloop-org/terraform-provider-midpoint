@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="urn:caps" xmlns:tns="urn:caps" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:a="http://prism.evolveum.com/xml/ns/public/annotation-3">
+  <xsd:element name="capability" type="tns:CapBase"/>
+  <xsd:complexType name="CapBase"><xsd:sequence/></xsd:complexType>
+  <xsd:complexType name="ScriptCap"><xsd:sequence><xsd:element name="host" type="xsd:string"/></xsd:sequence></xsd:complexType>
+  <xsd:element name="script" type="tns:ScriptCap" substitutionGroup="tns:capability"/>
+  <xsd:complexType name="Capabilities"><xsd:sequence><xsd:element ref="tns:capability"/></xsd:sequence></xsd:complexType>
+</xsd:schema>

@@ -24,7 +24,7 @@ func commonAttributes(spec engineSpec) map[string]schema.Attribute {
 				"the configuration to it as an update instead of failing. The configuration must describe the whole " +
 				"object: items midPoint holds that are not configured (other than server-managed ones) are removed " +
 				"on the first apply. The plan warns that the object will be adopted and lists the changes the " +
-				"update will send. Meant for the midPoint built-ins a catalogue customizes. Without it, creating an " +
+				"update will send. Meant for midPoint's built-in objects. Without it, creating an " +
 				"object whose oid already exists fails and nothing is written. While it is true, destroying the object " +
 				"fails unless force_destroy is set: an adopted object is not Terraform's to delete. Remove it from state " +
 				"with a removed block (lifecycle { destroy = false }) to stop managing it. Importing a midPoint built-in " +

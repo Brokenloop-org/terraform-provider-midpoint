@@ -3,6 +3,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 	"strconv"
@@ -20,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/client"
+	"github.com/Brokenloop-org/terraform-provider-midpoint/internal/mpschema"
 )
 
 // resourceShortNames are the keys accepted in default_options.
@@ -49,6 +51,7 @@ type providerModel struct {
 	DefaultOptions       types.Map    `tfsdk:"default_options"`
 	FailOnUnappliedWrite types.Bool   `tfsdk:"fail_on_unapplied_write"`
 	OnPartialError       types.String `tfsdk:"on_partial_error"`
+	OnInvalidItem        types.String `tfsdk:"on_invalid_item"`
 }
 
 // providerConfig is the provider configuration after environment fallbacks.
@@ -70,6 +73,11 @@ type providerData struct {
 	// PartialWarning makes a partial error on a create or update a warning
 	// instead of an error.
 	PartialWarning bool
+	// SchemaTable holds the items the server's midPoint line accepts; nil
+	// when there is none, which skips the checks.
+	SchemaTable *mpschema.Table
+	// InvalidItemWarning makes an invalid item a warning instead of an error.
+	InvalidItemWarning bool
 }
 
 // New returns a constructor for the midPoint provider.
@@ -138,6 +146,17 @@ func (p *midpointProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 					stringvalidator.OneOf(onPartialErrorError, onPartialErrorWarning),
 				},
 			},
+			"on_invalid_item": schema.StringAttribute{
+				Description: "What to do when the configuration of a resource holds a key or a value that midPoint's " +
+					"schema does not accept, such as a misspelled item name or an enum value that does not exist. It is " +
+					"checked at plan time against the schema of the server's midPoint version (4.9, 4.10 and 4.11 are " +
+					"known). \"error\" (the default) fails the plan; \"warning\" reports it and carries on, for an item " +
+					"your midPoint accepts although its schema does not list it. Other versions are not checked.",
+				Optional: true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(onInvalidItemError, onInvalidItemWarning),
+				},
+			},
 		},
 	}
 }
@@ -183,11 +202,19 @@ func (p *midpointProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
+	var table *mpschema.Table
 	if version, err := c.ServerVersion(ctx); err != nil {
 		resp.Diagnostics.AddWarning("Unable to read midPoint server version",
-			"Reading the server version from "+redactURL(cfg.URL)+" failed; later requests may fail too: "+err.Error())
+			"Reading the server version from "+redactURL(cfg.URL)+" failed; later requests may fail too, and "+
+				"the configuration is not checked against the midPoint schema: "+err.Error())
 	} else {
 		tflog.Info(ctx, "connected to midPoint", map[string]any{"url": redactURL(cfg.URL), "version": version})
+		var ok bool
+		if table, ok = mpschema.For(version); !ok {
+			resp.Diagnostics.AddWarning("midPoint version not covered by the schema checks",
+				fmt.Sprintf("The server runs midPoint %s; the provider knows the schema of 4.9, 4.10 and 4.11. "+
+					"The configuration is not checked for invalid items.", version))
+		}
 	}
 
 	data := &providerData{
@@ -196,6 +223,8 @@ func (p *midpointProvider) Configure(ctx context.Context, req provider.Configure
 		DefaultOptions:       defaults,
 		FailOnUnappliedWrite: model.FailOnUnappliedWrite.ValueBool(),
 		PartialWarning:       model.OnPartialError.ValueString() == onPartialErrorWarning,
+		SchemaTable:          table,
+		InvalidItemWarning:   model.OnInvalidItem.ValueString() == onInvalidItemWarning,
 	}
 	resp.ResourceData = data
 	resp.DataSourceData = data

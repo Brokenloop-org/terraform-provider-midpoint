@@ -69,6 +69,9 @@ type typedResource[S any] struct {
 	// body from: s, the plan, without the computed values that config, the
 	// configuration, does not set (they are never sent); nil means s.
 	bodyModel func(ctx context.Context, s *S, config tfsdk.Config) (*S, diag.Diagnostics)
+	// checks says what the configuration is checked against at plan time;
+	// the zero value checks nothing.
+	checks schemaChecks
 
 	data *providerData
 }
@@ -208,8 +211,12 @@ func setOID(ctx context.Context, state interface {
 // ModifyPlan warns, when creating with adopt_existing, that an existing
 // object will be adopted, listing the changes the adoption will send.
 func (r *typedResource[S]) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	if req.Plan.Raw.IsNull() || !req.State.Raw.IsNull() || r.data == nil {
-		return // destroy, update, or not configured
+	if req.Plan.Raw.IsNull() {
+		return // destroy
+	}
+	checkConfigItems(ctx, r.data, r.checks, req.Config, resp)
+	if !req.State.Raw.IsNull() || r.data == nil {
+		return // update, or not configured
 	}
 	var oid types.String
 	var adopt types.Bool

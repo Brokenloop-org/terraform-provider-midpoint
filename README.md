@@ -13,9 +13,15 @@ and any other type) in HCL through the midPoint REST API.
   the object is never resent whole.
 - Safe by default: no silent overwrite on create, no delete of an object that
   still has members or shadows.
+- Checked at plan: a misspelled key or an impossible value in a free-form
+  attribute fails `terraform plan`, using the schema of your midPoint version.
 
-Tested against midPoint 4.9 (acceptance suite on a dockerized server). The
-nightly CI job also runs it against 4.10. Requires Terraform 1.5 or later.
+Tested against midPoint 4.9, 4.10 and 4.11 (acceptance suite on a dockerized
+server); [`docs/compatibility.md`](docs/compatibility.md) has the results.
+Requires Terraform 1.5 or later.
+
+Upgrading from v0.2.0 or earlier? v0.3.0 has breaking changes: see
+[`docs/upgrading.md`](docs/upgrading.md).
 
 Generated reference documentation is in [`docs/`](docs/index.md); runnable
 examples are in [`examples/`](examples/).
@@ -78,10 +84,12 @@ provider "midpoint" {
 | `default_options` | none | no | Execution options per resource type, keyed by `service`, `role`, `org`, `archetype`, `object_template`, `mark`, `task`, `resource`, `object`. See [Execution options](#execution-options). |
 | `fail_on_unapplied_write` | none | no | `true` fails an update when the object read back differs from the configuration, and a delete when the object still exists. Default `false` (warnings). See [Writes held for approval](#writes-held-for-approval). |
 | `on_partial_error` | none | no | `"error"` (the default) fails the apply when midPoint answers a create or update with HTTP 250; `"warning"` reports it and carries on. See [Partial errors](#partial-errors). |
+| `on_invalid_item` | none | no | `"error"` (the default) fails the plan on a key or value midPoint's schema does not accept; `"warning"` reports it and carries on. See [Invalid items](#invalid-items). |
 
 A value set in the configuration wins over the environment variable. At
-configure time the provider reads the server version for its logs; a failure
-there is a warning, not an error.
+configure time the provider reads the server version, for its logs and to pick the schema
+table of the invalid item checks. A failure there is a warning, not an error,
+and the checks are skipped.
 
 ## Resources and data sources
 
@@ -116,7 +124,7 @@ Both data sources fail when nothing matches or more than one object matches.
 | Rule | Behaviour |
 |---|---|
 | No silent overwrite | Creating an object whose `oid` already exists fails and writes nothing; the error says to import it. |
-| `adopt_existing = true` | The existing object is adopted into state instead, and the configuration is applied to it as an update. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warning lists the changes the update will send. Meant for the midPoint built-ins the catalogue customizes (`00000000-0000-0000-0000-*`). Default `false`. See [Adopting a built-in](#adopting-a-built-in). |
+| `adopt_existing = true` | The existing object is adopted into state instead, and the configuration is applied to it as an update. The configuration must describe the whole object: items midPoint holds that are not configured (other than server-managed ones) are removed on the first apply. The plan warning lists the changes the update will send. Meant for midPoint's built-in objects (`00000000-0000-0000-0000-*`). Default `false`. See [Adopting a built-in](#adopting-a-built-in). |
 | Adopted objects are not destroyed | While a resource has `adopt_existing = true` in state, destroying it (or replacing it) fails and sends nothing: "<type>/<oid> was adopted from midPoint; refusing to delete it". To stop managing it, remove it from state with a `removed { lifecycle { destroy = false } }` block; set `force_destroy = true` to delete it anyway. |
 | `force_destroy = true` | Required to delete a service, role, org or archetype that still has members (objects assigned to it or holding it in `roleMembershipRef`), or a resource that still has shadows. Without it the delete fails and names the first few. `midpoint_object` applies the same check for `roles`, `services`, `orgs`, `archetypes` and `resources`. Marks, tasks and object templates are deleted without a check. It also lifts the refusal to delete an adopted object. Default `false`. |
 | `overwrite` never sent | Only when listed in a resource's `options`. |
@@ -225,6 +233,7 @@ list sends no options.
   | task `binding` | midPoint defaults it to `loose`. |
   | task `assignment` | midPoint assigns a task its activity's archetype on the first run. A hand-added task assignment is not drift unless the task configures assignments. |
   | resource `schema.definition` | midPoint caches the connector schema there on a connection test. Removing `definition` from the configuration leaves the server's schema in place; it is not deleted. |
+  | resource `cacheInvalidationTimestamp` | midPoint 4.11 stamps it on a connection test or an import task, and it can be set by hand. See [`docs/compatibility.md`](docs/compatibility.md#411-differences-found). |
 
 - **Task execution state** (`executionState`, `schedulingState`) is
   server-managed. Suspending or resuming a task in midPoint is not drift, and
@@ -249,6 +258,15 @@ list sends no options.
   construction `resource`, `kind` or `intent`, or `order`) is a different
   value: it is applied as a delete of the old value and an add of the new
   one, so the container id changes.
+
+### Invalid items
+
+At plan time the provider checks free-form attributes against the schema of the
+server's midPoint version. An unknown key or an impossible value fails the plan,
+with its path. `on_invalid_item = "warning"` in the provider block downgrades this
+to a warning. Set it when your midPoint accepts an item the schema does not list.
+[`docs/compatibility.md`](docs/compatibility.md#invalid-item-checks) says what is
+checked and what is not.
 
 ### Partial errors
 
@@ -407,8 +425,11 @@ make env-down
   `MIDPOINT_PASSWORD`; override them to test against another server).
 - `make testacc` does not start a server.
 - Another midPoint version: `MIDPOINT_VERSION=4.10 make env-up` (image
-  `evolveum/midpoint:${MIDPOINT_VERSION}-alpine`, default `4.9`). Run
-  `make env-down` first so the repository is created fresh.
+  `evolveum/midpoint:${MIDPOINT_VERSION}-alpine`, default `4.9`). 4.11 has no
+  `4.11-alpine` tag, so use `MIDPOINT_VERSION=4.11.0`. Run `make env-down` first
+  so the repository is created fresh.
+- `TestAccResource_stateFromV020PlansEmpty` downloads provider 0.2.0 from the
+  Terraform Registry.
 - More on the environment: [`testacc/README.md`](testacc/README.md).
 - Versions tested, with results: [`docs/compatibility.md`](docs/compatibility.md).
 
@@ -420,7 +441,7 @@ make env-down
   `make docs` with a check that `docs/` and `examples/` are unchanged, and
   `make validate-examples`.
 - `acceptance`, on manual dispatch and nightly: `make env-up`, `make testacc`
-  and `make env-down` for `MIDPOINT_VERSION` 4.9 and 4.10. On failure the
+  and `make env-down` for `MIDPOINT_VERSION` 4.9, 4.10 and 4.11.0. On failure the
   `docker compose logs` are uploaded as an artifact.
 
 ## Examples
@@ -433,16 +454,10 @@ make env-down
   [`examples/data-sources`](examples/data-sources): one example per resource
   and data source, rendered into `docs/`.
 
-## Migrating the JSON catalogue
-
-The existing JSON object catalogue is to be migrated once, keeping every OID,
-with the `midpoint-convert` CLI. It emits HCL plus `import` blocks; the import
-must then plan clean. Its design and implementation plan are in
-[`docs/superpowers/plans/2026-10-22-midpoint-convert.md`](docs/superpowers/plans/2026-10-22-midpoint-convert.md)
-(see also the design spec,
-[`docs/superpowers/specs/2026-10-22-midpoint-provider-design.md`](docs/superpowers/specs/2026-10-22-midpoint-provider-design.md),
-§4.6 and §5).
-
 ## License
 
-[Apache License 2.0](LICENSE).
+[European Union Public Licence v. 1.2 (EUPL-1.2)](LICENSE), from v0.3.0 on.
+Releases up to v0.2.0 were released under the Apache License 2.0.
+
+The schema tables are generated from midPoint's XSD files; see
+[`internal/mpschema/tables/NOTICE`](internal/mpschema/tables/NOTICE).

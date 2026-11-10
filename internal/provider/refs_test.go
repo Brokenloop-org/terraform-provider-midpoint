@@ -10,7 +10,7 @@ func TestRefFromJSON_structuredFilter(t *testing.T) {
 		want   string
 		ok     bool
 	}{
-		// The text midpoint-convert writes for this filter.
+		// The text form of this filter.
 		{"equal", structured, `name = "vault / operator"`, true},
 		{"text", map[string]any{"text": `name = "x"`}, `name = "x"`, true},
 		{"unsupported", map[string]any{"substring": map[string]any{"path": "name", "value": []any{"v"}}}, "", false},

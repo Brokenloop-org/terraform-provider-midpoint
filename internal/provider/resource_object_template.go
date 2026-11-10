@@ -200,11 +200,12 @@ func simpleValidator[S any](resourceName string, fields func(*S) simpleFields) f
 
 // simpleResource returns a simple typed resource whose state S maps
 // fields; extra conversion (beyond the fields) is none.
-func simpleResource[S any](name string, spec engineSpec, sch schema.Schema, fields func(*S) simpleFields) *typedResource[S] {
+func simpleResource[S any](name string, spec engineSpec, sch schema.Schema, checks schemaChecks, fields func(*S) simpleFields) *typedResource[S] {
 	return &typedResource[S]{
 		name:   name,
 		spec:   spec,
 		schema: sch,
+		checks: checks,
 		toBody: func(ctx context.Context, s *S, _, _ bool) (map[string]any, diag.Diagnostics) {
 			return simpleToBody(ctx, fields(s))
 		},
@@ -285,5 +286,5 @@ func NewObjectTemplateResource() resource.Resource {
 				"midPoint naming, e.g. { maxIterations = 5 }."),
 			"extra": extraAttribute(),
 		}, nil),
-		(*objectTemplateState).fields)
+		objectTemplateSchemaChecks, (*objectTemplateState).fields)
 }

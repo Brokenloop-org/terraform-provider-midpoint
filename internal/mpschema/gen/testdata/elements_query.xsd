@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="urn:query" xmlns:q="urn:query" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <xsd:complexType name="Clause"><xsd:sequence/></xsd:complexType>
+  <xsd:complexType name="OrgClause"><xsd:sequence/></xsd:complexType>
+  <xsd:element name="clause" type="q:Clause"/>
+  <xsd:element name="org" type="q:OrgClause" substitutionGroup="q:clause"/>
+  <xsd:element name="nested" type="xsd:string"/>
+  <xsd:element name="object"><xsd:complexType><xsd:sequence/></xsd:complexType></xsd:element>
+  <xsd:element name="plain" type="q:Clause"/>
+</xsd:schema>
