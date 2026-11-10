@@ -49,7 +49,7 @@ resource "midpoint_mark" "protected" {
 							return err
 						}
 						want := asJSON(t, map[string]any{
-							"name": "protected", "description": "Objects nobody may touch.",
+							"oid": oid, "name": "protected", "description": "Objects nobody may touch.",
 							"display":       map[string]any{"label": "Protected", "icon": map[string]any{"cssClass": "fa fa-lock"}},
 							"eventMark":     map[string]any{"enabledByDefault": true},
 							"documentation": "mark doc",

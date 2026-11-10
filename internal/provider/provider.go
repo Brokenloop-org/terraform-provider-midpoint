@@ -140,7 +140,9 @@ func (p *midpointProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 					"object is saved, but part of the operation failed, such as provisioning an account to a resource. " +
 					"\"error\" (the default) fails the apply; an object just created is kept in state and marked tainted, " +
 					"so the next apply replaces it. \"warning\" reports it and carries on, leaving midPoint to complete " +
-					"what failed. A partial error on a delete is always an error.",
+					"what failed. A partial error on a delete is always an error. The same applies when midPoint answers a " +
+					"create with a server error (HTTP 5xx, such as 502 for a fatal provisioning error) but saved the " +
+					"object: the provider finds it by the OID it sent.",
 				Optional: true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(onPartialErrorError, onPartialErrorWarning),

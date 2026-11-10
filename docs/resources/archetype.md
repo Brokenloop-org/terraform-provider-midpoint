@@ -53,7 +53,7 @@ resource "midpoint_archetype" "cluster_role" {
 - `identifier` (String) Identifier.
 - `inducement` (Block List) An inducement: what holders of this object get. Values are matched to midPoint by content (target, construction, order), not by position. (see [below for nested schema](#nestedblock--inducement))
 - `lifecycle_state` (String) Lifecycle state (lifecycleState), e.g. active, draft, proposed.
-- `oid` (String) Object OID. When unset midPoint generates one. Changing it replaces the object. Creating an object whose oid already exists fails unless adopt_existing is set.
+- `oid` (String) Object OID. When unset the provider generates a random one at apply time. Changing it replaces the object. Creating an object whose oid already exists fails unless adopt_existing is set.
 - `options` (List of String) midPoint execution options sent on create and update, e.g. raw, isImport, reevaluateSearchFilters. When unset, the provider default_options entry for archetype applies, else the built-in defaults: isImport, raw on create and raw on update. An empty list sends no options. overwrite is sent only when listed here; reevaluateSearchFilters is added to any write that sends a reference with a filter and no oid.
 - `requestable` (Boolean) Whether users can request it.
 - `risk_level` (String) Risk level (riskLevel).

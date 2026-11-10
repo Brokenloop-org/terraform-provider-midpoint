@@ -61,7 +61,7 @@ resource "midpoint_object_template" "user" {
 							return err
 						}
 						want := asJSON(t, map[string]any{
-							"name": "user template", "description": "v1", "lifecycleState": "active",
+							"oid": oid, "name": "user template", "description": "v1", "lifecycleState": "active",
 							"mapping": []any{map[string]any{
 								"name": "full-name", "strength": "weak",
 								"source": []any{map[string]any{"path": "givenName"}, map[string]any{"path": "familyName"}},

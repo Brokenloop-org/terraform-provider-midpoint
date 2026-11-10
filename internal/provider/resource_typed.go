@@ -121,7 +121,7 @@ func identityAttributes() map[string]schema.Attribute {
 			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 		},
 		"oid": schema.StringAttribute{
-			Description: "Object OID. When unset midPoint generates one. Changing it replaces the object. Creating an object " +
+			Description: "Object OID. When unset the provider generates a random one at apply time. Changing it replaces the object. Creating an object " +
 				"whose oid already exists fails unless adopt_existing is set.",
 			Optional: true,
 			Computed: true,

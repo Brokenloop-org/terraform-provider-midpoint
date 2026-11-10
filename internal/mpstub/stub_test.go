@@ -582,6 +582,44 @@ func TestStubSetPartialError(t *testing.T) {
 	}
 }
 
+// TestStubSetFailAfterWrite: a selected write is processed but answers the
+// given status with a fatal_error OperationResult and no Location, as midPoint
+// does when provisioning fails with a fatal criticality.
+func TestStubSetFailAfterWrite(t *testing.T) {
+	s, _ := newStub(t)
+	s.SetFailAfterWrite(func(r Recorded) int {
+		if r.Method == http.MethodPost {
+			return http.StatusBadGateway
+		}
+		return 0
+	})
+	req, err := http.NewRequest(http.MethodPost, s.URL()+restPath+"/roles", strings.NewReader(`{"role":{"oid":"`+roleOID+`","name":"r1"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusBadGateway {
+		t.Errorf("status = %d, want 502", resp.StatusCode)
+	}
+	if loc := resp.Header.Get("Location"); loc != "" {
+		t.Errorf("Location = %q, want none", loc)
+	}
+	if !strings.Contains(string(body), "fatal_error") {
+		t.Errorf("body = %s, want a fatal_error OperationResult", body)
+	}
+	if s.Get("roles", roleOID) == nil {
+		t.Error("the object was not saved")
+	}
+}
+
 // TestStubResolvesFilters: with reevaluateSearchFilters a filter-only
 // reference gets the oid of the object its name filter selects (on create
 // and on modify); without it, or when nothing matches, it keeps no oid.

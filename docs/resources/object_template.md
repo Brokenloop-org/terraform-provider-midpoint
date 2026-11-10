@@ -62,7 +62,7 @@ resource "midpoint_object_template" "user" {
 - `iteration_specification` (Dynamic) Iteration specification (iterationSpecification) in midPoint naming, e.g. { maxIterations = 5 }.
 - `lifecycle_state` (String) Lifecycle state (lifecycleState), e.g. active, draft, proposed.
 - `mapping` (Dynamic) Template mappings (mapping) in midPoint naming: a list of mappings, or one mapping object. Always written, and read back after a change in midPoint, as a list.
-- `oid` (String) Object OID. When unset midPoint generates one. Changing it replaces the object. Creating an object whose oid already exists fails unless adopt_existing is set.
+- `oid` (String) Object OID. When unset the provider generates a random one at apply time. Changing it replaces the object. Creating an object whose oid already exists fails unless adopt_existing is set.
 - `options` (List of String) midPoint execution options sent on create and update, e.g. raw, isImport, reevaluateSearchFilters. When unset, the provider default_options entry for object_template applies, else the built-in defaults: isImport, raw on create and raw on update. An empty list sends no options. overwrite is sent only when listed here; reevaluateSearchFilters is added to any write that sends a reference with a filter and no oid.
 
 ### Read-Only
