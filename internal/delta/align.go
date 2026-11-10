@@ -214,7 +214,8 @@ func alignBareValue(name string, d any, a []any) any {
 // alignSingleValue returns a in the shape of d when one of them is a
 // one-element list holding a scalar and the other is that scalar, and name
 // is not a normalize.MultiValued item (Canonical already makes those lists
-// on both sides).
+// on both sides; where a normalize singleValued rule exempts one, Canonical
+// makes both sides the bare scalar instead).
 func alignSingleValue(name string, d, a any) (any, bool) {
 	if normalize.MultiValued[name] {
 		return nil, false
