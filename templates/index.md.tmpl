@@ -15,6 +15,10 @@ midPoint returns strictly with the configuration, so a change made in the
 midPoint GUI shows as drift, and it writes only the changed items as narrow
 item deltas.
 
+A change to a role, archetype or org does not reach the users who already hold
+it until they are recomputed. See
+[Getting role changes to reach members](guides/role-changes-reaching-members.md).
+
 Safety rules that apply to every resource:
 
 - Creating an object whose `oid` already exists fails unless `adopt_existing = true`.

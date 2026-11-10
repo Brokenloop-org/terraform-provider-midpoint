@@ -109,7 +109,13 @@ handled the server behaviour.
    A repository upgraded from 4.9 keeps its existing system configuration,
    so it keeps recording.
 
-No new server-managed item showed up on 4.10: every
+4. **Tasks record their runs.** A task that has run on 4.10 holds
+   `taskRunRecord`, which the 4.9 schema does not have. It showed as drift in
+   `extra` on the next plan until the normalization rules listed it as server
+   managed. The original runs missed it because they only created suspended
+   tasks; `TestAccMemberRecompute_oneOffTask` runs one.
+
+Apart from `taskRunRecord`, no new server-managed item showed up on 4.10: every
 `emptyPlanAfterRefresh` and import-verify step passed with the 4.9
 normalization rules, including the resource after a connection test (cached
 schema, native capabilities, operational state).
