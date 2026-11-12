@@ -279,6 +279,7 @@ var yamlRoots = map[string]string{
 var yamlUnchecked = []string{
 	"../../examples/resources/midpoint_resource/connector-configuration.yaml",
 	"../../testacc/fixtures/csv-resource/connector-configuration.yaml",
+	"../../testacc/fixtures/ldap-resource/connector-configuration.yaml",
 }
 
 func TestCorpus_yaml(t *testing.T) {

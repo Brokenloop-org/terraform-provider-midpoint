@@ -315,8 +315,10 @@ func validateResource(ctx context.Context, req resource.ValidateConfigRequest, r
 	// Unknown parts convert with an error; only known content is checked.
 	if v, d := dynToGo(ctx, cc); !d.HasError() && hasKey(v, "clearValue") {
 		resp.Diagnostics.AddAttributeWarning(path.Root("connector_configuration"), "Clear-text secret in configuration",
-			"connector_configuration contains a clearValue; it will be stored in Terraform state in plain text. "+
-				"Prefer expression.const references or midPoint secret providers.")
+			"connector_configuration contains a clearValue; it will be stored in Terraform state in plain text, "+
+				"and since midPoint stores it encrypted, every plan sends it again. Give it as an externalData "+
+				"reference to a midPoint secrets provider instead, e.g. { externalData = { provider = \"env\", "+
+				"key = \"...\" } }: only the reference is stored in state.")
 	}
 }
 
@@ -406,14 +408,15 @@ func NewResourceResource() resource.Resource {
 					"carry the connector's namespace as \"@ns\" (e.g. \"@ns\" = \"http://midpoint.evolveum.com/xml/ns/" +
 					"public/connector/icf-1/bundle/com.evolveum.polygon.connector-csv/com.evolveum.polygon." +
 					"connector.csv.CsvConnector\"), or midPoint stores them unqualified and the connector finds none. " +
-					"\"@ns\" is an annotation, never compared: a change to \"@ns\" alone is not detected, and the " +
-					"changes the provider sends are built from the compared form, without \"@ns\". Changes to single " +
-					"properties are not affected, but an update that adds connectorConfiguration or " +
-					"configurationProperties whole (adopting or importing a resource that has none, or restoring them " +
-					"after they were removed in midPoint) writes the properties without their namespace, and the " +
-					"connector then finds no configuration; set them in midPoint first in that case. The value is " +
-					"stored in Terraform state in plain text: a password given as a clearValue is there too (a warning " +
-					"says so); prefer expression const references or midPoint secret providers."),
+					"\"@ns\" is an annotation, never compared: a change to \"@ns\" alone is not detected. Property " +
+					"values are sent with an explicit type, which midPoint converts to the property's own type, and " +
+					"configurationProperties sent whole (adopting or importing a resource that has none, or restoring " +
+					"them after they were removed in midPoint) carry the configured \"@ns\". Give a password or other " +
+					"protected property as a reference to a midPoint secrets provider, e.g. bindPassword = " +
+					"{ externalData = { provider = \"env\", key = \"LDAP_BIND_PASSWORD\" } }: only the reference is " +
+					"stored in Terraform state (see the Connector secrets guide). The value is stored in Terraform " +
+					"state in plain text: a password given as a clearValue is there too, and since midPoint stores it " +
+					"encrypted, every plan sends it again (a warning says so)."),
 				"schema_handling": optionalDynamic("Schema handling (schemaHandling) in midPoint naming: object " +
 					"types with their attributes and mappings, e.g. yamldecode(file(\"schema-handling.yaml\")). A " +
 					"change is applied as narrow item deltas (an added mapping is one add)."),
