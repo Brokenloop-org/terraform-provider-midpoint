@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,8 +24,10 @@ const accTriggerScannerOID = "00000000-0000-0000-0000-000000000007"
 // metarole holding the policy rule, and an object of resourceType assigned to
 // it, written without raw. A role written with the default options (raw)
 // carries the same assignment as a control. With granted set, both induce the
-// granted role.
-func accMemberRecomputeConfig(name, resourceType string, granted bool) string {
+// granted role. With trusted set, the metarole is written without raw and has
+// an archetype that runs it under the "configuration" expression profile, the
+// guide's step for a midPoint that puts roles under the "safe" profile.
+func accMemberRecomputeConfig(name, resourceType string, granted, trusted bool) string {
 	inducement := func(on bool) string {
 		if !on {
 			return ""
@@ -37,12 +40,35 @@ func accMemberRecomputeConfig(name, resourceType string, granted bool) string {
     }
   }`
 	}
-	return fmt.Sprintf(`
+	archetype, metaroleTrust := "", ""
+	if trusted {
+		archetype = `
+resource "midpoint_archetype" "trusted_policy" {
+  name          = "%[1]s-trusted-policy"
+  force_destroy = true
+
+  archetype_policy = {
+    expressionProfile = "configuration"
+  }
+}
+`
+		metaroleTrust = `  options       = []
+
+  assignment {
+    target {
+      oid  = midpoint_archetype.trusted_policy.oid
+      type = "ArchetypeType"
+    }
+  }
+
+`
+	}
+	return fmt.Sprintf(archetype+`
 resource "midpoint_role" "recompute_members" {
   name          = "%[1]s-metarole"
   force_destroy = true
 
-  inducement {
+`+metaroleTrust+`  inducement {
     policy_rule = jsonencode({
       name = "recompute-members-on-inducement-change"
       policyConstraints = {
@@ -97,6 +123,24 @@ resource "midpoint_role" "raw_control" {
 %[3]s
 }
 `, name, resourceType, inducement(granted))
+}
+
+// accTrustedProfileNeeded reports whether the server's system configuration
+// sets an expression profile for RoleType, as a fresh 4.11 repository does
+// ("safe", which denies the recompute action). The guide then has the
+// metarole run under the "configuration" profile.
+func accTrustedProfileNeeded(t *testing.T, c *client.Client) bool {
+	t.Helper()
+	obj, err := c.Get(context.Background(), "systemConfigurations", accSystemConfigurationOID, client.GetOptions{})
+	if err != nil {
+		t.Fatalf("reading the system configuration: %v", err)
+	}
+	for _, p := range asList(obj.Body["defaultObjectPolicyConfiguration"]) {
+		if m, _ := p.(map[string]any); m["expressionProfile"] != nil && strings.HasSuffix(fmt.Sprint(m["type"]), "RoleType") {
+			return true
+		}
+	}
+	return false
 }
 
 // accCreateMember creates a user assigned to holder through a normal (not
@@ -180,6 +224,7 @@ func TestAccMemberRecompute_onInducementChange(t *testing.T) {
 		t.Run(tc.resourceType, func(t *testing.T) {
 			testAccPreCheck(t)
 			c := accClient(t)
+			trusted := accTrustedProfileNeeded(t, c)
 			name := acctest.RandomWithPrefix("tf-acc-recompute")
 			var changedOID, rawOID, grantedOID, member, rawMember string
 			oidOf := func(st *terraform.State, addr string) string {
@@ -191,7 +236,7 @@ func TestAccMemberRecompute_onInducementChange(t *testing.T) {
 				CheckDestroy:             accFocusGone(c),
 				Steps: []resource.TestStep{
 					{
-						Config: accMemberRecomputeConfig(name, tc.resourceType, false),
+						Config: accMemberRecomputeConfig(name, tc.resourceType, false, trusted),
 						Check: func(st *terraform.State) error {
 							changedOID = oidOf(st, tc.resourceType+".changed")
 							rawOID = oidOf(st, "midpoint_role.raw_control")
@@ -205,7 +250,7 @@ func TestAccMemberRecompute_onInducementChange(t *testing.T) {
 							member = accCreateMember(t, c, name+"-member", changedOID, tc.midpointType)
 							rawMember = accCreateMember(t, c, name+"-raw-member", rawOID, "RoleType")
 						},
-						Config: accMemberRecomputeConfig(name, tc.resourceType, true),
+						Config: accMemberRecomputeConfig(name, tc.resourceType, true, trusted),
 						Check: func(*terraform.State) error {
 							if err := accAwaitDelayedRecompute(c, member, grantedOID); err != nil {
 								return err
@@ -235,7 +280,8 @@ func TestAccMemberRecompute_existingRawRole(t *testing.T) {
 	testAccPreCheck(t)
 	c := accClient(t)
 	name := acctest.RandomWithPrefix("tf-acc-recompute-raw")
-	full := func(granted bool) string { return accMemberRecomputeConfig(name, "midpoint_role", granted) }
+	trusted := accTrustedProfileNeeded(t, c)
+	full := func(granted bool) string { return accMemberRecomputeConfig(name, "midpoint_role", granted, trusted) }
 	// The same objects before the move: the changed role is still raw and is
 	// not assigned to the metarole.
 	before := regexp.MustCompile(`(?s)(resource "midpoint_role" "changed" \{.*?)  options       = \[\]\n(.*?)  assignment \{.*?\n  \}\n`).

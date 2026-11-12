@@ -16,7 +16,7 @@ midPoint can do this for you with a policy rule that recomputes the members when
 the inducements change. This guide sets up that rule for the objects you choose,
 and shows a one-off task for bringing existing members up to date.
 
-The setup and the task below were verified on midPoint 4.9 and 4.10 by the
+The setup and the task below were verified on midPoint 4.9, 4.10 and 4.11 by the
 `TestAccMemberRecompute_*` acceptance tests. See midPoint's
 [Linked Objects](https://docs.evolveum.com/midpoint/reference/support-4.10/synchronization/linked-objects/)
 for the mechanism.
@@ -104,6 +104,64 @@ were. It also changes how those writes behave:
 
 A role that was first written raw can move to this setup in place: apply
 `options = []` and the assignment, and later inducement changes run the rule.
+
+## Let the rule run under midPoint 4.11
+
+A midPoint 4.11 repository created from scratch runs the expressions of roles,
+orgs and archetypes under the `safe` expression profile, which denies bulk
+actions such as `recompute`. The rule then fails every apply that changes the
+inducements of an object with it:
+
+```
+midPoint returned HTTP 250: Couldn't execute script: Access to action
+'recompute' denied (applied expression profile 'safe', actions profile
+'prohibitive')
+```
+
+To check your server, look in the system configuration for a
+`defaultObjectPolicyConfiguration` entry with type `RoleType` and an
+`expressionProfile`. A repository upgraded from 4.10 or earlier keeps its
+system configuration and has none, so it needs no change. Neither do 4.9 and
+4.10, which do not define the profile used below; referencing it there makes
+the rule fail with "No expression profile with identifier 'configuration'".
+
+Where it applies, put the metarole under an archetype that runs it with the
+`configuration` profile, which 4.11 defines, and write the metarole without raw
+so that midPoint records the archetype:
+
+```terraform
+resource "midpoint_archetype" "trusted_policy" {
+  name = "trusted-policy"
+
+  archetype_policy = {
+    expressionProfile = "configuration"
+  }
+}
+
+resource "midpoint_role" "recompute_members" {
+  name    = "recompute-members"
+  options = []
+
+  assignment {
+    target {
+      oid  = midpoint_archetype.trusted_policy.oid
+      type = "ArchetypeType"
+    }
+  }
+
+  inducement {
+    policy_rule = jsonencode({
+      # The rule shown above, unchanged.
+    })
+  }
+}
+```
+
+This gives the metarole more power than 4.11 gives roles by default: the
+`configuration` profile allows every bulk action and privilege elevation, for
+all expressions in the metarole. Keep who can change the metarole and the
+archetype as narrow as for the system configuration. See midPoint's
+[expression profiles](https://docs.evolveum.com/midpoint/reference/expressions/expressions/profiles/).
 
 ## What to expect
 
