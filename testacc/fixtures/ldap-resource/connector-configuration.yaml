@@ -1,0 +1,13 @@
+# The bundled LDAP connector, with its bind password given as a reference
+# to a midPoint secrets provider. No LDAP server is needed: the acceptance
+# tests check what midPoint stores and never test the connection.
+configurationProperties:
+  "@ns": http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/com.evolveum.polygon.connector-ldap/com.evolveum.polygon.connector.ldap.LdapConnector
+  host: ldap.invalid
+  port: 389
+  bindDn: cn=admin,dc=example,dc=com
+  baseContext: dc=example,dc=com
+  bindPassword:
+    externalData:
+      provider: env
+      key: MP_TESTACC_LDAP_SECRET
