@@ -16,6 +16,8 @@ is `${MIDPOINT_VERSION}-alpine`. There is no `4.11-alpine` tag, so use
 
 | midPoint | Image tag | Date | Result | Notes |
 |---|---|---|---|---|
+| 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-12 | pass, 41/41 | Connector configuration writes fixed: protected strings, in-place property changes and properties sent whole. See below. |
+| 4.9 | `evolveum/midpoint:4.9-alpine` | 2026-11-12 | pass, 41/41 | Typed connector configuration writes work on 4.9 too. |
 | 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-12 | pass, 39/39 | First run 35/39: the member recompute rule is denied under the `safe` expression profile; the guide and tests gained a step for it. See below. |
 | 4.10 | `evolveum/midpoint:4.10-alpine` | 2026-11-12 | pass, 39/39 | |
 | 4.9 | `evolveum/midpoint:4.9-alpine` | 2026-11-12 | pass, 39/39 | |
@@ -60,6 +62,29 @@ It is now compared only when the configuration sets it:
   this item shows a write-back in the plan after each connection test, because the
   test stamps a new time, and applying that plan writes the configured time back.
 
+### Fixed: connector configuration writes failed
+
+midPoint 4.11 rejected the connector configuration the provider sent. The
+configuration properties are defined by the connector, not by midPoint's own
+schema, and the provider sent them as untyped JSON:
+
+- A protected string such as `bindPassword = { externalData = { ... } }`
+  inherited the connector namespace from `configurationProperties`, so a create
+  failed with "Cannot marshall property value PPV(null)". With `@type` alone,
+  midPoint answered 201 and dropped the value.
+- A change to any configuration property, with or without a secret in the
+  resource, failed with "An attempt to modify an immutable: XNode".
+- `configurationProperties` sent whole (adopting or importing a resource that
+  has none) were stored without the connector namespace.
+
+The provider now sends protected strings in the prism types namespace, sends
+each configuration property value with an explicit type (midPoint converts it to
+the property's own type), and puts the configured `@ns` on a
+`configurationProperties` value sent whole. No `raw` option is involved.
+`TestAccResource_connectorSecret` and
+`TestAccResource_adoptWithoutConnectorConfiguration` cover it with the bundled
+LDAP connector; both failed on 4.11.0 before the change. See
+[Connector secrets](guides/connector-secrets.md).
 ### Guide step added: roles run under the `safe` expression profile
 
 A fresh 4.11 repository's system configuration has

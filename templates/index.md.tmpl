@@ -19,6 +19,9 @@ A change to a role, archetype or org does not reach the users who already hold
 it until they are recomputed. See
 [Getting role changes to reach members](guides/role-changes-reaching-members.md).
 
+To keep a connector password out of Terraform state, give it as a reference to
+a midPoint secrets provider. See [Connector secrets](guides/connector-secrets.md).
+
 Safety rules that apply to every resource:
 
 - Creating an object whose `oid` already exists fails unless `adopt_existing = true`.

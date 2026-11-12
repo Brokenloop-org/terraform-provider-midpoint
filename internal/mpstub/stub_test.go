@@ -747,3 +747,38 @@ func TestStubPatch_rejectsPathWithoutContainerID(t *testing.T) {
 		})
 	}
 }
+
+// TestStub_unwrapsTypedValues: midPoint reads a value written with an
+// explicit type ({"@type": ..., "@value": v}) back as v, and a protected
+// string written with "@type" back without it.
+func TestStub_unwrapsTypedValues(t *testing.T) {
+	s, c := newStub(t)
+	ctx := context.Background()
+	oid, err := c.Create(ctx, client.Object{Type: "resources", Body: map[string]any{
+		"name": "r",
+		"connectorConfiguration": map[string]any{"configurationProperties": map[string]any{
+			"host": map[string]any{"@type": "xsd:string", "@value": "h1"},
+		}},
+	}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.Modify(ctx, "resources", oid, []client.ItemDelta{
+		{ModificationType: "replace", Path: "connectorConfiguration/configurationProperties/port",
+			Value: map[string]any{"@type": "xsd:string", "@value": "636"}},
+		{ModificationType: "add", Path: "connectorConfiguration/configurationProperties/baseContext",
+			Value: []any{map[string]any{"@type": "xsd:string", "@value": "dc=a"}}},
+		{ModificationType: "replace", Path: "connectorConfiguration/configurationProperties/bindPassword",
+			Value: map[string]any{"@ns": "urn:t", "@type": "t:ProtectedStringType", "externalData": map[string]any{"provider": "env", "key": "K"}}},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := s.Get("resources", oid)["connectorConfiguration"]
+	assertJSONEqual(t, got, map[string]any{"configurationProperties": map[string]any{
+		"host":         "h1",
+		"port":         "636",
+		"baseContext":  []any{"dc=a"},
+		"bindPassword": map[string]any{"@ns": "urn:t", "externalData": map[string]any{"provider": "env", "key": "K"}},
+	}})
+}

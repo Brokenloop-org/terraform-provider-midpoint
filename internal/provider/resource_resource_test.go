@@ -777,6 +777,10 @@ func TestResource_clearValueInConnectorConfigurationWarns(t *testing.T) {
 	if diags.HasError() || !warned(diags) {
 		t.Errorf("clearValue: diagnostics %v, want the clear-text warning only", diags)
 	}
+	diags = validateResourceConfig(t, props(map[string]any{"externalData": map[string]any{"provider": "env", "key": "K"}}))
+	if diags.HasError() || warned(diags) {
+		t.Errorf("externalData: diagnostics %v, want none", diags)
+	}
 	diags = validateResourceConfig(t, props(map[string]any{"expression": map[string]any{"const": "ldapBindPassword"}}))
 	if diags.HasError() || warned(diags) {
 		t.Errorf("expression.const: diagnostics %v, want none", diags)
