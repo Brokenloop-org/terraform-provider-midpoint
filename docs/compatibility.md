@@ -16,6 +16,9 @@ is `${MIDPOINT_VERSION}-alpine`. There is no `4.11-alpine` tag, so use
 
 | midPoint | Image tag | Date | Result | Notes |
 |---|---|---|---|---|
+| 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-12 | pass, 41/41 | v0.3.0 release check, main at `c80d926`. |
+| 4.10 | `evolveum/midpoint:4.10-alpine` | 2026-11-12 | pass, 41/41 | v0.3.0 release check, main at `c80d926`. |
+| 4.9 | `evolveum/midpoint:4.9-alpine` | 2026-11-12 | pass, 41/41 | v0.3.0 release check, main at `c80d926`. |
 | 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-12 | pass, 41/41 | Connector configuration writes fixed: protected strings, in-place property changes and properties sent whole. See below. |
 | 4.9 | `evolveum/midpoint:4.9-alpine` | 2026-11-12 | pass, 41/41 | Typed connector configuration writes work on 4.9 too. |
 | 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-12 | pass, 39/39 | First run 35/39: the member recompute rule is denied under the `safe` expression profile; the guide and tests gained a step for it. See below. |
