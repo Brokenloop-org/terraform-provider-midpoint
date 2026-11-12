@@ -26,6 +26,8 @@ var resourceSpec = engineSpec{
 	UpdateOptions: []string{"reevaluateSearchFilters"},
 	ReadOptions:   []string{"noFetch"},
 	MembersCheck:  shadowsCheck,
+	PrepareCreate: connectorCreateBody,
+	PrepareDeltas: connectorDeltas,
 }
 
 // xmlSchemaNamespace is the "@ns" of a resource schema definition; midPoint

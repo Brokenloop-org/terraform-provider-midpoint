@@ -224,3 +224,41 @@ func deleteValues(name string, existing, value any) []any {
 	}
 	return out
 }
+
+// protectedStringKeys mark a protected string value.
+var protectedStringKeys = []string{"clearValue", "encryptedData", "hashedData", "externalData"}
+
+// untyped returns v as midPoint reads it back after a write: a value sent with
+// an explicit type ({"@type": t, "@value": x}) is x, and a protected string
+// loses its "@type". midPoint converts a typed value to the item's own type;
+// the stub has no connector schema and keeps x as sent.
+func untyped(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		if _, ok := t["@value"]; ok && len(t) == 2 && t["@type"] != nil {
+			return t["@value"]
+		}
+		protected := false
+		for _, k := range protectedStringKeys {
+			if _, ok := t[k]; ok {
+				protected = true
+			}
+		}
+		out := make(map[string]any, len(t))
+		for k, e := range t {
+			if protected && k == "@type" {
+				continue
+			}
+			out[k] = untyped(e)
+		}
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, e := range t {
+			out[i] = untyped(e)
+		}
+		return out
+	default:
+		return v
+	}
+}

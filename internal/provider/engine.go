@@ -32,6 +32,13 @@ type engineSpec struct {
 	// any, unless forced. nil means no check. Use roleMembersCheck or
 	// shadowsCheck.
 	MembersCheck func(oid string) (restType, axiomFilter string)
+	// PrepareCreate, when set, returns the body to send for a create in
+	// place of the desired body; PrepareDeltas returns the deltas to send in
+	// place of those computed against desired (the raw desired body). They
+	// change only what goes over the wire: comparison and state use the
+	// desired body.
+	PrepareCreate func(body map[string]any) map[string]any
+	PrepareDeltas func(desired map[string]any, deltas []client.ItemDelta) []client.ItemDelta
 }
 
 // objectState is what a resource hands the engine to create an object.
@@ -159,6 +166,9 @@ func (e *engine) create(ctx context.Context, st objectState) (oid string, adopte
 	options := effectiveOptions(e.defaults, e.spec.ShortName, st.Options, e.spec.CreateOptions)
 	if hasFilterOnlyReference(body) {
 		options = withOption(options, optionReevaluateSearchFilters)
+	}
+	if e.spec.PrepareCreate != nil {
+		body = e.spec.PrepareCreate(body)
 	}
 	tflog.Debug(ctx, "creating midPoint object", map[string]any{"type": e.spec.RestType, "oid": oid, "options": options})
 	created, err := e.c.Create(ctx, client.Object{Type: e.spec.RestType, Body: body}, options)
@@ -300,6 +310,9 @@ func (e *engine) update(ctx context.Context, oid string, desired map[string]any,
 	opts := effectiveOptions(e.defaults, e.spec.ShortName, options, e.spec.UpdateOptions)
 	if delta.NeedsFilterReevaluation(deltas) {
 		opts = withOption(opts, optionReevaluateSearchFilters)
+	}
+	if e.spec.PrepareDeltas != nil {
+		deltas = e.spec.PrepareDeltas(desired, deltas)
 	}
 	paths := make([]string, len(deltas))
 	for i, d := range deltas {

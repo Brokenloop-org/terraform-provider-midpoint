@@ -346,7 +346,7 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request, typ string, body
 	}
 	var obj map[string]any
 	for _, v := range body {
-		obj, _ = v.(map[string]any)
+		obj, _ = untyped(v).(map[string]any)
 	}
 	if obj == nil {
 		writeError(w, http.StatusBadRequest, "expected one wrapped object")
@@ -388,7 +388,7 @@ func (s *Server) modify(w http.ResponseWriter, typ, oid string, body map[string]
 		dm, _ := d.(map[string]any)
 		mt, _ := dm["modificationType"].(string)
 		path, _ := dm["path"].(string)
-		if err := applyDelta(updated, mt, path, dm["value"]); err != nil {
+		if err := applyDelta(updated, mt, path, untyped(dm["value"])); err != nil {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("cannot apply %s of %s: %v", mt, path, err))
 			return
 		}

@@ -37,6 +37,8 @@ var testResourceSpec = engineSpec{
 	UpdateOptions: []string{"reevaluateSearchFilters"},
 	ReadOptions:   []string{"noFetch"},
 	MembersCheck:  shadowsCheck,
+	PrepareCreate: connectorCreateBody,
+	PrepareDeltas: connectorDeltas,
 }
 
 func testEngine(t *testing.T, spec engineSpec, defaults map[string][]string) (*engine, *mpstub.Server) {
@@ -771,5 +773,83 @@ func TestEngine_structuredServerFilter(t *testing.T) {
 	}}}
 	if got := asJSON(t, patches[0].Body); !reflect.DeepEqual(got, asJSON(t, want)) {
 		t.Fatalf("PATCH body = %v\nwant %v", got, want)
+	}
+}
+
+// ldapResource is a resource holding connector configuration properties.
+func ldapResource(props map[string]any) map[string]any {
+	p := map[string]any{"@ns": "urn:c"}
+	for k, v := range props {
+		p[k] = v
+	}
+	return map[string]any{"name": "ldap", "connectorConfiguration": map[string]any{"configurationProperties": p}}
+}
+
+func TestEngineUpdate_resourceTypesConnectorProperties(t *testing.T) {
+	e, s := testEngine(t, testResourceSpec, nil)
+	seeded := ldapResource(map[string]any{"host": "h"})
+	seeded["oid"] = engResourceOID
+	s.Put("resources", seeded)
+	secret := map[string]any{"externalData": map[string]any{"provider": "env", "key": "K"}}
+	desired := ldapResource(map[string]any{"host": "h2", "bindPassword": secret})
+
+	noErrors(t, e.update(context.Background(), engResourceOID, desired, nil))
+	patches := requests(s, http.MethodPatch)
+	if len(patches) != 1 {
+		t.Fatalf("sent %d PATCHes, want 1", len(patches))
+	}
+	want := map[string]any{"objectModification": map[string]any{"itemDelta": []any{
+		map[string]any{"modificationType": "replace", "path": "connectorConfiguration/configurationProperties/host",
+			"value": map[string]any{"@type": "xsd:string", "@value": "h2"}},
+		map[string]any{"modificationType": "add", "path": "connectorConfiguration/configurationProperties/bindPassword",
+			"value": map[string]any{"@ns": prismTypesNS, "@type": "t:ProtectedStringType",
+				"externalData": map[string]any{"provider": "env", "key": "K"}}},
+	}}}
+	if got := asJSON(t, patches[0].Body); !reflect.DeepEqual(got, asJSON(t, want)) {
+		t.Fatalf("PATCH body = %s\nwant %s", mustJSON(t, got), mustJSON(t, want))
+	}
+	// What midPoint stored compares equal: nothing more to send.
+	noErrors(t, e.update(context.Background(), engResourceOID, desired, nil))
+	if n := len(requests(s, http.MethodPatch)); n != 1 {
+		t.Fatalf("second update sent a PATCH (%d total)", n)
+	}
+}
+
+func TestEngineCreate_resourceQualifiesProtectedStrings(t *testing.T) {
+	e, s := testEngine(t, testResourceSpec, nil)
+	desired := ldapResource(map[string]any{"host": "h",
+		"bindPassword": map[string]any{"externalData": map[string]any{"provider": "env", "key": "K"}}})
+	_, _, diags := e.create(context.Background(), objectState{Body: desired})
+	noErrors(t, diags)
+	posts := requests(s, http.MethodPost)
+	if len(posts) != 1 {
+		t.Fatalf("sent %d POSTs, want 1", len(posts))
+	}
+	body, _ := asJSON(t, posts[0].Body).(map[string]any)
+	cp := body["resource"].(map[string]any)["connectorConfiguration"].(map[string]any)["configurationProperties"].(map[string]any)
+	if got := cp["bindPassword"].(map[string]any)["@ns"]; got != prismTypesNS {
+		t.Errorf("bindPassword @ns = %v, want %s", got, prismTypesNS)
+	}
+	if cp["host"] != "h" {
+		t.Errorf("host = %v, want it sent as given", cp["host"])
+	}
+	if _, ok := desired["connectorConfiguration"].(map[string]any)["configurationProperties"].(map[string]any)["bindPassword"].(map[string]any)["@ns"]; ok {
+		t.Error("the desired body was changed")
+	}
+}
+
+func TestEngineUpdate_rolesUnchanged(t *testing.T) {
+	e, s := testEngine(t, testRoleSpec, nil)
+	s.Put("roles", seededRole())
+	desired := desiredRole()
+	desired["description"] = "new"
+	noErrors(t, e.update(context.Background(), engRoleOID, desired, nil))
+	patches := requests(s, http.MethodPatch)
+	if len(patches) != 1 {
+		t.Fatalf("sent %d PATCHes, want 1", len(patches))
+	}
+	deltas := asJSON(t, patches[0].Body).(map[string]any)["objectModification"].(map[string]any)["itemDelta"].([]any)
+	if got := deltas[0].(map[string]any)["value"]; got != "new" {
+		t.Errorf("value = %v, want the bare string", got)
 	}
 }
