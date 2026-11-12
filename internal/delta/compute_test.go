@@ -220,3 +220,34 @@ func TestNeedsFilterReevaluation(t *testing.T) {
 		})
 	}
 }
+
+// An edit of a limit whose characterClass holds an inline value replaces
+// limitations with that value as a string: midPoint 4.9 answers HTTP 500 to a
+// one-element list there.
+func TestCompute_characterClassValueSentAsString(t *testing.T) {
+	limit := func(minOccurs int, value any) map[string]any {
+		return map[string]any{"stringPolicy": map[string]any{"limitations": map[string]any{"limit": map[string]any{
+			"minOccurs":      minOccurs,
+			"characterClass": map[string]any{"value": value},
+		}}}}
+	}
+	for _, configured := range []any{"abc", []any{"abc"}} {
+		desired := normalize.Canonical("valuePolicies", limit(2, configured))
+		actual := normalize.Canonical("valuePolicies", limit(1, "abc"))
+		got, err := Compute(desired, actual)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := []client.ItemDelta{{ModificationType: "replace", Path: "stringPolicy/limitations", Value: map[string]any{"limit": map[string]any{
+			"minOccurs":      2,
+			"characterClass": map[string]any{"value": "abc"},
+		}}}}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("configured %v: Compute = %#v, want %#v", configured, got, want)
+		}
+		same := normalize.Canonical("valuePolicies", limit(1, configured))
+		if got, err := Compute(same, actual); err != nil || len(got) != 0 {
+			t.Errorf("configured %v unchanged: Compute = %v, %v, want no delta", configured, got, err)
+		}
+	}
+}

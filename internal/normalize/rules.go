@@ -130,7 +130,9 @@ var configurationOverrides = []Rule{
 // shape of one value and of several values compare alike. Names are global,
 // so an item that is multi-valued under one parent only (policyRule, of a mark
 // but not of an assignment) does not belong here: package delta addresses its
-// values by the "@id" midPoint returns.
+// values by the "@id" midPoint returns. An item that is multi-valued nearly
+// everywhere but single-valued under one parent (characterClass/value) is
+// listed here with a singleValued rule for that path.
 var MultiValued = map[string]bool{
 	"assignment":                 true, // AssignmentHolderType.assignment (AssignmentType)
 	"inducement":                 true, // AbstractRoleType.inducement (AssignmentType)
@@ -165,6 +167,30 @@ var MultiValued = map[string]bool{
 	"panel":                      true, // GuiObjectDetailsPageType.panel (ContainerPanelConfigurationType); archetype-application fixture
 	"supportedTypes":             true, // ObjectTypeSearchItemConfigurationType.supportedTypes (QName); archetype-application fixture
 	"function":                   true, // FunctionLibraryType.function (ExpressionType), unbounded; 4.9 returns a single function as an object
+}
+
+// singleValued are items whose local name MultiValued lists but that hold a
+// single value below the given path. Canonical neither wraps them nor keeps a
+// configured one-element list of a scalar: the bare value is what midPoint
+// returns, and the only shape it accepts in a delta.
+var singleValued = []Rule{
+	{Path: "**/characterClass/value", Reason: "CharacterClassType.value (and CharacterClassOrRefType.value) is a single string; midPoint 4.9 answers HTTP 500 (argument type mismatch on CharacterClassType.setValue) to a one-element list in the replace of stringPolicy/limitations; \"value\" is in MultiValued for the literal expression evaluator"},
+}
+
+// isMultiValued reports whether the item at path holds a list in canonical
+// form: its local name is in MultiValued and no singleValued rule matches it.
+func isMultiValued(restType string, path []string) bool {
+	return len(path) > 0 && MultiValued[path[len(path)-1]] && !isSingleValued(restType, path)
+}
+
+// isSingleValued reports whether a singleValued rule matches the item at path.
+func isSingleValued(restType string, path []string) bool {
+	for _, r := range singleValued {
+		if r.matches(restType, path) {
+			return true
+		}
+	}
+	return false
 }
 
 // IsServerManaged reports whether the item at path (local names only, no

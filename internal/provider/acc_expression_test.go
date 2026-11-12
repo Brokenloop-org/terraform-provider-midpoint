@@ -188,10 +188,14 @@ func TestAccObject_valuePolicyLimitEdit(t *testing.T) {
 	testAccPreCheck(t)
 	c := accClient(t)
 	name := acctest.RandomWithPrefix("tf-acc-vp")
+	// characterClass/value is a single string: midPoint 4.9 answers HTTP 500
+	// to the replace of limitations when it carries a one-element list.
 	limit := func(minOccurs int) string {
 		return fmt.Sprintf(`
           description: digits
-          minOccurs: %d`, minOccurs)
+          minOccurs: %d
+          characterClass:
+            value: "0123456789"`, minOccurs)
 	}
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },

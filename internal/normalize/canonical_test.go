@@ -243,7 +243,7 @@ func TestIsServerManaged(t *testing.T) {
 }
 
 func TestServerManaged_everyRuleHasReason(t *testing.T) {
-	for _, r := range append(slices.Clone(ServerManaged), configurationOverrides...) {
+	for _, r := range slices.Concat(ServerManaged, configurationOverrides, singleValued) {
 		if strings.TrimSpace(r.Reason) == "" {
 			t.Errorf("rule %q has no Reason", r.Path)
 		}
@@ -302,5 +302,36 @@ func TestCanonical_resourceCorrelatorsAndActionsAreLists(t *testing.T) {
 	}}}}
 	if got := Canonical("resources", body); !reflect.DeepEqual(got, want) {
 		t.Errorf("Canonical = %v, want %v", got, want)
+	}
+}
+
+// CharacterClassType.value is a single string, though "value" is multi-valued
+// as the literal expression evaluator: midPoint 4.9 answers HTTP 500 to a
+// one-element list there. Canonical keeps it bare, unwraps a configured
+// one-element list, and still wraps a literal evaluator value.
+func TestCanonical_characterClassValueIsSingleValued(t *testing.T) {
+	limit := func(value any) map[string]any {
+		return map[string]any{"stringPolicy": map[string]any{"limitations": map[string]any{"limit": map[string]any{
+			"minOccurs": 1,
+			"characterClass": map[string]any{
+				"value":          value,
+				"characterClass": map[string]any{"value": value},
+			},
+		}}}}
+	}
+	want := limit("abc")
+	for _, in := range []any{"abc", []any{"abc"}} {
+		if got := Canonical("valuePolicies", limit(in)); !reflect.DeepEqual(got, want) {
+			t.Errorf("Canonical(value %v) = %v, want %v", in, got, want)
+		}
+	}
+	two := []any{"a", "b"}
+	if got := Canonical("valuePolicies", limit(two)); !reflect.DeepEqual(got, limit(two)) {
+		t.Errorf("Canonical(value %v) = %v, want it kept as written", two, got)
+	}
+	literal := map[string]any{"expression": map[string]any{"value": "x"}}
+	wantLiteral := map[string]any{"expression": map[string]any{"value": []any{"x"}}}
+	if got := Canonical("roles", literal); !reflect.DeepEqual(got, wantLiteral) {
+		t.Errorf("Canonical(literal) = %v, want %v", got, wantLiteral)
 	}
 }

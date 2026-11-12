@@ -41,8 +41,9 @@ const defaultRelation = "org:default"
 // from reference type values and @type values), drops items matching
 // ServerManaged (root @ns/@type, metadata, computed state), folds polystrings
 // to their orig string, wraps single values of MultiValued items into
-// one-element lists, drops the "#" or "c:" prefix of type QName string
-// values ("#UserType" is "UserType"), gives references without a relation
+// one-element lists (where a singleValued rule matches, it unwraps a
+// one-element list of a scalar instead), drops the "#" or "c:" prefix of type
+// QName string values ("#UserType" is "UserType"), gives references without a relation
 // "org:default" and an unqualified relation the org: prefix,
 // prunes maps that only became empty through stripping and every empty list,
 // and keeps container "@id"s. midPoint stores an explicit empty list it was
@@ -86,9 +87,13 @@ func canonicalMap(restType string, path []string, in map[string]any) (map[string
 		if isReference(name) {
 			cv = canonicalReference(cv)
 		}
-		if MultiValued[name] {
+		if isMultiValued(restType, itemPath) {
 			if _, isList := cv.([]any); !isList {
 				cv = []any{cv}
+			}
+		} else if l, isList := cv.([]any); isList && len(l) == 1 && isSingleValued(restType, itemPath) {
+			if _, isMap := l[0].(map[string]any); !isMap {
+				cv = l[0]
 			}
 		}
 		out[name] = cv
