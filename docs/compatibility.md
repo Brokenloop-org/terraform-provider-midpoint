@@ -16,6 +16,9 @@ is `${MIDPOINT_VERSION}-alpine`. There is no `4.11-alpine` tag, so use
 
 | midPoint | Image tag | Date | Result | Notes |
 |---|---|---|---|---|
+| 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-12 | pass, 39/39 | First run 35/39: the member recompute rule is denied under the `safe` expression profile; the guide and tests gained a step for it. See below. |
+| 4.10 | `evolveum/midpoint:4.10-alpine` | 2026-11-12 | pass, 39/39 | |
+| 4.9 | `evolveum/midpoint:4.9-alpine` | 2026-11-12 | pass, 39/39 | |
 | 4.11.0 | `evolveum/midpoint:4.11.0-alpine` | 2026-11-06 | pass, 32/32 | First run 27/32: two existing tests assumed older versions and were adjusted, the new mistyped-key test recorded a difference, and `cacheInvalidationTimestamp` needed a provider change. See below. |
 | 4.10.5 | `evolveum/midpoint:4.10.5-alpine` | 2026-11-06 | pass, 32/32 | |
 | 4.10 | `evolveum/midpoint:4.10-alpine` | 2026-11-06 | pass, 32/32 | |
@@ -56,6 +59,25 @@ It is now compared only when the configuration sets it:
 - A configured value is compared and written. On 4.11, a resource that configures
   this item shows a write-back in the plan after each connection test, because the
   test stamps a new time, and applying that plan writes the configured time back.
+
+### Guide step added: roles run under the `safe` expression profile
+
+A fresh 4.11 repository's system configuration has
+`defaultObjectPolicyConfiguration` entries that run the expressions of roles,
+orgs, archetypes, services and several other types under the `safe` expression
+profile. Its bulk actions profile, `prohibitive`, denies `recompute`, so the
+policy rule of the
+[member recompute guide](guides/role-changes-reaching-members.md) failed every
+apply that changed an inducement, with HTTP 250 "Access to action 'recompute'
+denied (applied expression profile 'safe', actions profile 'prohibitive')".
+The provider reported this correctly.
+
+The guide now puts the metarole under an archetype whose `archetypePolicy` sets
+`expressionProfile = "configuration"`, a profile 4.11 defines, and writes the
+metarole without raw. The `TestAccMemberRecompute_*` tests take this step when
+the system configuration sets an expression profile for `RoleType`. 4.9 and 4.10
+define neither `configuration` nor a built-in alternative such as `##full`, and
+referencing one there fails the rule, so the step is only for 4.11.
 
 ### Test assumptions, adjusted
 
