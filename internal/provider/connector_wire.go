@@ -163,8 +163,8 @@ func typedProperties(v any, ns string) any {
 
 // typedValue is v as sent for a configuration property: scalars wrapped with
 // an explicit type (numbers as their text, which midPoint converts to the
-// property's type), protected strings qualified and typed, values that carry
-// "@type" unchanged, and lists and other maps typed element by element.
+// property's type), protected strings qualified and typed, other values that
+// carry "@type" unchanged, and lists and other maps typed element by element.
 func typedValue(v any) any {
 	switch t := v.(type) {
 	case nil:
@@ -184,19 +184,23 @@ func typedValue(v any) any {
 		}
 		return out
 	case map[string]any:
-		if _, ok := t["@type"]; ok {
-			return t
-		}
 		out := make(map[string]any, len(t)+2)
 		if isProtectedValue(t) {
+			// Typed or not, a protected string without the types namespace
+			// is stored without its value.
 			for k, e := range t {
 				out[k] = e
 			}
 			if _, ok := t["@ns"]; !ok {
 				out["@ns"] = prismTypesNS
 			}
-			out["@type"] = "t:ProtectedStringType"
+			if _, ok := t["@type"]; !ok {
+				out["@type"] = "t:ProtectedStringType"
+			}
 			return out
+		}
+		if _, ok := t["@type"]; ok {
+			return t
 		}
 		for k, e := range t {
 			if strings.HasPrefix(k, "@") {

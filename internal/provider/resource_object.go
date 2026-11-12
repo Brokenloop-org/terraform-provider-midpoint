@@ -121,6 +121,8 @@ func objectSpec(typ string) engineSpec {
 	case "resources":
 		spec.MembersCheck = shadowsCheck
 		spec.ReadOptions = []string{"noFetch"}
+		spec.PrepareCreate = connectorCreateBody
+		spec.PrepareDeltas = connectorDeltas
 	}
 	return spec
 }

@@ -82,6 +82,8 @@ func TestConnectorDeltas(t *testing.T) {
 		{"list", withNS, "replace", cp + "/baseContext", `["a","b"]`, `[` + str("a") + `,` + str("b") + `]`},
 		{"secret", withNS, "replace", cp + "/bindPassword", `{"externalData":{"provider":"env","key":"K"}}`, secret},
 		{"secret in a list", withNS, "add", cp + "/bindPassword", `[{"externalData":{"provider":"env","key":"K"}}]`, `[` + secret + `]`},
+		{"typed secret without a namespace", withNS, "replace", cp + "/bindPassword",
+			`{"@type":"t:ProtectedStringType","externalData":{"provider":"env","key":"K"}}`, secret},
 		{"already typed", withNS, "replace", cp + "/host", `{"@type":"xsd:int","@value":1}`, `{"@type":"xsd:int","@value":1}`},
 		{"no value", withNS, "replace", cp + "/host", `null`, `null`},
 		{"delete", withNS, "delete", cp + "/baseContext", `["a"]`, `[` + str("a") + `]`},

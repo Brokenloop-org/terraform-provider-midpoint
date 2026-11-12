@@ -853,3 +853,22 @@ func TestEngineUpdate_rolesUnchanged(t *testing.T) {
 		t.Errorf("value = %v, want the bare string", got)
 	}
 }
+
+// TestEngineUpdate_objectResourceTypesConnectorProperties: a resource
+// managed through midpoint_object gets the same typed connector writes.
+func TestEngineUpdate_objectResourceTypesConnectorProperties(t *testing.T) {
+	e, s := testEngine(t, objectSpec("resources"), nil)
+	seeded := ldapResource(map[string]any{"host": "h"})
+	seeded["oid"] = engResourceOID
+	s.Put("resources", seeded)
+	noErrors(t, e.update(context.Background(), engResourceOID, ldapResource(map[string]any{"host": "h2"}), nil))
+	patches := requests(s, http.MethodPatch)
+	if len(patches) != 1 {
+		t.Fatalf("sent %d PATCHes, want 1", len(patches))
+	}
+	deltas := asJSON(t, patches[0].Body).(map[string]any)["objectModification"].(map[string]any)["itemDelta"].([]any)
+	want := asJSON(t, map[string]any{"@type": "xsd:string", "@value": "h2"})
+	if got := deltas[0].(map[string]any)["value"]; !reflect.DeepEqual(got, want) {
+		t.Errorf("host value = %v, want %v", got, want)
+	}
+}
